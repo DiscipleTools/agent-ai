@@ -32,6 +32,28 @@ npm run setup
 ```
 Runs the initial database setup (if available).
 
+### 4. Fix Agent Permissions (Migration)
+```bash
+npm run fix-agent-permissions
+```
+**Purpose**: Fixes agent permissions for existing agents created before the permission system was implemented.
+
+**What it does:**
+- Finds all agents in the database
+- Grants creators access to their own agents (if they don't already have it)
+- Skips admin users (they have access to all agents)
+- Safe to run multiple times
+
+**When to use:**
+- After upgrading to a version with the agent permission fix
+- If users report that agents they created are not showing in their list
+- As a one-time migration after implementing the permission system
+
+**Output:**
+- Shows progress for each agent processed
+- Reports how many permissions were updated
+- Safe to run - won't duplicate permissions
+
 ## User Roles
 
 ### Admin Users
@@ -45,6 +67,20 @@ Runs the initial database setup (if available).
 - Cannot manage other users
 - Cannot access admin-only features
 - Must be invited by an admin user
+
+## Agent Permissions
+
+### How It Works
+- When a user creates an agent, they're automatically granted access to it
+- Admin users have access to all agents regardless of the `agentAccess` array
+- Regular users only see agents listed in their `agentAccess` array
+- The permission system was added to ensure users can manage their own agents
+
+### Troubleshooting
+If a user can't see an agent they created:
+1. Check if the agent was created before the permission fix
+2. Run the `fix-agent-permissions` migration script
+3. Verify the user's `agentAccess` array includes the agent ID
 
 ## Notes
 

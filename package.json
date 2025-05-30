@@ -10,7 +10,8 @@
     "postinstall": "nuxt prepare",
     "create-admin": "node scripts/createAdmin.js",
     "create-user": "node scripts/create-user.cjs",
-    "setup": "node scripts/setup.js"
+    "setup": "node scripts/setup.js",
+    "fix-agent-permissions": "node scripts/fix-agent-permissions.js"
   },
   "dependencies": {
     "@headlessui/vue": "^1.7.23",

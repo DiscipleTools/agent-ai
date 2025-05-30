@@ -84,7 +84,6 @@ const agentSchema = new mongoose.Schema({
 // Indexes for better performance
 agentSchema.index({ isActive: 1 })
 agentSchema.index({ createdBy: 1 })
-agentSchema.index({ webhookUrl: 1 })
 
 // Generate webhook URL before saving
 agentSchema.pre('save', function(next) {

@@ -119,6 +119,7 @@
 <script setup>
 import { PlusIcon, CpuChipIcon, ClipboardIcon } from '@heroicons/vue/24/outline'
 import { useAgentsStore } from '~/stores/agents'
+import { useNuxtApp } from 'nuxt/app'
 
 definePageMeta({
   layout: 'dashboard',
@@ -126,6 +127,7 @@ definePageMeta({
 })
 
 const agentsStore = useAgentsStore()
+const { $toast } = useNuxtApp()
 
 const fetchAgents = async () => {
   try {
@@ -136,13 +138,11 @@ const fetchAgents = async () => {
 }
 
 const createAgent = () => {
-  // TODO: Navigate to create agent page or open modal
-  console.log('Create agent clicked')
+  navigateTo('/dashboard/agents/create')
 }
 
 const editAgent = (agent) => {
-  // TODO: Navigate to edit agent page or open modal
-  console.log('Edit agent:', agent)
+  navigateTo(`/dashboard/agents/${agent._id}`)
 }
 
 const deleteAgent = async (agentId) => {
@@ -150,18 +150,20 @@ const deleteAgent = async (agentId) => {
   
   try {
     await agentsStore.deleteAgent(agentId)
-    console.log('Agent deleted successfully')
+    $toast.success('Agent deleted successfully')
   } catch (error) {
     console.error('Failed to delete agent:', error)
+    $toast.error('Failed to delete agent')
   }
 }
 
 const copyWebhookUrl = async (url) => {
   try {
     await navigator.clipboard.writeText(url)
-    console.log('Webhook URL copied to clipboard')
+    $toast.success('Webhook URL copied to clipboard')
   } catch (error) {
     console.error('Failed to copy URL:', error)
+    $toast.error('Failed to copy URL')
   }
 }
 

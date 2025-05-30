@@ -12,11 +12,13 @@ export const useAgentsStore = defineStore('agents', () => {
     loading.value = true
     error.value = null
     try {
-      const { data } = await $api('/api/agents')
-      agents.value = data
+      const response = await $api('/api/agents')
+      agents.value = response.data
     } catch (err) {
-      error.value = err.data?.message || 'Failed to fetch agents'
-      throw err
+      console.error('Fetch agents error:', err)
+      const errorMessage = err.data?.message || err.message || 'Failed to fetch agents'
+      error.value = errorMessage
+      throw new Error(errorMessage)
     } finally {
       loading.value = false
     }
@@ -26,12 +28,14 @@ export const useAgentsStore = defineStore('agents', () => {
     loading.value = true
     error.value = null
     try {
-      const { data } = await $api(`/api/agents/${id}`)
-      currentAgent.value = data
-      return data
+      const response = await $api(`/api/agents/${id}`)
+      currentAgent.value = response.data
+      return response.data
     } catch (err) {
-      error.value = err.data?.message || 'Failed to fetch agent'
-      throw err
+      console.error('Fetch agent error:', err)
+      const errorMessage = err.data?.message || err.message || 'Failed to fetch agent'
+      error.value = errorMessage
+      throw new Error(errorMessage)
     } finally {
       loading.value = false
     }
@@ -41,15 +45,17 @@ export const useAgentsStore = defineStore('agents', () => {
     loading.value = true
     error.value = null
     try {
-      const { data } = await $api('/api/agents', {
+      const response = await $api('/api/agents', {
         method: 'POST',
         body: agentData
       })
-      agents.value.unshift(data)
-      return data
+      agents.value.unshift(response.data)
+      return response.data
     } catch (err) {
-      error.value = err.data?.message || 'Failed to create agent'
-      throw err
+      console.error('Create agent error:', err)
+      const errorMessage = err.data?.message || err.message || 'Failed to create agent'
+      error.value = errorMessage
+      throw new Error(errorMessage)
     } finally {
       loading.value = false
     }
@@ -59,7 +65,7 @@ export const useAgentsStore = defineStore('agents', () => {
     loading.value = true
     error.value = null
     try {
-      const { data } = await $api(`/api/agents/${id}`, {
+      const response = await $api(`/api/agents/${id}`, {
         method: 'PUT',
         body: agentData
       })
@@ -67,18 +73,20 @@ export const useAgentsStore = defineStore('agents', () => {
       // Update in agents list
       const index = agents.value.findIndex(agent => agent._id === id)
       if (index !== -1) {
-        agents.value[index] = data
+        agents.value[index] = response.data
       }
       
       // Update current agent if it's the same
       if (currentAgent.value?._id === id) {
-        currentAgent.value = data
+        currentAgent.value = response.data
       }
       
-      return data
+      return response.data
     } catch (err) {
-      error.value = err.data?.message || 'Failed to update agent'
-      throw err
+      console.error('Update agent error:', err)
+      const errorMessage = err.data?.message || err.message || 'Failed to update agent'
+      error.value = errorMessage
+      throw new Error(errorMessage)
     } finally {
       loading.value = false
     }
@@ -97,8 +105,10 @@ export const useAgentsStore = defineStore('agents', () => {
         currentAgent.value = null
       }
     } catch (err) {
-      error.value = err.data?.message || 'Failed to delete agent'
-      throw err
+      console.error('Delete agent error:', err)
+      const errorMessage = err.data?.message || err.message || 'Failed to delete agent'
+      error.value = errorMessage
+      throw new Error(errorMessage)
     } finally {
       loading.value = false
     }
@@ -109,11 +119,11 @@ export const useAgentsStore = defineStore('agents', () => {
     formData.append('file', file)
     
     try {
-      const { data } = await $api(`/api/agents/${agentId}/context/upload`, {
+      const response = await $api(`/api/agents/${agentId}/context/upload`, {
         method: 'POST',
         body: formData
       })
-      return data
+      return response.data
     } catch (err) {
       error.value = err.data?.message || 'Failed to upload context'
       throw err
@@ -122,11 +132,11 @@ export const useAgentsStore = defineStore('agents', () => {
 
   const addContextUrl = async (agentId, url) => {
     try {
-      const { data } = await $api(`/api/agents/${agentId}/context/url`, {
+      const response = await $api(`/api/agents/${agentId}/context/url`, {
         method: 'POST',
         body: { url }
       })
-      return data
+      return response.data
     } catch (err) {
       error.value = err.data?.message || 'Failed to add context URL'
       throw err
