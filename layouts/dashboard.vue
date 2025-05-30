@@ -240,6 +240,7 @@ import {
 } from '@heroicons/vue/24/outline'
 
 const authStore = useAuthStore()
+const agentsStore = useAgentsStore()
 const colorMode = useColorMode()
 const route = useRoute()
 
@@ -247,7 +248,12 @@ const mobileMenuOpen = ref(false)
 
 const navigation = computed(() => [
   { name: 'Dashboard', href: '/dashboard', icon: HomeIcon },
-  { name: 'Agents', href: '/dashboard/agents', icon: CpuChipIcon, badge: '0' },
+  { 
+    name: 'Agents', 
+    href: '/dashboard/agents', 
+    icon: CpuChipIcon, 
+    badge: agentsStore.agents.length > 0 ? agentsStore.agents.length.toString() : undefined 
+  },
   ...(authStore.isAdmin ? [{ name: 'Users', href: '/dashboard/users', icon: UsersIcon }] : []),
   ...(authStore.isAdmin ? [{ name: 'Settings', href: '/dashboard/settings', icon: CogIcon }] : [])
 ])
@@ -276,5 +282,17 @@ const closeMobileMenu = () => {
 // Close mobile menu when route changes
 watch(() => route.path, () => {
   mobileMenuOpen.value = false
+})
+
+// Fetch agents on mount if not already loaded
+onMounted(async () => {
+  if (agentsStore.agents.length === 0 && !agentsStore.loading) {
+    try {
+      await agentsStore.fetchAgents()
+    } catch (error) {
+      // Silently fail - the user will see the count as 0 and can navigate to agents page
+      console.error('Failed to fetch agents for sidebar count:', error)
+    }
+  }
 })
 </script> 

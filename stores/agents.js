@@ -49,11 +49,31 @@ export const useAgentsStore = defineStore('agents', () => {
         method: 'POST',
         body: agentData
       })
+      
+      // The response should be the agent object directly (since $fetch unwraps the response)
       agents.value.unshift(response.data)
       return response.data
     } catch (err) {
       console.error('Create agent error:', err)
-      const errorMessage = err.data?.message || err.message || 'Failed to create agent'
+      
+      // Better error handling for different error types
+      let errorMessage = 'Failed to create agent'
+      
+      if (err && typeof err === 'object') {
+        // Handle FetchError from Nuxt
+        if (err.data && err.data.statusMessage) {
+          errorMessage = err.data.statusMessage
+        } else if (err.data && err.data.message) {
+          errorMessage = err.data.message
+        } else if (err.statusMessage) {
+          errorMessage = err.statusMessage
+        } else if (err.message) {
+          errorMessage = err.message
+        }
+      } else if (typeof err === 'string') {
+        errorMessage = err
+      }
+      
       error.value = errorMessage
       throw new Error(errorMessage)
     } finally {
@@ -70,13 +90,11 @@ export const useAgentsStore = defineStore('agents', () => {
         body: agentData
       })
       
-      // Update in agents list
       const index = agents.value.findIndex(agent => agent._id === id)
       if (index !== -1) {
         agents.value[index] = response.data
       }
       
-      // Update current agent if it's the same
       if (currentAgent.value?._id === id) {
         currentAgent.value = response.data
       }

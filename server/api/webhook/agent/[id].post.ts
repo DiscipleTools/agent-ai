@@ -18,7 +18,7 @@ export default defineEventHandler(async (event) => {
     }
 
     // Find agent by webhook URL
-    const webhookUrl = `/webhook/agent/${webhookId}`
+    const webhookUrl = `/api/webhook/agent/${webhookId}`
     const agent = await Agent.findOne({ webhookUrl, isActive: true })
 
     if (!agent) {

@@ -59,8 +59,10 @@ const fetchAgent = async () => {
     await agentsStore.fetchAgent(route.params.id)
   } catch (error) {
     console.error('Failed to load agent:', error)
-    const { $toast } = useNuxtApp()
-    $toast.error('Failed to load agent')
+    const toast = useNuxtApp().$toast
+    if (toast) {
+      toast.error('Failed to load agent')
+    }
   }
 }
 
@@ -69,15 +71,19 @@ const handleSubmit = async (agentData) => {
     await agentsStore.updateAgent(route.params.id, agentData)
     
     // Show success message
-    const { $toast } = useNuxtApp()
-    $toast.success('Agent updated successfully!')
+    const toast = useNuxtApp().$toast
+    if (toast) {
+      toast.success('Agent updated successfully!')
+    }
     
     // Navigate back to agents list
     await router.push('/dashboard/agents')
   } catch (error) {
     console.error('Failed to update agent:', error)
-    const { $toast } = useNuxtApp()
-    $toast.error(error.message || 'Failed to update agent')
+    const toast = useNuxtApp().$toast
+    if (toast) {
+      toast.error(error.message || 'Failed to update agent')
+    }
   }
 }
 

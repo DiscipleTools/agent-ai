@@ -40,15 +40,19 @@ const handleSubmit = async (agentData) => {
     await agentsStore.createAgent(agentData)
     
     // Show success message
-    const { $toast } = useNuxtApp()
-    $toast.success('Agent created successfully!')
+    const toast = useNuxtApp().$toast
+    if (toast) {
+      toast.success('Agent created successfully!')
+    }
     
     // Navigate back to agents list
     await router.push('/dashboard/agents')
   } catch (error) {
     console.error('Failed to create agent:', error)
-    const { $toast } = useNuxtApp()
-    $toast.error(error.message || 'Failed to create agent')
+    const toast = useNuxtApp().$toast
+    if (toast) {
+      toast.error(error.message || 'Failed to create agent')
+    }
   }
 }
 

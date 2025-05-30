@@ -150,20 +150,32 @@ const deleteAgent = async (agentId) => {
   
   try {
     await agentsStore.deleteAgent(agentId)
-    $toast.success('Agent deleted successfully')
+    const toast = useNuxtApp().$toast
+    if (toast) {
+      toast.success('Agent deleted successfully')
+    }
   } catch (error) {
     console.error('Failed to delete agent:', error)
-    $toast.error('Failed to delete agent')
+    const toast = useNuxtApp().$toast
+    if (toast) {
+      toast.error('Failed to delete agent')
+    }
   }
 }
 
 const copyWebhookUrl = async (url) => {
   try {
     await navigator.clipboard.writeText(url)
-    $toast.success('Webhook URL copied to clipboard')
+    const toast = useNuxtApp().$toast
+    if (toast) {
+      toast.success('Webhook URL copied to clipboard')
+    }
   } catch (error) {
     console.error('Failed to copy URL:', error)
-    $toast.error('Failed to copy URL')
+    const toast = useNuxtApp().$toast
+    if (toast) {
+      toast.error('Failed to copy URL')
+    }
   }
 }
 
