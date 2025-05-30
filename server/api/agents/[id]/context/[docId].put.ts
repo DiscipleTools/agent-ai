@@ -82,6 +82,88 @@ export default defineEventHandler(async (event) => {
       }
     }
 
+    // Handle website re-crawl
+    if (refreshUrl && contextDoc.type === 'website' && contextDoc.url) {
+      try {
+        console.log(`Re-crawling website for: ${contextDoc.url}`)
+        
+        // Use the original crawl options if available, otherwise use defaults
+        const originalOptions = contextDoc.metadata?.crawlOptions || {
+          maxPages: 10,
+          maxDepth: 2,
+          sameDomainOnly: true
+        }
+        
+        const websiteContent = await webScrapingService.crawlWebsite(contextDoc.url, originalOptions)
+        
+        // Combine all page content into a single document (same format as original)
+        let combinedContent = `${websiteContent.summary}\n\n`
+        combinedContent += `=== WEBSITE CONTENT ===\n\n`
+        
+        websiteContent.pages.forEach((page, index) => {
+          combinedContent += `--- Page ${index + 1}: ${page.title || 'Untitled'} ---\n`
+          combinedContent += `URL: ${page.url}\n`
+          combinedContent += `${page.content}\n\n`
+        })
+        
+        updatedContent = combinedContent
+        updatedFilename = `${new URL(websiteContent.baseUrl).hostname} (${websiteContent.totalPages} pages)`
+        
+        // Update metadata with new crawl information
+        const updatedMetadata = {
+          ...contextDoc.metadata,
+          totalPages: websiteContent.totalPages,
+          totalContentLength: websiteContent.totalContentLength,
+          pageUrls: websiteContent.pages.map(page => page.url),
+          lastCrawled: new Date()
+        }
+        
+        // Update the document with new metadata
+        agent.contextDocuments[docIndex] = {
+          ...contextDoc,
+          content: updatedContent,
+          filename: updatedFilename,
+          uploadedAt: new Date(),
+          metadata: updatedMetadata
+        }
+        
+        await agent.save()
+        
+        console.log(`Website re-crawled: ${websiteContent.totalPages} pages, ${websiteContent.totalContentLength} characters`)
+        
+        const updatedDoc = agent.contextDocuments[docIndex]
+        
+        return {
+          success: true,
+          message: `Website re-crawled successfully (${websiteContent.totalPages} pages)`,
+          data: {
+            contextDocument: {
+              _id: updatedDoc._id,
+              type: updatedDoc.type,
+              filename: updatedDoc.filename,
+              url: updatedDoc.url,
+              uploadedAt: updatedDoc.uploadedAt,
+              contentLength: updatedDoc.content?.length || 0,
+              contentPreview: updatedDoc.content?.substring(0, 200) + (updatedDoc.content?.length > 200 ? '...' : ''),
+              metadata: updatedDoc.metadata
+            },
+            agent: {
+              _id: agent._id,
+              name: agent.name,
+              contextDocumentsCount: agent.contextDocuments.length
+            }
+          }
+        }
+        
+      } catch (error: any) {
+        console.error('Website re-crawl failed:', error.message)
+        throw createError({
+          statusCode: 400,
+          statusMessage: `Failed to re-crawl website: ${error.message}`
+        })
+      }
+    }
+
     // Handle manual content update
     if (content !== undefined) {
       if (typeof content !== 'string') {

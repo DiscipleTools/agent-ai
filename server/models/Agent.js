@@ -4,7 +4,7 @@ import crypto from 'crypto'
 const contextDocumentSchema = new mongoose.Schema({
   type: {
     type: String,
-    enum: ['file', 'url'],
+    enum: ['file', 'url', 'website'],
     required: true
   },
   content: {
@@ -16,6 +16,10 @@ const contextDocumentSchema = new mongoose.Schema({
   uploadedAt: {
     type: Date,
     default: Date.now
+  },
+  metadata: {
+    type: mongoose.Schema.Types.Mixed,
+    default: {}
   }
 })
 

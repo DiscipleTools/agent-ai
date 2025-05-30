@@ -130,16 +130,22 @@
           <div class="flex items-center space-x-3 flex-1">
             <div class="flex-shrink-0">
               <DocumentIcon v-if="doc.type === 'file'" class="h-5 w-5 text-gray-400" />
-              <LinkIcon v-else class="h-5 w-5 text-gray-400" />
+              <LinkIcon v-else-if="doc.type === 'url'" class="h-5 w-5 text-gray-400" />
+              <svg v-else-if="doc.type === 'website'" class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9v-3a5 5 0 00-5-5 5 5 0 00-5 5v3m0 0h10" />
+              </svg>
             </div>
             <div class="flex-1 min-w-0">
               <p class="text-sm font-medium text-gray-900 dark:text-white truncate">
                 {{ doc.filename || doc.url }}
               </p>
               <p class="text-xs text-gray-500">
-                {{ doc.type === 'file' ? 'File' : 'URL' }} • 
+                {{ doc.type === 'file' ? 'File' : doc.type === 'url' ? 'URL' : 'Website' }} • 
                 {{ formatDate(doc.uploadedAt) }} • 
                 {{ formatContentLength(doc.contentLength) }}
+                <span v-if="doc.type === 'website' && doc.metadata?.totalPages">
+                  • {{ doc.metadata.totalPages }} pages
+                </span>
               </p>
               <p v-if="doc.contentPreview" class="text-xs text-gray-600 dark:text-gray-400 mt-1 truncate">
                 {{ doc.contentPreview }}
@@ -156,15 +162,19 @@
               View
             </button>
             <button
-              v-if="doc.type === 'url'"
+              v-if="doc.type === 'url' || doc.type === 'website'"
               type="button"
               @click="refreshContextDocument(doc._id)"
               :disabled="refreshingDocs.has(doc._id)"
               class="text-green-600 hover:text-green-700 text-sm disabled:opacity-50"
-              title="Refresh URL content"
+              :title="doc.type === 'website' ? 'Re-crawl website' : 'Refresh URL content'"
             >
-              <span v-if="refreshingDocs.has(doc._id)">Refreshing...</span>
-              <span v-else>Refresh</span>
+              <span v-if="refreshingDocs.has(doc._id)">
+                {{ doc.type === 'website' ? 'Re-crawling...' : 'Refreshing...' }}
+              </span>
+              <span v-else>
+                {{ doc.type === 'website' ? 'Re-crawl' : 'Refresh' }}
+              </span>
             </button>
             <button
               type="button"
@@ -207,6 +217,13 @@
               class="btn-secondary text-sm"
             >
               Add URL
+            </button>
+            <button
+              type="button"
+              @click="showWebsiteInput = !showWebsiteInput"
+              class="btn-secondary text-sm"
+            >
+              Add Website
             </button>
           </div>
           
@@ -283,6 +300,130 @@
             </div>
           </div>
           
+          <!-- Website Input -->
+          <div v-if="showWebsiteInput" class="mt-4 space-y-4">
+            <div class="space-y-3">
+              <div class="flex space-x-2">
+                <input
+                  v-model="websiteInput"
+                  type="url"
+                  placeholder="https://example.com"
+                  class="input-field flex-1"
+                  :disabled="websiteTesting || websiteAdding"
+                  @keyup.enter="testWebsiteBeforeAdd"
+                />
+                <button
+                  type="button"
+                  @click="testWebsiteBeforeAdd"
+                  :disabled="!websiteInput.trim() || websiteTesting || websiteAdding"
+                  class="btn-secondary text-sm"
+                >
+                  <span v-if="websiteTesting">Testing...</span>
+                  <span v-else>Test</span>
+                </button>
+                <button
+                  type="button"
+                  @click="addContextWebsite"
+                  :disabled="!websiteInput.trim() || websiteTesting || websiteAdding || !websiteTestResult?.success"
+                  class="btn-primary text-sm"
+                >
+                  <span v-if="websiteAdding">Crawling...</span>
+                  <span v-else>Crawl Website</span>
+                </button>
+              </div>
+
+              <!-- Crawl Options -->
+              <div v-if="websiteTestResult?.success" class="bg-gray-50 dark:bg-gray-700 p-4 rounded-md space-y-3">
+                <h4 class="text-sm font-medium text-gray-900 dark:text-white">Crawl Options</h4>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Max Pages
+                    </label>
+                    <input
+                      v-model.number="crawlOptions.maxPages"
+                      type="number"
+                      min="1"
+                      max="200"
+                      class="input-field text-sm"
+                    />
+                    <p class="text-xs text-gray-500 mt-1">Maximum pages to crawl (1-200)</p>
+                  </div>
+                  <div>
+                    <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Max Depth
+                    </label>
+                    <input
+                      v-model.number="crawlOptions.maxDepth"
+                      type="number"
+                      min="1"
+                      max="3"
+                      class="input-field text-sm"
+                    />
+                    <p class="text-xs text-gray-500 mt-1">How deep to follow links (1-3)</p>
+                  </div>
+                  <div>
+                    <label class="flex items-center space-x-2">
+                      <input
+                        v-model="crawlOptions.sameDomainOnly"
+                        type="checkbox"
+                        class="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                      />
+                      <span class="text-xs font-medium text-gray-700 dark:text-gray-300">Same domain only</span>
+                    </label>
+                    <p class="text-xs text-gray-500 mt-1">Only crawl pages on the same domain</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Website Test Results -->
+            <div v-if="websiteTestResult" class="text-left">
+              <div v-if="websiteTestResult.success" class="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-md">
+                <div class="flex">
+                  <div class="flex-shrink-0">
+                    <svg class="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
+                      <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                    </svg>
+                  </div>
+                  <div class="ml-3">
+                    <h4 class="text-sm font-medium text-green-800 dark:text-green-200">Website is accessible for crawling</h4>
+                    <div class="mt-1 text-sm text-green-700 dark:text-green-300">
+                      <p>Estimated pages: {{ websiteTestResult.data?.estimatedPages || 'Unknown' }}</p>
+                      <p>Robots.txt: {{ websiteTestResult.data?.robotsAllowed ? 'Allows crawling' : 'Restricts crawling' }}</p>
+                      <p v-if="websiteTestResult.data?.estimatedProcessingTime">{{ websiteTestResult.data.estimatedProcessingTime }}</p>
+                      <div v-if="websiteTestResult.data?.sampleLinks?.length" class="mt-2">
+                        <p class="text-xs font-medium">Sample pages found:</p>
+                        <ul class="text-xs list-disc list-inside ml-2">
+                          <li v-for="link in websiteTestResult.data.sampleLinks.slice(0, 3)" :key="link">
+                            {{ getUrlPath(link) }}
+                          </li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <div v-else class="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
+                <div class="flex">
+                  <div class="flex-shrink-0">
+                    <svg class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                      <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+                    </svg>
+                  </div>
+                  <div class="ml-3">
+                    <h4 class="text-sm font-medium text-red-800 dark:text-red-200">Website is not accessible for crawling</h4>
+                    <p class="mt-1 text-sm text-red-700 dark:text-red-300">{{ websiteTestResult.data?.error || 'Unknown error' }}</p>
+                    <ul v-if="websiteTestResult.data?.suggestions" class="mt-2 text-xs text-red-600 dark:text-red-400 list-disc list-inside">
+                      <li v-for="suggestion in websiteTestResult.data.suggestions" :key="suggestion">{{ suggestion }}</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
           <!-- Hidden file input -->
           <input
             ref="fileInput"
@@ -321,6 +462,7 @@
 
 <script setup>
 import { DocumentIcon, LinkIcon } from '@heroicons/vue/24/outline'
+import { useAgentsStore } from '~/stores/agents'
 
 const props = defineProps({
   agent: {
@@ -341,7 +483,7 @@ const form = reactive({
   description: props.agent?.description || '',
   prompt: props.agent?.prompt || '',
   settings: {
-    temperature: props.agent?.settings?.temperature || 0.7,
+    temperature: props.agent?.settings?.temperature || 0.,
     maxTokens: props.agent?.settings?.maxTokens || 500,
     responseDelay: props.agent?.settings?.responseDelay || 0
   }
@@ -350,15 +492,27 @@ const form = reactive({
 const errors = reactive({})
 const isSubmitting = ref(false)
 const showUrlInput = ref(false)
+const showWebsiteInput = ref(false)
 const urlInput = ref('')
 const urlTesting = ref(false)
 const urlAdding = ref(false)
 const urlTestResult = ref(null)
+const websiteInput = ref('')
+const websiteTesting = ref(false)
+const websiteAdding = ref(false)
+const websiteTestResult = ref(null)
 
 // Context documents state
 const contextDocuments = ref([])
 const refreshingDocs = ref(new Set())
 const deletingDocs = ref(new Set())
+
+// Crawl options
+const crawlOptions = reactive({
+  maxPages: 50,
+  maxDepth: 2,
+  sameDomainOnly: true
+})
 
 // Load context documents function (defined before watcher)
 const loadContextDocuments = async () => {
@@ -561,6 +715,65 @@ const handleFileUpload = (event) => {
   }
 }
 
+// Website management functions
+const testWebsiteBeforeAdd = async () => {
+  if (!websiteInput.value.trim() || !props.agent?._id) return
+  
+  websiteTesting.value = true
+  websiteTestResult.value = null
+  
+  try {
+    const result = await agentsStore.testWebsite(props.agent._id, websiteInput.value.trim(), crawlOptions)
+    websiteTestResult.value = result
+  } catch (error) {
+    console.error('Frontend: Website test failed with error:', error)
+    console.error('Frontend: Error details:', {
+      message: error.message,
+      data: error.data,
+      statusCode: error.statusCode,
+      statusMessage: error.statusMessage,
+      stack: error.stack
+    })
+    
+    // Ensure consistent structure for error cases
+    websiteTestResult.value = {
+      success: false,
+      message: 'Website test failed',
+      data: { 
+        error: error.message || 'Failed to test website',
+        suggestions: [
+          'Check if the URL is correct and publicly accessible',
+          'Ensure the website allows automated access',
+          'Try accessing the URL manually in a browser',
+          'Check if robots.txt allows crawling'
+        ]
+      }
+    }
+  } finally {
+    websiteTesting.value = false
+  }
+}
+
+const addContextWebsite = async () => {
+  if (!websiteInput.value.trim() || !props.agent?._id) return
+  
+  websiteAdding.value = true
+  
+  try {
+    await agentsStore.addContextWebsite(props.agent._id, websiteInput.value.trim(), crawlOptions)
+    toast.success('Website content added successfully')
+    websiteInput.value = ''
+    showWebsiteInput.value = false
+    websiteTestResult.value = null
+    await loadContextDocuments()
+  } catch (error) {
+    console.error('Failed to add website:', error)
+    toast.error(error.message || 'Failed to add website content')
+  } finally {
+    websiteAdding.value = false
+  }
+}
+
 // Utility functions
 const formatDate = (date) => {
   return new Date(date).toLocaleDateString()
@@ -571,6 +784,16 @@ const formatContentLength = (length) => {
   if (length < 1024) return `${length} bytes`
   if (length < 1024 * 1024) return `${(length / 1024).toFixed(1)} KB`
   return `${(length / (1024 * 1024)).toFixed(1)} MB`
+}
+
+const getUrlPath = (url) => {
+  try {
+    const parsedUrl = new URL(url)
+    return parsedUrl.pathname
+  } catch (error) {
+    console.error('Failed to parse URL:', error)
+    return url
+  }
 }
 </script>
 

@@ -11,7 +11,8 @@ A full-stack Nuxt.js application for managing AI agents that integrate with Chat
 - **Admin Dashboard**: Complete admin interface for user and agent management
 - **AI-Powered Responses**: Integration with Prediction Guard API for intelligent, secure responses
 - **Modern UI**: Beautiful, responsive interface built with Vue 3 + Tailwind CSS
-- **Context-Aware Agents**: Support for file uploads and URL-based context enhancement
+- **Context-Aware Agents**: Support for file uploads, URL content, and full website scraping
+- **Website Crawling**: Automatically crawl entire websites to extract comprehensive content for agent context
 - **Real-time Testing**: Built-in AI connection testing and model selection
 
 ## 🛠️ Technology Stack
@@ -135,7 +136,17 @@ Each agent can be configured with:
 - **Temperature**: Controls response creativity (0.0-1.0)
 - **Max Tokens**: Maximum response length (1-2000)
 - **Response Delay**: Delay before responding (0-30 seconds)
-- **Context Documents**: File uploads and URL content for enhanced responses
+- **Context Documents**: File uploads, URL content, and full website crawling for enhanced responses
+
+### Website Scraping
+The platform now supports crawling entire websites to provide comprehensive context:
+- **Multi-page crawling**: Automatically discover and scrape multiple pages
+- **Configurable options**: Control depth (1-3 levels), page limits (1-50), and domain filtering
+- **Robots.txt compliance**: Respects website crawling permissions
+- **Smart filtering**: Excludes admin pages, media files, and irrelevant content
+- **Re-crawling**: Update website content to keep context current
+
+For detailed information, see [WEBSITE_SCRAPING.md](./WEBSITE_SCRAPING.md).
 
 ## 📁 Project Structure
 

@@ -275,6 +275,48 @@ export const useAgentsStore = defineStore('agents', () => {
     }
   }
 
+  const testWebsite = async (agentId, url, options = {}) => {
+    try {
+      const response = await $api(`/api/agents/${agentId}/context/test-website`, {
+        method: 'POST',
+        body: { url, options }
+      })
+      // Ensure we return the structure the frontend expects
+      if (response.success !== undefined) {
+        return response // Already has the right structure
+      } else {
+        // If $api unwrapped it, wrap it back
+        return {
+          success: true,
+          message: 'Website test successful',
+          data: response
+        }
+      }
+    } catch (err) {
+      error.value = err.data?.message || 'Failed to test website'
+      throw err
+    }
+  }
+
+  const addContextWebsite = async (agentId, url, options = {}) => {
+    try {
+      const response = await $api(`/api/agents/${agentId}/context/website`, {
+        method: 'POST',
+        body: { url, options }
+      })
+      
+      // Update current agent if it's loaded
+      if (currentAgent.value?._id === agentId) {
+        await fetchAgent(agentId)
+      }
+      
+      return response.data
+    } catch (err) {
+      error.value = err.data?.message || 'Failed to add website context'
+      throw err
+    }
+  }
+
   return {
     agents: readonly(agents),
     currentAgent: readonly(currentAgent),
@@ -293,6 +335,8 @@ export const useAgentsStore = defineStore('agents', () => {
     refreshContextDocument,
     testUrl,
     uploadContext,
-    addContextUrl
+    addContextUrl,
+    testWebsite,
+    addContextWebsite
   }
 }) 
