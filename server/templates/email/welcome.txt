@@ -1,0 +1,34 @@
+Welcome to {{appName}}!
+
+Hello {{userName}},
+
+Congratulations! Your account has been successfully set up and you're now ready to start using {{appName}}.
+
+You now have access to our powerful AI agent management platform where you can create, configure, and manage intelligent conversational agents.
+
+Visit your dashboard: {{dashboardUrl}}
+
+What you can do now:
+• Create AI Agents: Build custom agents with personalized prompts and behaviors
+• Manage Context: Upload documents and add URLs to enhance agent knowledge
+• Configure Settings: Adjust AI parameters like temperature and response length
+• Monitor Performance: Track agent interactions and optimize responses
+• Integrate with Chatwoot: Connect agents to your customer support workflows
+
+Getting Started Tips:
+1. Start by creating your first agent in the Agents section
+2. Define a clear system prompt that describes your agent's role
+3. Add relevant context documents to improve responses
+4. Test your agent before deploying to production
+5. Monitor and refine based on performance
+
+If you need help getting started or have any questions, don't hesitate to reach out to your administrator or check our documentation.
+
+We're excited to see what you'll build with {{appName}}!
+
+Best regards,
+The {{appName}} Team
+
+---
+You're receiving this email because your {{appName}} account was successfully activated.
+Need help? Contact your administrator or visit our documentation. 

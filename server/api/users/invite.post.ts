@@ -1,6 +1,6 @@
 import User from '~/server/models/User'
 import { requireAuth, requireAdmin } from '~/server/utils/auth'
-import bcrypt from 'bcryptjs'
+import emailService from '~/server/services/emailService'
 
 export default defineEventHandler(async (event) => {
   // Require authentication and admin role
@@ -36,13 +36,21 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
-    // Check if user already exists
+    // Check if any user already exists with this email (active or inactive)
     const existingUser = await User.findOne({ email: email.toLowerCase() })
+    
     if (existingUser) {
-      throw createError({
-        statusCode: 409,
-        statusMessage: 'User with this email already exists'
-      })
+      if (existingUser.isActive) {
+        // Active user exists - cannot invite
+        throw createError({
+          statusCode: 409,
+          statusMessage: 'User with this email already exists'
+        })
+      } else {
+        // Inactive user exists - delete it so we can create a new one
+        console.log(`Removing inactive user ${existingUser.email} to allow new invitation`)
+        await User.findByIdAndDelete(existingUser._id)
+      }
     }
 
     // Generate a temporary password (user will need to reset it)
@@ -56,17 +64,34 @@ export default defineEventHandler(async (event) => {
       role,
       agentAccess,
       invitedBy: event.context.user._id,
-      isActive: true
+      isActive: false // User starts inactive until they complete setup
     })
 
+    // Generate invitation token
+    const invitationToken = newUser.createInvitationToken()
+    
     await newUser.save()
 
     // Populate the response
     await newUser.populate('invitedBy', 'name email')
     await newUser.populate('agentAccess', 'name')
 
-    // TODO: Send invitation email with temporary password
-    // This would typically send an email with a password reset link
+    // Send invitation email
+    try {
+      const emailSent = await emailService.sendInvitationEmail(
+        newUser.email,
+        newUser.name,
+        event.context.user.name,
+        invitationToken
+      )
+
+      if (!emailSent) {
+        console.warn(`Invitation email could not be sent to ${newUser.email}`)
+      }
+    } catch (emailError) {
+      console.error('Failed to send invitation email:', emailError)
+      // Don't fail the user creation if email fails
+    }
 
     return {
       success: true,
@@ -74,13 +99,15 @@ export default defineEventHandler(async (event) => {
       message: 'User invited successfully'
     }
   } catch (error: any) {
+    console.error('Invitation error details:', error)
+    
     if (error.statusCode) {
       throw error
     }
     
     throw createError({
       statusCode: 500,
-      statusMessage: 'Failed to invite user'
+      statusMessage: `Failed to invite user: ${error.message || 'Unknown error'}`
     })
   }
 }) 

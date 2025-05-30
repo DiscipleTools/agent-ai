@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welcome to {{appName}}!</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            margin: 0;
+            padding: 0;
+            background-color: #f8fafc;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .header {
+            background: linear-gradient(135deg, #059669 0%, #047857 100%);
+            color: white;
+            padding: 40px 30px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 28px;
+            font-weight: 600;
+        }
+        .content {
+            padding: 40px 30px;
+        }
+        .content h2 {
+            color: #1f2937;
+            font-size: 24px;
+            margin-bottom: 20px;
+        }
+        .content p {
+            margin-bottom: 16px;
+            color: #4b5563;
+            font-size: 16px;
+        }
+        .button {
+            display: inline-block;
+            background-color: #059669;
+            color: white;
+            padding: 14px 28px;
+            text-decoration: none;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 16px;
+            margin: 20px 0;
+            transition: background-color 0.2s;
+        }
+        .button:hover {
+            background-color: #047857;
+        }
+        .feature-list {
+            background-color: #f0fdf4;
+            border-left: 4px solid #059669;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+        .feature-list h3 {
+            margin-top: 0;
+            color: #065f46;
+        }
+        .footer {
+            background-color: #f9fafb;
+            padding: 30px;
+            text-align: center;
+            border-top: 1px solid #e5e7eb;
+        }
+        .footer p {
+            margin: 0;
+            color: #6b7280;
+            font-size: 14px;
+        }
+        .footer a {
+            color: #2563eb;
+            text-decoration: none;
+        }
+        @media (max-width: 600px) {
+            .container {
+                margin: 0;
+                border-radius: 0;
+            }
+            .header, .content, .footer {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎉 Welcome to {{appName}}!</h1>
+        </div>
+        
+        <div class="content">
+            <h2>Hello {{userName}},</h2>
+            
+            <p>Congratulations! Your account has been successfully set up and you're now ready to start using <strong>{{appName}}</strong>.</p>
+            
+            <p>You now have access to our powerful AI agent management platform where you can create, configure, and manage intelligent conversational agents.</p>
+            
+            <div style="text-align: center;">
+                <a href="{{dashboardUrl}}" class="button">Go to Dashboard</a>
+            </div>
+            
+            <div class="feature-list">
+                <h3>🚀 What you can do now:</h3>
+                <ul>
+                    <li><strong>Create AI Agents:</strong> Build custom agents with personalized prompts and behaviors</li>
+                    <li><strong>Manage Context:</strong> Upload documents and add URLs to enhance agent knowledge</li>
+                    <li><strong>Configure Settings:</strong> Adjust AI parameters like temperature and response length</li>
+                    <li><strong>Monitor Performance:</strong> Track agent interactions and optimize responses</li>
+                    <li><strong>Integrate with Chatwoot:</strong> Connect agents to your customer support workflows</li>
+                </ul>
+            </div>
+            
+            <p><strong>Getting Started Tips:</strong></p>
+            <ol>
+                <li>Start by creating your first agent in the Agents section</li>
+                <li>Define a clear system prompt that describes your agent's role</li>
+                <li>Add relevant context documents to improve responses</li>
+                <li>Test your agent before deploying to production</li>
+                <li>Monitor and refine based on performance</li>
+            </ol>
+            
+            <p>If you need help getting started or have any questions, don't hesitate to reach out to your administrator or check our documentation.</p>
+            
+            <p>We're excited to see what you'll build with {{appName}}!</p>
+            
+            <p>Best regards,<br>
+            The {{appName}} Team</p>
+        </div>
+        
+        <div class="footer">
+            <p>You're receiving this email because your {{appName}} account was successfully activated.</p>
+            <p>Need help? Contact your administrator or visit our documentation.</p>
+        </div>
+    </div>
+</body>
+</html> 

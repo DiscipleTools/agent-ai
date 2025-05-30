@@ -1,5 +1,28 @@
 import mongoose from 'mongoose'
 import bcrypt from 'bcryptjs'
+import crypto from 'crypto'
+
+interface IUser extends mongoose.Document {
+  email: string
+  name: string
+  password: string
+  role: 'admin' | 'user'
+  isActive: boolean
+  agentAccess: mongoose.Types.ObjectId[]
+  invitedBy?: mongoose.Types.ObjectId
+  invitationToken?: string
+  invitationTokenExpires?: Date
+  passwordResetToken?: string
+  passwordResetExpires?: Date
+  lastLogin?: Date
+  refreshTokens: string[]
+  comparePassword(candidatePassword: string): Promise<boolean>
+  createInvitationToken(): string
+  createPasswordResetToken(): string
+  addRefreshToken(token: string): void
+  removeRefreshToken(token: string): void
+  clearRefreshTokens(): void
+}
 
 const userSchema = new mongoose.Schema({
   email: {
@@ -42,6 +65,26 @@ const userSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
   },
+  invitationToken: {
+    type: String,
+    required: false,
+    select: false // Don't include in queries by default
+  },
+  invitationTokenExpires: {
+    type: Date,
+    required: false,
+    select: false // Don't include in queries by default
+  },
+  passwordResetToken: {
+    type: String,
+    required: false,
+    select: false // Don't include in queries by default
+  },
+  passwordResetExpires: {
+    type: Date,
+    required: false,
+    select: false // Don't include in queries by default
+  },
   lastLogin: {
     type: Date
   },
@@ -56,6 +99,10 @@ const userSchema = new mongoose.Schema({
     transform: function(doc, ret) {
       delete ret.password;
       delete ret.refreshTokens;
+      delete ret.invitationToken;
+      delete ret.invitationTokenExpires;
+      delete ret.passwordResetToken;
+      delete ret.passwordResetExpires;
       return ret;
     }
   }
@@ -63,7 +110,8 @@ const userSchema = new mongoose.Schema({
 
 // Indexes for better performance (removed duplicate email index)
 userSchema.index({ isActive: 1 });
-userSchema.index({ role: 1 });
+userSchema.index({ invitationToken: 1 });
+userSchema.index({ passwordResetToken: 1 });
 
 // Hash password before saving
 userSchema.pre('save', async function(next) {
@@ -75,22 +123,38 @@ userSchema.pre('save', async function(next) {
     const salt = await bcrypt.genSalt(12);
     this.password = await bcrypt.hash(this.password, salt);
     next();
-  } catch (error) {
+  } catch (error: any) {
     next(error);
   }
 });
 
-// Instance method to compare password
-userSchema.methods.comparePassword = async function(candidatePassword) {
-  try {
-    return await bcrypt.compare(candidatePassword, this.password);
-  } catch (error) {
-    throw new Error('Password comparison failed');
-  }
+// Instance method to check password
+userSchema.methods.comparePassword = async function(candidatePassword: string): Promise<boolean> {
+  return bcrypt.compare(candidatePassword, this.password);
+};
+
+// Instance method to generate invitation token
+userSchema.methods.createInvitationToken = function(): string {
+  const token = crypto.randomBytes(32).toString('hex');
+  
+  this.invitationToken = crypto.createHash('sha256').update(token).digest('hex');
+  this.invitationTokenExpires = Date.now() + 7 * 24 * 60 * 60 * 1000; // 7 days
+  
+  return token;
+};
+
+// Instance method to generate password reset token
+userSchema.methods.createPasswordResetToken = function(): string {
+  const token = crypto.randomBytes(32).toString('hex');
+  
+  this.passwordResetToken = crypto.createHash('sha256').update(token).digest('hex');
+  this.passwordResetExpires = Date.now() + 24 * 60 * 60 * 1000; // 24 hours
+  
+  return token;
 };
 
 // Instance method to add refresh token
-userSchema.methods.addRefreshToken = function(token) {
+userSchema.methods.addRefreshToken = function(token: string): void {
   // Initialize refreshTokens array if it doesn't exist
   if (!this.refreshTokens) {
     this.refreshTokens = [];
@@ -104,21 +168,21 @@ userSchema.methods.addRefreshToken = function(token) {
 };
 
 // Instance method to remove refresh token
-userSchema.methods.removeRefreshToken = function(token) {
+userSchema.methods.removeRefreshToken = function(token: string): void {
   if (!this.refreshTokens) {
     this.refreshTokens = [];
     return;
   }
-  this.refreshTokens = this.refreshTokens.filter(t => t !== token);
+  this.refreshTokens = this.refreshTokens.filter((t: string) => t !== token);
 };
 
 // Instance method to clear all refresh tokens
-userSchema.methods.clearRefreshTokens = function() {
+userSchema.methods.clearRefreshTokens = function(): void {
   this.refreshTokens = [];
 };
 
 // Static method to find user by email
-userSchema.statics.findByEmail = function(email) {
+userSchema.statics.findByEmail = function(email: string) {
   return this.findOne({ email: email.toLowerCase(), isActive: true }).select('+refreshTokens');
 };
 
@@ -128,7 +192,7 @@ userSchema.statics.findActive = function() {
 };
 
 // Static method to find users by role
-userSchema.statics.findByRole = function(role) {
+userSchema.statics.findByRole = function(role: string) {
   return this.find({ role, isActive: true });
 };
 
@@ -144,6 +208,6 @@ userSchema.virtual('profile').get(function() {
   };
 });
 
-const User = mongoose.model('User', userSchema);
+const User = mongoose.model<IUser>('User', userSchema);
 
 export default User; 

@@ -17,6 +17,51 @@ const settingsSchema = new mongoose.Schema({
       default: 'Hermes-3-Llama-3.1-8B'
     }
   },
+  email: {
+    provider: {
+      type: String,
+      enum: ['smtp'],
+      default: 'smtp'
+    },
+    smtp: {
+      host: {
+        type: String,
+        required: false
+      },
+      port: {
+        type: Number,
+        default: 587
+      },
+      secure: {
+        type: Boolean,
+        default: false
+      },
+      auth: {
+        user: {
+          type: String,
+          required: false
+        },
+        pass: {
+          type: String,
+          required: false
+        }
+      }
+    },
+    from: {
+      email: {
+        type: String,
+        required: false
+      },
+      name: {
+        type: String,
+        default: 'Agent AI Server'
+      }
+    },
+    enabled: {
+      type: Boolean,
+      default: false
+    }
+  },
   server: {
     webhookSecret: {
       type: String,

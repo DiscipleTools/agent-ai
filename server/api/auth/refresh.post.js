@@ -1,5 +1,5 @@
 import { connectDB } from '~/server/utils/db'
-import AuthService from '~/server/services/authService'
+import authService from '~/server/services/authService'
 
 export default defineEventHandler(async (event) => {
   try {
@@ -18,7 +18,6 @@ export default defineEventHandler(async (event) => {
     }
 
     // Refresh tokens
-    const authService = new AuthService()
     const newTokens = await authService.refreshTokens(refreshToken)
 
     // Set new cookies

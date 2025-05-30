@@ -11,6 +11,7 @@ export default defineEventHandler(async (event) => {
     await requireAuth(event)
     await requireAdmin(event)
 
+    // Get active users only (keeping isActive filtering)
     const users = await User.find({ isActive: true })
       .sort({ createdAt: -1 })
       .select('-password -refreshTokens')

@@ -1,5 +1,5 @@
 import mongoose from 'mongoose'
-import User from '../server/models/User.js'
+import User from '../server/models/User.ts'
 import dotenv from 'dotenv'
 
 dotenv.config()

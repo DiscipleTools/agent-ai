@@ -1,5 +1,5 @@
 import { connectDB } from '~/server/utils/db'
-import AuthService from '~/server/services/authService'
+import authService from '~/server/services/authService'
 
 export default defineEventHandler(async (event) => {
   try {
@@ -12,7 +12,6 @@ export default defineEventHandler(async (event) => {
     if (refreshToken) {
       // Get user ID from token (if possible)
       try {
-        const authService = new AuthService()
         const decoded = await authService.verifyRefreshToken(refreshToken)
         await authService.logout(decoded.userId, refreshToken)
       } catch (error) {

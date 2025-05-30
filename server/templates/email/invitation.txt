@@ -1,0 +1,30 @@
+Welcome to {{appName}}!
+
+Hello {{userName}},
+
+You've been invited to join {{appName}} by {{invitedByName}}.
+
+{{appName}} is an AI-powered agent management platform that helps teams automate customer conversations and support workflows.
+
+To complete your account setup and start using the platform, please visit the following link:
+
+{{setupUrl}}
+
+IMPORTANT: This invitation link will expire in 7 days. If you need a new invitation, please contact your administrator.
+
+Once you've completed the setup, you'll be able to:
+• Create and manage AI agents
+• Configure agent prompts and behaviors  
+• Monitor agent performance and conversations
+• Collaborate with your team
+
+If you didn't expect this invitation or have any questions, please contact your administrator or ignore this email.
+
+We're excited to have you on board!
+
+Best regards,
+The {{appName}} Team
+
+---
+This email was sent to {{userEmail}} because you were invited to join {{appName}}.
+If you have any questions, please contact your administrator. 

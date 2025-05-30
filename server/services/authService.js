@@ -1,6 +1,6 @@
 import jwt from 'jsonwebtoken'
 import crypto from 'crypto'
-import User from '../models/User.js'
+import User from '../models/User'
 
 class AuthService {
   /**
@@ -260,4 +260,4 @@ class AuthService {
   }
 }
 
-export default AuthService 
+export default new AuthService() 

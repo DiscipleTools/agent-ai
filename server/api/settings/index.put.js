@@ -39,6 +39,27 @@ export default defineEventHandler(async (event) => {
       })
     }
 
+    // Validate email configuration if provided
+    if (body.email) {
+      if (body.email.enabled && !body.email.from?.email) {
+        throw createError({
+          statusCode: 400,
+          statusMessage: 'From email address is required when email is enabled'
+        })
+      }
+
+      // Validate SMTP settings
+      if (body.email.enabled) {
+        const hasExistingSmtpPass = existingSettings?.email?.smtp?.auth?.pass
+        if (!body.email.smtp?.host || !body.email.smtp?.auth?.user || (!hasExistingSmtpPass && !body.email.smtp?.auth?.pass)) {
+          throw createError({
+            statusCode: 400,
+            statusMessage: 'SMTP host and authentication are required when email is enabled'
+          })
+        }
+      }
+    }
+
     // Use the existing settings we already fetched for validation
     let settings = existingSettings
 
@@ -48,6 +69,43 @@ export default defineEventHandler(async (event) => {
         apiKey: body.predictionGuard?.apiKey || settings.predictionGuard.apiKey,
         endpoint: body.predictionGuard.endpoint,
         model: body.predictionGuard.model || 'Hermes-3-Llama-3.1-8B'
+      }
+      
+      if (body.email) {
+        // Update email settings in place to avoid Mongoose validation issues
+        
+        // Update basic email settings
+        if (body.email.enabled !== undefined) {
+          settings.email.enabled = body.email.enabled
+        }
+        if (body.email.provider) {
+          settings.email.provider = body.email.provider
+        }
+        if (body.email.from) {
+          if (!settings.email.from) {
+            settings.email.from = {}
+          }
+          if (body.email.from.email) {
+            settings.email.from.email = body.email.from.email
+          }
+          if (body.email.from.name) {
+            settings.email.from.name = body.email.from.name
+          }
+        }
+        
+        // Update provider-specific configurations
+        if (body.email.smtp) {
+          if (!settings.email.smtp) {
+            settings.email.smtp = {}
+          }
+          Object.assign(settings.email.smtp, body.email.smtp)
+          if (body.email.smtp.auth) {
+            if (!settings.email.smtp.auth) {
+              settings.email.smtp.auth = {}
+            }
+            Object.assign(settings.email.smtp.auth, body.email.smtp.auth)
+          }
+        }
       }
       
       if (body.server) {
@@ -66,6 +124,13 @@ export default defineEventHandler(async (event) => {
           endpoint: body.predictionGuard.endpoint,
           model: body.predictionGuard.model || 'Hermes-3-Llama-3.1-8B'
         },
+        email: body.email || {
+          provider: 'smtp',
+          enabled: false,
+          from: {
+            name: 'Agent AI Server'
+          }
+        },
         server: body.server || {
           maxFileSize: 10485760,
           allowedFileTypes: ['pdf', 'txt', 'doc', 'docx']
@@ -80,13 +145,23 @@ export default defineEventHandler(async (event) => {
     // Clear the settings cache so AI service picks up new configuration
     settingsService.clearCache()
 
-    // Don't send the actual API key back
+    // Don't send sensitive data back
     const response = {
       ...settings.toObject(),
       predictionGuard: {
         ...settings.predictionGuard,
         apiKey: '***HIDDEN***'
-      }
+      },
+      email: settings.email ? {
+        ...settings.email,
+        smtp: settings.email.smtp ? {
+          ...settings.email.smtp,
+          auth: settings.email.smtp.auth ? {
+            user: settings.email.smtp.auth.user,
+            pass: '***HIDDEN***'
+          } : undefined
+        } : undefined
+      } : undefined
     }
 
     return {
