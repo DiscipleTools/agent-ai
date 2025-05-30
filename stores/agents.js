@@ -132,6 +132,108 @@ export const useAgentsStore = defineStore('agents', () => {
     }
   }
 
+  // Context Document Management Functions
+
+  const fetchContextDocuments = async (agentId) => {
+    try {
+      const response = await $api(`/api/agents/${agentId}/context`)
+      return response.data
+    } catch (err) {
+      error.value = err.data?.message || 'Failed to fetch context documents'
+      throw err
+    }
+  }
+
+  const getContextDocument = async (agentId, docId) => {
+    try {
+      const response = await $api(`/api/agents/${agentId}/context/${docId}`)
+      return response.data
+    } catch (err) {
+      error.value = err.data?.message || 'Failed to get context document'
+      throw err
+    }
+  }
+
+  const deleteContextDocument = async (agentId, docId) => {
+    try {
+      const response = await $api(`/api/agents/${agentId}/context/${docId}`, {
+        method: 'DELETE'
+      })
+      
+      // Update current agent if it's loaded
+      if (currentAgent.value?._id === agentId) {
+        await fetchAgent(agentId)
+      }
+      
+      return response.data
+    } catch (err) {
+      error.value = err.data?.message || 'Failed to delete context document'
+      throw err
+    }
+  }
+
+  const updateContextDocument = async (agentId, docId, updateData) => {
+    try {
+      const response = await $api(`/api/agents/${agentId}/context/${docId}`, {
+        method: 'PUT',
+        body: updateData
+      })
+      
+      // Update current agent if it's loaded
+      if (currentAgent.value?._id === agentId) {
+        await fetchAgent(agentId)
+      }
+      
+      return response.data
+    } catch (err) {
+      error.value = err.data?.message || 'Failed to update context document'
+      throw err
+    }
+  }
+
+  const refreshContextDocument = async (agentId, docId) => {
+    try {
+      const response = await $api(`/api/agents/${agentId}/context/${docId}`, {
+        method: 'PUT',
+        body: { refreshUrl: true }
+      })
+      
+      // Update current agent if it's loaded
+      if (currentAgent.value?._id === agentId) {
+        await fetchAgent(agentId)
+      }
+      
+      return response.data
+    } catch (err) {
+      error.value = err.data?.message || 'Failed to refresh context document'
+      throw err
+    }
+  }
+
+  const testUrl = async (agentId, url) => {
+    try {
+      const response = await $api(`/api/agents/${agentId}/context/test-url`, {
+        method: 'POST',
+        body: { url }
+      })
+      // The backend returns { success, message, data }, but $api might unwrap it
+      // Ensure we return the structure the frontend expects
+      if (response.success !== undefined) {
+        return response // Already has the right structure
+      } else {
+        // If $api unwrapped it, wrap it back
+        return {
+          success: true,
+          message: 'URL test successful',
+          data: response
+        }
+      }
+    } catch (err) {
+      error.value = err.data?.message || 'Failed to test URL'
+      throw err
+    }
+  }
+
   const uploadContext = async (agentId, file) => {
     const formData = new FormData()
     formData.append('file', file)
@@ -141,6 +243,12 @@ export const useAgentsStore = defineStore('agents', () => {
         method: 'POST',
         body: formData
       })
+      
+      // Update current agent if it's loaded
+      if (currentAgent.value?._id === agentId) {
+        await fetchAgent(agentId)
+      }
+      
       return response.data
     } catch (err) {
       error.value = err.data?.message || 'Failed to upload context'
@@ -154,6 +262,12 @@ export const useAgentsStore = defineStore('agents', () => {
         method: 'POST',
         body: { url }
       })
+      
+      // Update current agent if it's loaded
+      if (currentAgent.value?._id === agentId) {
+        await fetchAgent(agentId)
+      }
+      
       return response.data
     } catch (err) {
       error.value = err.data?.message || 'Failed to add context URL'
@@ -171,6 +285,13 @@ export const useAgentsStore = defineStore('agents', () => {
     createAgent,
     updateAgent,
     deleteAgent,
+    // Context document management
+    fetchContextDocuments,
+    getContextDocument,
+    deleteContextDocument,
+    updateContextDocument,
+    refreshContextDocument,
+    testUrl,
     uploadContext,
     addContextUrl
   }

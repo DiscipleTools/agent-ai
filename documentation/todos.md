@@ -12,25 +12,29 @@
   - [ ] File storage (local filesystem or cloud)
   - [ ] File cleanup on agent deletion
 
-- [ ] **URL Content Fetching**
-  - [ ] Implement URL content endpoint (`POST /api/agents/:id/context/url`)
-  - [ ] Web scraping service for URL content
-  - [ ] Content sanitization and processing
-  - [ ] URL validation and security checks
-  - [ ] Handle different content types (HTML, PDF, etc.)
+- [x] **URL Content Fetching**
+  - [x] Implement URL content endpoint (`POST /api/agents/:id/context/url`)
+  - [x] Web scraping service for URL content
+  - [x] Content sanitization and processing
+  - [x] URL validation and security checks
+  - [x] Handle different content types (HTML, PDF, etc.)
 
-- [ ] **Context Document CRUD**
-  - [ ] List context documents for agent
-  - [ ] Delete individual context documents
-  - [ ] Update/edit context documents
-  - [ ] Context document preview/display
+- [x] **Context Document CRUD**
+  - [x] List context documents for agent (`GET /api/agents/:id/context`)
+  - [x] Delete individual context documents (`DELETE /api/agents/:id/context/:docId`)
+  - [x] Update/edit context documents (`PUT /api/agents/:id/context/:docId`)
+  - [x] Context document preview/display (`GET /api/agents/:id/context/:docId`)
+  - [x] URL accessibility testing (`POST /api/agents/:id/context/test-url`)
+  - [x] URL content refresh functionality
 
-- [ ] **Frontend Components**
-  - [ ] Complete `components/Agent/ContextUpload.vue` implementation
+- [x] **Frontend Components**
+  - [x] Complete `components/Agent/ContextUpload.vue` implementation
+  - [x] URL input and validation with test functionality
+  - [x] Context document management interface
+  - [x] URL test results display with success/error states
+  - [x] Context document list with actions (view, refresh, remove)
   - [ ] File upload progress indicators
-  - [ ] Context document management interface
   - [ ] Drag-and-drop file upload
-  - [ ] URL input and validation
 
 ### 2. User Invitation Email System
 - [ ] **Email Service Implementation**

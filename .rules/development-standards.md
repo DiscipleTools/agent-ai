@@ -1,0 +1,119 @@
+# Agent AI Development Standards
+
+## 🔍 Debug First, Fix Second
+**Before making ANY changes when debugging:**
+1. Add logging at each step: Backend → Store → Component → Template
+2. Check browser Network tab for actual HTTP responses
+3. Add `console.log('Data received:', JSON.stringify(data))` everywhere
+4. Use `{{ JSON.stringify(debugData) }}` in templates temporarily
+5. Map out expected vs actual data structure
+
+## 📊 Data Flow Rules
+**Backend API Response Structure (REQUIRED):**
+```json
+{
+  "success": boolean,
+  "message": string, 
+  "data": object
+}
+```
+
+**Store Functions Must:**
+- Return consistent structure that templates expect
+- Handle both `response` and `response.data` cases
+- Always use try-catch with meaningful error messages
+- Log the response structure during development
+
+**Components Must:**
+- Use `reactive()` for form data
+- Include loading, error, and success states
+- Validate data structure before using
+- Handle null/undefined with `?.` operator
+
+## 🎯 Essential Patterns
+
+### Form Component Template
+```vue
+<template>
+  <div v-if="loading">Loading...</div>
+  <div v-else-if="error" class="text-red-600">{{ error }}</div>
+  <form v-else @submit.prevent="handleSubmit">
+    <!-- Form content -->
+  </form>
+</template>
+```
+
+### Store Function Pattern
+```javascript
+const apiFunction = async (data) => {
+  try {
+    const response = await $api('/endpoint', { method: 'POST', body: data })
+    console.log('API response:', response) // DEBUG
+    
+    // Handle response structure
+    if (response.success !== undefined) {
+      return response // Already correct structure
+    } else {
+      return { success: true, data: response } // Wrap if needed
+    }
+  } catch (err) {
+    console.error('API error:', err)
+    throw new Error(err.data?.message || err.message || 'Operation failed')
+  }
+}
+```
+
+### Component Script Pattern
+```javascript
+const form = reactive({ /* fields */ })
+const loading = ref(false)
+const error = ref(null)
+
+const handleSubmit = async () => {
+  loading.value = true
+  error.value = null
+  
+  try {
+    const result = await store.submitData(form)
+    console.log('Submit result:', result) // DEBUG
+    toast.success('Success!')
+  } catch (err) {
+    error.value = err.message
+    toast.error(err.message)
+  } finally {
+    loading.value = false
+  }
+}
+```
+
+## ⚡ Quick Debugging Checklist
+When something doesn't work:
+- [ ] Check browser Network tab - is the API call successful?
+- [ ] Check server logs - is the backend returning the right data?
+- [ ] Check store function - is it returning the right structure?
+- [ ] Check component - is it handling the data correctly?
+- [ ] Check template - is it looking for the right properties?
+
+## 🚫 Common Mistakes to Avoid
+- **Don't assume** `$api` response structure - always verify
+- **Don't skip** error handling for any async operation
+- **Don't forget** loading states for user feedback
+- **Don't use** hardcoded data in templates
+- **Don't ignore** browser console errors
+
+## 🎯 Before Committing Code
+1. Test both success AND error scenarios
+2. Check responsive design on mobile
+3. Verify all loading states work
+4. Remove debug console.logs
+5. Ensure proper error messages for users
+
+## 📝 Project-Specific Notes
+- Use `useToast()` for user notifications
+- Use `useAgentsStore()` for agent-related operations
+- Follow existing CSS class patterns (`btn-primary`, `input-field`)
+- All forms should have validation with clear error messages
+- Context documents need proper CRUD operations with state updates
+
+---
+**Remember: When in doubt, add more logging and check the data flow step by step!** 
