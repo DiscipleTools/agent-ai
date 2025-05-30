@@ -89,7 +89,7 @@ agentSchema.index({ createdBy: 1 })
 agentSchema.pre('save', function(next) {
   if (!this.webhookUrl) {
     const webhookId = crypto.randomBytes(16).toString('hex')
-    this.webhookUrl = `/webhook/agent/${webhookId}`
+    this.webhookUrl = `/api/webhook/agent/${webhookId}`
   }
   next()
 })

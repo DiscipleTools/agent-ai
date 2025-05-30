@@ -7,11 +7,8 @@ export default defineNuxtRouteMiddleware((to, from) => {
     return navigateTo('/login')
   }
 
-  // If user data not loaded, try to fetch it
+  // If no user data and we have a token, something went wrong
   if (!authStore.user && accessToken.value) {
-    authStore.fetchUser().catch(() => {
-      // If fetch fails, redirect to login
-      return navigateTo('/login')
-    })
+    return navigateTo('/login')
   }
 }) 

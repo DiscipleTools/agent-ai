@@ -22,7 +22,8 @@ export const useAuthStore = defineStore('auth', () => {
       await router.push('/dashboard')
       return { success: true }
     } catch (error) {
-      throw new Error(error.data?.message || 'Login failed')
+      const errorMessage = error.message || error.data?.message || error.statusMessage || 'Login failed'
+      throw new Error(errorMessage)
     } finally {
       loading.value = false
     }

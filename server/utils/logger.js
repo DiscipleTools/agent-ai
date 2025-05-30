@@ -1,5 +1,6 @@
-const winston = require('winston');
-const path = require('path');
+import winston from 'winston';
+import path from 'path';
+import fs from 'fs';
 
 // Define log levels
 const levels = {
@@ -80,7 +81,6 @@ const logger = winston.createLogger({
 });
 
 // Create logs directory if it doesn't exist
-const fs = require('fs');
 const logsDir = 'logs';
 if (!fs.existsSync(logsDir)) {
   fs.mkdirSync(logsDir);
@@ -93,4 +93,4 @@ logger.stream = {
   }
 };
 
-module.exports = logger; 
+export default logger; 
