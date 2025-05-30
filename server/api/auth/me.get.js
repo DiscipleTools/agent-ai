@@ -1,0 +1,35 @@
+import { connectDB } from '~/server/utils/db'
+import AuthService from '~/server/services/authService'
+
+export default defineEventHandler(async (event) => {
+  try {
+    // Connect to database
+    await connectDB()
+
+    // Get access token from cookies or Authorization header
+    const accessToken = getCookie(event, 'access-token') || 
+                       getHeader(event, 'authorization')?.replace('Bearer ', '')
+
+    if (!accessToken) {
+      throw createError({
+        statusCode: 401,
+        statusMessage: 'Access token required'
+      })
+    }
+
+    // Verify token and get user
+    const authService = new AuthService()
+    const decoded = await authService.verifyAccessToken(accessToken)
+    const user = await authService.getUserById(decoded.userId)
+
+    return {
+      success: true,
+      data: user
+    }
+  } catch (error) {
+    throw createError({
+      statusCode: 401,
+      statusMessage: error.message || 'Authentication failed'
+    })
+  }
+}) 
