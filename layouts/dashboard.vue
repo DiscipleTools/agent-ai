@@ -121,6 +121,7 @@
                 </p>
               </div>
               <div class="ml-2 flex space-x-1">
+                <!-- Theme toggle button hidden
                 <button
                   @click="toggleDarkMode"
                   class="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
@@ -129,6 +130,7 @@
                   <SunIcon v-if="$colorMode.value === 'dark'" class="w-4 h-4" />
                   <MoonIcon v-else class="w-4 h-4" />
                 </button>
+                -->
                 <button
                   @click="authStore.logout"
                   class="ml-2 flex items-center px-3 py-2 text-sm font-medium text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900 rounded-md transition-colors"
@@ -177,11 +179,7 @@
               </div>
               
               <div class="flex items-center space-x-4">
-                <!-- Notifications -->
-                <button class="p-2 text-gray-400 hover:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors relative">
-                  <BellIcon class="w-5 h-5" />
-                  <span class="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-                </button>
+                <!-- Notifications button removed -->
                 
                 <!-- Logout button (desktop) -->
                 <button
@@ -193,7 +191,7 @@
                   Logout
                 </button>
                 
-                <!-- Theme toggle (mobile) -->
+                <!-- Theme toggle (mobile) hidden
                 <button
                   @click="toggleDarkMode"
                   class="md:hidden p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
@@ -201,6 +199,7 @@
                   <SunIcon v-if="$colorMode.value === 'dark'" class="w-5 h-5" />
                   <MoonIcon v-else class="w-5 h-5" />
                 </button>
+                -->
                 
                 <!-- Logout button (mobile) -->
                 <button
@@ -235,7 +234,6 @@ import {
   XMarkIcon,
   SunIcon,
   MoonIcon,
-  BellIcon,
   ChevronRightIcon
 } from '@heroicons/vue/24/outline'
 
