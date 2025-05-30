@@ -1,6 +1,6 @@
 # Agent AI Server
 
-A full-stack Nuxt.js application for managing AI agents that integrate with Chatwoot instances. This system enables organizations to deploy multiple AI agents that can automatically respond to customer inquiries via chat and email.
+A full-stack Nuxt.js application for managing AI agents that integrate with Chatwoot instances. This system enables organizations to deploy multiple AI agents that can automatically respond to customer inquiries via chat and email using Prediction Guard's secure AI models.
 
 ## 🚀 Features
 
@@ -9,8 +9,10 @@ A full-stack Nuxt.js application for managing AI agents that integrate with Chat
 - **Chatwoot Integration**: Seamless webhook integration with Chatwoot instances
 - **User Authentication**: JWT-based authentication with role-based access control
 - **Admin Dashboard**: Complete admin interface for user and agent management
-- **AI-Powered Responses**: Integration with Prediction Guard API for intelligent responses
+- **AI-Powered Responses**: Integration with Prediction Guard API for intelligent, secure responses
 - **Modern UI**: Beautiful, responsive interface built with Vue 3 + Tailwind CSS
+- **Context-Aware Agents**: Support for file uploads and URL-based context enhancement
+- **Real-time Testing**: Built-in AI connection testing and model selection
 
 ## 🛠️ Technology Stack
 
@@ -18,7 +20,7 @@ A full-stack Nuxt.js application for managing AI agents that integrate with Chat
 - **Backend**: Nuxt.js Server API, Node.js
 - **Database**: MongoDB with Mongoose ODM
 - **Authentication**: JWT tokens with refresh token rotation
-- **AI Integration**: Prediction Guard API
+- **AI Integration**: Prediction Guard API with multiple model support
 - **Validation**: VeeValidate for form validation
 
 ## 📋 Prerequisites
@@ -26,6 +28,7 @@ A full-stack Nuxt.js application for managing AI agents that integrate with Chat
 - Node.js 18+ 
 - MongoDB 4.4+
 - npm or yarn
+- Prediction Guard API key (for AI functionality)
 
 ## 🚀 Quick Start
 
@@ -60,15 +63,29 @@ JWT_REFRESH_SECRET=your-super-secret-refresh-key
 JWT_EXPIRE=1h
 JWT_REFRESH_EXPIRE=7d
 
-# Prediction Guard API (optional for development)
+# Prediction Guard AI Configuration
 PREDICTION_GUARD_API_KEY=your-prediction-guard-api-key
+PREDICTION_GUARD_ENDPOINT=https://api.predictionguard.com
+PREDICTION_GUARD_DEFAULT_MODEL=Hermes-3-Llama-3.1-8B
+
+# Chatwoot Integration (optional)
+CHATWOOT_URL=https://your-chatwoot-instance.com
+CHATWOOT_API_TOKEN=your-chatwoot-api-token
 
 # Application
 APP_NAME=Agent AI Server
 NODE_ENV=development
 ```
 
-### 4. Create Admin User
+### 4. Get Prediction Guard API Key
+
+1. Sign up at [predictionguard.com](https://predictionguard.com)
+2. Get your API key from the dashboard
+3. Add it to your `.env` file **OR** configure it through the Settings interface after starting the server
+
+**Note**: You can configure Prediction Guard settings either through environment variables or through the admin Settings interface in the dashboard. Database settings take priority over environment variables.
+
+### 5. Create Admin User
 ```bash
 npm run create-admin
 ```
@@ -78,7 +95,7 @@ This will create an admin user with:
 - **Password**: AdminPassword123
 - **Role**: admin
 
-### 5. Start the Development Server
+### 6. Start the Development Server
 ```bash
 npm run dev
 ```
@@ -86,6 +103,39 @@ npm run dev
 The application will be available at:
 - **Frontend**: http://localhost:3000
 - **API**: http://localhost:3000/api
+
+### 7. Test AI Integration
+
+1. Log in to the dashboard
+2. Go to Settings
+3. Click "Test AI Connection" to verify Prediction Guard setup
+
+## 🤖 AI Integration with Prediction Guard
+
+### Available Models
+
+| Model | Type | Use Case | Context Length |
+|-------|------|----------|----------------|
+| Hermes-3-Llama-3.1-70B | Chat | Advanced reasoning, complex tasks | 20,480 |
+| Hermes-3-Llama-3.1-8B | Chat | General conversation, fast responses | 20,480 |
+| DeepSeek-R1-Distill-Qwen-32B | Reasoning | Complex problem solving | 20,480 |
+| Qwen2.5-Coder-14B-Instruct | Code | Programming assistance | 8,192 |
+| neural-chat-7b-v3-3 | Chat | Basic conversation | 8,192 |
+
+### Security Features
+
+- **No Data Storage**: Prediction Guard doesn't store your conversations
+- **No Training**: Your data isn't used for model training
+- **Built-in Safety**: Automatic content filtering and safety checks
+- **Secure Transit**: All requests encrypted with HTTPS
+
+### Configuration Options
+
+Each agent can be configured with:
+- **Temperature**: Controls response creativity (0.0-1.0)
+- **Max Tokens**: Maximum response length (1-2000)
+- **Response Delay**: Delay before responding (0-30 seconds)
+- **Context Documents**: File uploads and URL content for enhanced responses
 
 ## 📁 Project Structure
 

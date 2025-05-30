@@ -1,4 +1,5 @@
 import Settings from '../../models/Settings.js'
+import { requireAuth, requireAdmin } from '../../utils/auth.ts'
 
 export default defineEventHandler(async (event) => {
   try {

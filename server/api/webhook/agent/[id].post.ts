@@ -1,6 +1,28 @@
 import { connectDB } from '~/server/utils/db'
 import Agent from '~/server/models/Agent'
 import chatwootService from '~/server/services/chatwootService'
+import aiService from '~/server/services/aiService'
+
+interface AgentSettings {
+  temperature?: number
+  maxTokens?: number
+  responseDelay?: number
+}
+
+interface AgentDocument {
+  _id: string
+  name: string
+  prompt: string
+  webhookUrl: string
+  contextDocuments?: Array<{
+    type: 'file' | 'url'
+    content: string
+    filename?: string
+    url?: string
+  }>
+  settings?: AgentSettings
+  isActive: boolean
+}
 
 export default defineEventHandler(async (event) => {
   try {
@@ -19,7 +41,7 @@ export default defineEventHandler(async (event) => {
 
     // Find agent by webhook URL
     const webhookUrl = `/api/webhook/agent/${webhookId}`
-    const agent = await Agent.findOne({ webhookUrl, isActive: true })
+    const agent = await Agent.findOne({ webhookUrl, isActive: true }) as AgentDocument | null
 
     if (!agent) {
       throw createError({
@@ -59,21 +81,46 @@ export default defineEventHandler(async (event) => {
     console.log('Message:', payload.message.content)
     console.log('Conversation ID:', payload.conversation.id)
 
-    // Generate placeholder response: reverse each word
-    const originalMessage = payload.message.content.trim()
-    const reversedMessage = originalMessage
-      .split(' ')
-      .map((word: string) => word.split('').reverse().join(''))
-      .join(' ')
-
-    // This is what actually gets sent to Chatwoot
-    const responseMessage = reversedMessage
+    // Generate AI response using the agent's prompt and context
+    let responseMessage: string
+    
+    try {
+      responseMessage = await aiService.generateResponse(
+        agent.prompt,
+        agent.contextDocuments || [],
+        payload.message.content.trim(),
+        {
+          temperature: agent.settings?.temperature,
+          maxTokens: agent.settings?.maxTokens,
+          responseDelay: agent.settings?.responseDelay
+        }
+      )
+      
+      console.log('AI response generated:', {
+        agentName: agent.name,
+        responseLength: responseMessage.length,
+        originalMessage: payload.message.content.substring(0, 100) + (payload.message.content.length > 100 ? '...' : '')
+      })
+      
+    } catch (aiError: any) {
+      console.error('AI generation failed:', aiError)
+      
+      // Fallback response when AI fails
+      responseMessage = "I apologize, but I'm experiencing technical difficulties right now. Please try again later or contact support if the issue persists."
+      
+      // Log the error for monitoring
+      console.error('AI Service Error Details:', {
+        agentId: agent._id,
+        agentName: agent.name,
+        error: aiError.message,
+        userMessage: payload.message.content
+      })
+    }
 
     // Add configured delay if any
-    const agentSettings = agent.settings as any
-    if (agentSettings?.responseDelay && agentSettings.responseDelay > 0) {
-      console.log(`Waiting ${agentSettings.responseDelay} seconds before responding...`)
-      await new Promise(resolve => setTimeout(resolve, agentSettings.responseDelay * 1000))
+    if (agent.settings?.responseDelay && agent.settings.responseDelay > 0) {
+      console.log(`Waiting ${agent.settings.responseDelay} seconds before responding...`)
+      await aiService.delay(agent.settings.responseDelay * 1000)
     }
 
     // Send response back to Chatwoot
@@ -88,14 +135,16 @@ export default defineEventHandler(async (event) => {
 
       return {
         success: true,
-        message: 'Webhook processed and response sent',
+        message: 'Webhook processed and AI response sent',
         data: {
           agentId: agent._id,
           agentName: agent.name,
-          originalMessage,
+          originalMessage: payload.message.content,
           responseMessage,
           conversationId: payload.conversation.id,
-          accountId: payload.conversation.account_id
+          accountId: payload.conversation.account_id,
+          responseLength: responseMessage.length,
+          hasContextDocuments: (agent.contextDocuments || []).length > 0
         }
       }
 
@@ -110,7 +159,7 @@ export default defineEventHandler(async (event) => {
         data: {
           agentId: agent._id,
           agentName: agent.name,
-          originalMessage,
+          originalMessage: payload.message.content,
           responseMessage
         }
       }

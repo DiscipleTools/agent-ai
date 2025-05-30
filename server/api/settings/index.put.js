@@ -1,4 +1,6 @@
 import Settings from '../../models/Settings.js'
+import settingsService from '../../services/settingsService.ts'
+import { requireAuth, requireAdmin } from '../../utils/auth.ts'
 
 export default defineEventHandler(async (event) => {
   try {
@@ -74,6 +76,9 @@ export default defineEventHandler(async (event) => {
 
     await settings.save()
     await settings.populate('updatedBy', 'name email')
+
+    // Clear the settings cache so AI service picks up new configuration
+    settingsService.clearCache()
 
     // Don't send the actual API key back
     const response = {
