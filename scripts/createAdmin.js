@@ -24,7 +24,7 @@ const createAdminUser = async () => {
     // Get admin details from command line arguments or use defaults
     const email = process.argv[2] || 'admin@example.com';
     const name = process.argv[3] || 'Admin User';
-    const password = process.argv[4] || 'password123';
+    const password = process.argv[4] || 'AdminPassword123';
 
     // Create admin user
     const adminUser = new User({

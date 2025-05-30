@@ -7,10 +7,12 @@ export const useAuthStore = defineStore('auth', () => {
   const loading = ref(false)
 
   const router = useRouter()
+  const { $api } = useApi()
 
   const login = async (credentials) => {
     loading.value = true
     try {
+      // Use regular $fetch for login since we don't have a token yet
       const { data } = await $fetch('/api/auth/login', {
         method: 'POST',
         body: credentials
@@ -28,7 +30,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   const logout = async () => {
     try {
-      await $fetch('/api/auth/logout', {
+      await $api('/api/auth/logout', {
         method: 'POST'
       })
     } catch (error) {
@@ -42,7 +44,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   const fetchUser = async () => {
     try {
-      const { data } = await $fetch('/api/auth/me')
+      const { data } = await $api('/api/auth/me')
       user.value = data
     } catch (error) {
       console.error('Failed to fetch user:', error)
@@ -52,7 +54,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   const refreshTokens = async () => {
     try {
-      const { data } = await $fetch('/api/auth/refresh', {
+      const { data } = await $api('/api/auth/refresh', {
         method: 'POST'
       })
       return data.accessToken

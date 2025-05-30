@@ -6,20 +6,14 @@ export const useAgentsStore = defineStore('agents', () => {
   const loading = ref(false)
   const error = ref(null)
 
+  const { $api } = useApi()
+
   const fetchAgents = async () => {
     loading.value = true
     error.value = null
     try {
-      const { $fetch } = useNuxtApp()
-      const accessToken = useCookie('access-token')
-      
-      const response = await $fetch('/agents', {
-        baseURL: useRuntimeConfig().public.apiBase,
-        headers: {
-          Authorization: `Bearer ${accessToken.value}`
-        }
-      })
-      agents.value = response.data
+      const { data } = await $api('/api/agents')
+      agents.value = data
     } catch (err) {
       error.value = err.data?.message || 'Failed to fetch agents'
       throw err
@@ -32,17 +26,9 @@ export const useAgentsStore = defineStore('agents', () => {
     loading.value = true
     error.value = null
     try {
-      const { $fetch } = useNuxtApp()
-      const accessToken = useCookie('access-token')
-      
-      const response = await $fetch(`/agents/${id}`, {
-        baseURL: useRuntimeConfig().public.apiBase,
-        headers: {
-          Authorization: `Bearer ${accessToken.value}`
-        }
-      })
-      currentAgent.value = response.data
-      return response.data
+      const { data } = await $api(`/api/agents/${id}`)
+      currentAgent.value = data
+      return data
     } catch (err) {
       error.value = err.data?.message || 'Failed to fetch agent'
       throw err
@@ -55,20 +41,12 @@ export const useAgentsStore = defineStore('agents', () => {
     loading.value = true
     error.value = null
     try {
-      const { $fetch } = useNuxtApp()
-      const accessToken = useCookie('access-token')
-      
-      const response = await $fetch('/agents', {
+      const { data } = await $api('/api/agents', {
         method: 'POST',
-        baseURL: useRuntimeConfig().public.apiBase,
-        headers: {
-          Authorization: `Bearer ${accessToken.value}`
-        },
         body: agentData
       })
-      const newAgent = response.data
-      agents.value.unshift(newAgent)
-      return newAgent
+      agents.value.unshift(data)
+      return data
     } catch (err) {
       error.value = err.data?.message || 'Failed to create agent'
       throw err
@@ -81,31 +59,23 @@ export const useAgentsStore = defineStore('agents', () => {
     loading.value = true
     error.value = null
     try {
-      const { $fetch } = useNuxtApp()
-      const accessToken = useCookie('access-token')
-      
-      const response = await $fetch(`/agents/${id}`, {
+      const { data } = await $api(`/api/agents/${id}`, {
         method: 'PUT',
-        baseURL: useRuntimeConfig().public.apiBase,
-        headers: {
-          Authorization: `Bearer ${accessToken.value}`
-        },
         body: agentData
       })
-      const updatedAgent = response.data
       
       // Update in agents list
       const index = agents.value.findIndex(agent => agent._id === id)
       if (index !== -1) {
-        agents.value[index] = updatedAgent
+        agents.value[index] = data
       }
       
       // Update current agent if it's the same
       if (currentAgent.value?._id === id) {
-        currentAgent.value = updatedAgent
+        currentAgent.value = data
       }
       
-      return updatedAgent
+      return data
     } catch (err) {
       error.value = err.data?.message || 'Failed to update agent'
       throw err
@@ -118,15 +88,8 @@ export const useAgentsStore = defineStore('agents', () => {
     loading.value = true
     error.value = null
     try {
-      const { $fetch } = useNuxtApp()
-      const accessToken = useCookie('access-token')
-      
-      await $fetch(`/agents/${id}`, {
-        method: 'DELETE',
-        baseURL: useRuntimeConfig().public.apiBase,
-        headers: {
-          Authorization: `Bearer ${accessToken.value}`
-        }
+      await $api(`/api/agents/${id}`, {
+        method: 'DELETE'
       })
       agents.value = agents.value.filter(agent => agent._id !== id)
       
@@ -146,18 +109,11 @@ export const useAgentsStore = defineStore('agents', () => {
     formData.append('file', file)
     
     try {
-      const { $fetch } = useNuxtApp()
-      const accessToken = useCookie('access-token')
-      
-      const response = await $fetch(`/agents/${agentId}/context/upload`, {
+      const { data } = await $api(`/api/agents/${agentId}/context/upload`, {
         method: 'POST',
-        baseURL: useRuntimeConfig().public.apiBase,
-        headers: {
-          Authorization: `Bearer ${accessToken.value}`
-        },
         body: formData
       })
-      return response.data
+      return data
     } catch (err) {
       error.value = err.data?.message || 'Failed to upload context'
       throw err
@@ -166,18 +122,11 @@ export const useAgentsStore = defineStore('agents', () => {
 
   const addContextUrl = async (agentId, url) => {
     try {
-      const { $fetch } = useNuxtApp()
-      const accessToken = useCookie('access-token')
-      
-      const response = await $fetch(`/agents/${agentId}/context/url`, {
+      const { data } = await $api(`/api/agents/${agentId}/context/url`, {
         method: 'POST',
-        baseURL: useRuntimeConfig().public.apiBase,
-        headers: {
-          Authorization: `Bearer ${accessToken.value}`
-        },
         body: { url }
       })
-      return response.data
+      return data
     } catch (err) {
       error.value = err.data?.message || 'Failed to add context URL'
       throw err

@@ -160,6 +160,7 @@
             </NuxtLink>
 
             <NuxtLink
+              v-if="authStore.isAdmin"
               to="/dashboard/settings"
               class="action-card group"
             >
@@ -268,7 +269,7 @@
             <PlusIcon class="w-4 h-4 mr-2" />
             Create Your First Agent
           </NuxtLink>
-          <NuxtLink to="/dashboard/settings" class="btn-secondary">
+          <NuxtLink v-if="authStore.isAdmin" to="/dashboard/settings" class="btn-secondary">
             <CogIcon class="w-4 h-4 mr-2" />
             Configure Settings
           </NuxtLink>

@@ -9,6 +9,7 @@
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare",
     "create-admin": "node scripts/createAdmin.js",
+    "create-user": "node scripts/create-user.cjs",
     "setup": "node scripts/setup.js"
   },
   "dependencies": {
@@ -34,6 +35,11 @@
     "vee-validate": "^4.15.0",
     "vue": "^3.5.15",
     "vue-router": "^4.5.1",
+    "vue-toastification": "^2.0.0-rc.5",
     "winston": "^3.17.0"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/jsonwebtoken": "^9.0.9"
   }
 }

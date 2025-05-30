@@ -249,7 +249,7 @@ const navigation = computed(() => [
   { name: 'Dashboard', href: '/dashboard', icon: HomeIcon },
   { name: 'Agents', href: '/dashboard/agents', icon: CpuChipIcon, badge: '0' },
   ...(authStore.isAdmin ? [{ name: 'Users', href: '/dashboard/users', icon: UsersIcon }] : []),
-  { name: 'Settings', href: '/dashboard/settings', icon: CogIcon }
+  ...(authStore.isAdmin ? [{ name: 'Settings', href: '/dashboard/settings', icon: CogIcon }] : [])
 ])
 
 const currentPageName = computed(() => {
