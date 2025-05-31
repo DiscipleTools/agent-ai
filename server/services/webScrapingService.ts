@@ -268,7 +268,7 @@ class WebScrapingService {
       const isNavigationContent = (text: string): boolean => {
         const lowerText = text.toLowerCase()
         
-        // Common navigation patterns
+        // Common navigation patterns (generic, not site-specific)
         const navPatterns = [
           /^(home|about|contact|login|register|sign in|sign up|logout|search)$/i,
           /^(menu|navigation|nav|breadcrumb)$/i,
@@ -277,7 +277,8 @@ class WebScrapingService {
           /^(facebook|twitter|instagram|linkedin|youtube|social)$/i,
           /^(privacy|terms|policy|legal|copyright)$/i,
           /^(subscribe|newsletter|follow|share|like)$/i,
-          /^(documentation|training|videos|community|forum|discord|channel)$/i
+          /^(documentation|training|videos|community|forum|blog|news)$/i,
+          /^(help|support|faq|guide|tutorial)$/i
         ]
         
         // Check if text matches navigation patterns
@@ -287,14 +288,16 @@ class WebScrapingService {
           }
         }
         
-        // Check for very short navigation-like text
+        // Check for very short navigation-like text with action words
         if (text.length < 30 && (
           lowerText.includes('click') ||
           lowerText.includes('here') ||
           lowerText.includes('link') ||
           lowerText.includes('page') ||
           lowerText.includes('view') ||
-          lowerText.includes('see')
+          lowerText.includes('see') ||
+          lowerText.includes('read more') ||
+          lowerText.includes('learn more')
         )) {
           return true
         }
@@ -302,6 +305,11 @@ class WebScrapingService {
         // Check for lists of short items (likely navigation)
         const words = text.split(/\s+/)
         if (words.length <= 3 && text.length < 50) {
+          return true
+        }
+        
+        // Check for common navigation separators in short text
+        if (text.length < 100 && /[|•\-›»>]/.test(text) && words.length <= 5) {
           return true
         }
         
@@ -372,20 +380,32 @@ class WebScrapingService {
               return false
             }
             
-            // Remove lines with common navigation patterns
-            const navKeywords = [
-              'view categories', 'search about', 'kingdom vision', 'our history',
-              'what is disciple', 'for online strategies', 'for small teams', 'for multiple teams',
-              'why disciple', 'pricing (free)', 'software download', 'translation',
-              'open source', 'resources documentation', 'training videos', 'community forum',
-              'discord channel', 'join the community', 'news', 'home', 'about', 'contact'
-            ]
-            
+            // Generic navigation pattern detection (not site-specific)
             const lowerLine = trimmedLine.toLowerCase()
-            for (const keyword of navKeywords) {
-              if (lowerLine.includes(keyword)) {
+            
+            // Skip lines that are just navigation links (multiple short words separated by bullets/pipes)
+            if (/^[•\|\-\s]*([a-z\s]{1,20}[•\|\-\s]+){3,}[a-z\s]{1,20}[•\|\-\s]*$/i.test(trimmedLine)) {
+              return false
+            }
+            
+            // Skip lines with multiple navigation-like separators
+            if ((trimmedLine.match(/[•\|\-]/g) || []).length >= 3 && trimmedLine.length < 200) {
+              return false
+            }
+            
+            // Skip lines that are mostly common navigation words
+            const commonNavWords = ['home', 'about', 'contact', 'login', 'register', 'search', 'menu', 'news', 'blog', 'help', 'support', 'privacy', 'terms', 'policy']
+            const words = lowerLine.split(/\s+/).filter(word => word.length > 2)
+            if (words.length > 0) {
+              const navWordCount = words.filter(word => commonNavWords.includes(word)).length
+              if (navWordCount / words.length > 0.5 && words.length <= 10) {
                 return false
               }
+            }
+            
+            // Skip lines that look like breadcrumbs (word > word > word)
+            if (/\w+\s*[>»]\s*\w+\s*[>»]\s*\w+/.test(trimmedLine)) {
+              return false
             }
             
             return true
