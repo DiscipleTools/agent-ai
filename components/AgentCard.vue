@@ -43,7 +43,7 @@
     
     <div class="flex space-x-2">
       <NuxtLink
-        :to="`/dashboard/agents/${agent._id}`"
+        :to="`/agents/${agent._id}`"
         class="flex-1 btn-primary text-center"
       >
         Edit

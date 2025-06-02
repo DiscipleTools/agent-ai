@@ -77,7 +77,7 @@ const handleSubmit = async (agentData) => {
     }
     
     // Navigate back to agents list
-    await router.push('/dashboard/agents')
+    await router.push('/agents')
   } catch (error) {
     console.error('Failed to update agent:', error)
     const toast = useNuxtApp().$toast

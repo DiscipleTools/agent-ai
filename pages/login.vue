@@ -101,7 +101,7 @@ const error = ref('')
 // Redirect if already authenticated
 onMounted(() => {
   if (authStore.isAuthenticated) {
-    navigateTo('/dashboard')
+    navigateTo('/agents')
   }
 })
 

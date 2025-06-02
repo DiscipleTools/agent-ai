@@ -165,10 +165,10 @@
                     <li>
                       <div class="flex items-center">
                         <HomeIcon class="w-4 h-4 text-gray-400" />
-                        <span class="ml-2 text-sm font-medium text-gray-500 dark:text-gray-400">Dashboard</span>
+                        <span class="ml-2 text-sm font-medium text-gray-500 dark:text-gray-400">Agents</span>
                       </div>
                     </li>
-                    <li v-if="currentPageName !== 'Dashboard'">
+                    <li v-if="currentPageName !== 'Agents'">
                       <div class="flex items-center">
                         <ChevronRightIcon class="w-4 h-4 text-gray-400 mx-2" />
                         <span class="text-sm font-medium text-gray-900 dark:text-white">{{ currentPageName }}</span>
@@ -245,24 +245,22 @@ const route = useRoute()
 const mobileMenuOpen = ref(false)
 
 const navigation = computed(() => [
-  { name: 'Dashboard', href: '/dashboard', icon: HomeIcon },
   { 
     name: 'Agents', 
-    href: '/dashboard/agents', 
+    href: '/agents', 
     icon: CpuChipIcon, 
     badge: agentsStore.agents.length > 0 ? agentsStore.agents.length.toString() : undefined 
   },
-  ...(authStore.isAdmin ? [{ name: 'Users', href: '/dashboard/users', icon: UsersIcon }] : []),
-  ...(authStore.isAdmin ? [{ name: 'Settings', href: '/dashboard/settings', icon: CogIcon }] : [])
+  ...(authStore.isAdmin ? [{ name: 'Users', href: '/users', icon: UsersIcon }] : []),
+  ...(authStore.isAdmin ? [{ name: 'Settings', href: '/settings', icon: CogIcon }] : [])
 ])
 
 const currentPageName = computed(() => {
   const path = route.path
-  if (path === '/dashboard') return 'Dashboard'
   if (path.includes('/agents')) return 'Agents'
   if (path.includes('/users')) return 'Users'
   if (path.includes('/settings')) return 'Settings'
-  return 'Dashboard'
+  return 'Agents'
 })
 
 const toggleDarkMode = () => {

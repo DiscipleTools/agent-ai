@@ -138,11 +138,11 @@ const fetchAgents = async () => {
 }
 
 const createAgent = () => {
-  navigateTo('/dashboard/agents/create')
+  navigateTo('/agents/create')
 }
 
 const editAgent = (agent) => {
-  navigateTo(`/dashboard/agents/${agent._id}`)
+  navigateTo(`/agents/${agent._id}`)
 }
 
 const deleteAgent = async (agentId) => {

@@ -326,7 +326,7 @@ The {{appName}} Team
       const templateData = {
         userName,
         appName,
-        dashboardUrl: `${baseUrl}/dashboard`
+        dashboardUrl: `${baseUrl}/agents`
       }
 
       const mailOptions = {

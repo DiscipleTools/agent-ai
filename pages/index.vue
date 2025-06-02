@@ -21,12 +21,12 @@ onMounted(async () => {
   if (accessToken.value && !authStore.user) {
     try {
       await authStore.fetchUser()
-      await navigateTo('/dashboard')
+      await navigateTo('/agents')
     } catch (error) {
       await navigateTo('/login')
     }
   } else if (authStore.isAuthenticated) {
-    await navigateTo('/dashboard')
+    await navigateTo('/agents')
   } else {
     await navigateTo('/login')
   }
