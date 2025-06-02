@@ -207,9 +207,14 @@
             <button
               type="button"
               @click="$refs.fileInput?.click()"
+              :disabled="fileUploading"
               class="btn-secondary text-sm"
             >
-              Choose File
+              <span v-if="fileUploading" class="flex items-center">
+                <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600 mr-2"></div>
+                Uploading...
+              </span>
+              <span v-else>Choose File</span>
             </button>
             <button
               type="button"
@@ -430,8 +435,27 @@
             type="file"
             class="sr-only"
             @change="handleFileUpload"
-            accept=".pdf,.txt,.doc,.docx"
+            accept=".pdf,.txt,.doc,.docx,application/pdf,text/plain,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            :disabled="fileUploading"
           />
+          
+          <!-- File upload progress -->
+          <div v-if="fileUploading" class="mt-4">
+            <div class="bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+              <div 
+                class="bg-primary-600 h-2 rounded-full transition-all duration-300"
+                :style="{ width: `${fileUploadProgress}%` }"
+              ></div>
+            </div>
+            <p class="text-xs text-gray-500 mt-1 text-center">Processing file...</p>
+          </div>
+          
+          <!-- File type help text -->
+          <div v-if="!fileUploading" class="mt-4">
+            <p class="text-xs text-gray-500 text-center">
+              Supported file types: PDF, TXT, DOC, DOCX (max 10MB)
+            </p>
+          </div>
         </div>
       </div>
     </div>
@@ -483,7 +507,7 @@ const form = reactive({
   description: props.agent?.description || '',
   prompt: props.agent?.prompt || '',
   settings: {
-    temperature: props.agent?.settings?.temperature || 0.,
+    temperature: props.agent?.settings?.temperature || 0.7,
     maxTokens: props.agent?.settings?.maxTokens || 500,
     responseDelay: props.agent?.settings?.responseDelay || 0
   }
@@ -501,6 +525,10 @@ const websiteInput = ref('')
 const websiteTesting = ref(false)
 const websiteAdding = ref(false)
 const websiteTestResult = ref(null)
+
+// File upload state
+const fileUploading = ref(false)
+const fileUploadProgress = ref(0)
 
 // Context documents state
 const contextDocuments = ref([])
@@ -706,12 +734,57 @@ const viewContextDocument = async (docId) => {
   }
 }
 
-const handleFileUpload = (event) => {
+const handleFileUpload = async (event) => {
   const file = event.target.files[0]
-  if (file) {
-    // TODO: Implement file upload
-    console.log('File selected:', file)
-    toast.info('File upload not yet implemented')
+  if (!file || !props.agent?._id) return
+  
+  // Validate file type
+  const allowedTypes = ['application/pdf', 'text/plain', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']
+  const allowedExtensions = ['.pdf', '.txt', '.doc', '.docx']
+  const fileExtension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'))
+  
+  if (!allowedTypes.includes(file.type) && !allowedExtensions.includes(fileExtension)) {
+    toast.error('File type not supported. Please upload PDF, TXT, DOC, or DOCX files.')
+    event.target.value = '' // Clear the input
+    return
+  }
+  
+  // Validate file size (10MB limit)
+  const maxSize = 10 * 1024 * 1024 // 10MB
+  if (file.size > maxSize) {
+    toast.error('File size too large. Maximum allowed size is 10MB.')
+    event.target.value = '' // Clear the input
+    return
+  }
+  
+  fileUploading.value = true
+  fileUploadProgress.value = 0
+  
+  try {
+    console.log(`Uploading file: ${file.name} (${file.size} bytes, ${file.type})`)
+    
+    // Create FormData
+    const formData = new FormData()
+    formData.append('file', file)
+    
+    // Upload file with progress tracking
+    const response = await agentsStore.uploadContext(props.agent._id, file)
+    
+    toast.success(`File "${file.name}" uploaded and processed successfully`)
+    
+    // Clear the file input
+    event.target.value = ''
+    
+    // Reload context documents
+    await loadContextDocuments()
+    
+  } catch (error) {
+    console.error('File upload failed:', error)
+    toast.error(error.message || 'Failed to upload file')
+    event.target.value = '' // Clear the input on error
+  } finally {
+    fileUploading.value = false
+    fileUploadProgress.value = 0
   }
 }
 
