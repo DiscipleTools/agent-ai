@@ -120,6 +120,6 @@ agentSchema.virtual('info').get(function() {
   }
 })
 
-const Agent = mongoose.model('Agent', agentSchema)
+const Agent = mongoose.models.Agent || mongoose.model('Agent', agentSchema)
 
 export default Agent 

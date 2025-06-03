@@ -122,3 +122,7 @@ When something doesn't work:
 
 ---
 **Remember: When in doubt, add more logging and check the data flow step by step!** 
+
+
+## Server.
+Server is always running on port 3000. Try to kill this server before starting a new server

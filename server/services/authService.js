@@ -9,16 +9,14 @@ class AuthService {
    * @returns {Object} Object containing accessToken and refreshToken
    */
   generateTokens(userId) {
-    const config = useRuntimeConfig()
-    
     const accessToken = jwt.sign(
       { 
         userId,
         type: 'access'
       },
-      config.jwtSecret,
+      useRuntimeConfig().jwtSecret,
       { 
-        expiresIn: config.jwtExpire || '1h',
+        expiresIn: useRuntimeConfig().jwtExpire || '1h',
         issuer: 'agent-ai-server',
         audience: 'agent-ai-client'
       }
@@ -30,9 +28,9 @@ class AuthService {
         type: 'refresh',
         tokenId: crypto.randomBytes(16).toString('hex')
       },
-      config.jwtRefreshSecret,
+      useRuntimeConfig().jwtRefreshSecret,
       { 
-        expiresIn: config.jwtRefreshExpire || '7d',
+        expiresIn: useRuntimeConfig().jwtRefreshExpire || '7d',
         issuer: 'agent-ai-server',
         audience: 'agent-ai-client'
       }
@@ -48,8 +46,7 @@ class AuthService {
    */
   async verifyAccessToken(token) {
     try {
-      const config = useRuntimeConfig()
-      const decoded = jwt.verify(token, config.jwtSecret, {
+      const decoded = jwt.verify(token, useRuntimeConfig().jwtSecret, {
         issuer: 'agent-ai-server',
         audience: 'agent-ai-client'
       });
@@ -76,8 +73,7 @@ class AuthService {
    */
   async verifyRefreshToken(token) {
     try {
-      const config = useRuntimeConfig()
-      const decoded = jwt.verify(token, config.jwtRefreshSecret, {
+      const decoded = jwt.verify(token, useRuntimeConfig().jwtRefreshSecret, {
         issuer: 'agent-ai-server',
         audience: 'agent-ai-client'
       });

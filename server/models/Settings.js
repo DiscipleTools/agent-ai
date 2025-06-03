@@ -88,4 +88,4 @@ const settingsSchema = new mongoose.Schema({
 // Ensure only one settings document exists
 settingsSchema.index({}, { unique: true })
 
-export default mongoose.model('Settings', settingsSchema) 
+export default mongoose.models.Settings || mongoose.model('Settings', settingsSchema) 

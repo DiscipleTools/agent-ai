@@ -12,7 +12,20 @@ export async function requireAuth(event: any) {
   }
 
   try {
-    const decoded = jwt.verify(token, useRuntimeConfig().jwtSecret) as any
+    // Verify token with same options as AuthService for consistency
+    const decoded = jwt.verify(token, useRuntimeConfig().jwtSecret, {
+      issuer: 'agent-ai-server',
+      audience: 'agent-ai-client'
+    }) as any
+
+    // Validate token type
+    if (decoded.type !== 'access') {
+      throw createError({
+        statusCode: 401,
+        statusMessage: 'Invalid token type'
+      })
+    }
+
     const user = await User.findById(decoded.userId).select('-password -refreshTokens')
 
     if (!user || !user.isActive) {
@@ -25,7 +38,8 @@ export async function requireAuth(event: any) {
     // Attach user to event context
     event.context.user = user
     return user
-  } catch (error) {
+  } catch (error: any) {
+    console.error('Token verification error:', error.message)
     throw createError({
       statusCode: 401,
       statusMessage: 'Invalid token'
