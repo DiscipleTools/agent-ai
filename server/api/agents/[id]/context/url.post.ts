@@ -3,6 +3,7 @@ import { requireAuth } from '~/server/utils/auth'
 import Agent from '~/server/models/Agent'
 import User from '~/server/models/User'
 import webScrapingService from '~/server/services/webScrapingService'
+import { ragService } from '~/server/services/ragService'
 import mongoose from 'mongoose'
 
 export default defineEventHandler(async (event) => {
@@ -40,6 +41,12 @@ export default defineEventHandler(async (event) => {
         statusCode: 404,
         statusMessage: 'Agent not found'
       })
+    }
+
+    // Defensive check: Ensure createdBy field exists (fix for legacy agents)
+    if (!agent.createdBy) {
+      console.warn(`Agent ${agent.name} missing createdBy field, setting to current user`)
+      agent.createdBy = user._id
     }
 
     // Check if user has access to this agent
@@ -87,7 +94,36 @@ export default defineEventHandler(async (event) => {
     agent.contextDocuments.push(contextDocument)
     await agent.save()
 
+    // Get the document ID for RAG processing
+    const savedDocument = agent.contextDocuments[agent.contextDocuments.length - 1]
+    const documentId = savedDocument._id?.toString()
+
     console.log(`Added URL context to agent ${agent.name}: ${scrapedContent.url} (${scrapedContent.content.length} characters)`)
+
+    // Process document for RAG (vector embeddings)
+    let ragInfo = null
+    try {
+      if (documentId) {
+        const ragResult = await ragService.processDocument(
+          agentId,
+          documentId,
+          scrapedContent.content,
+          {
+            type: 'url',
+            title: contextDocument.filename,
+            source: scrapedContent.url
+          }
+        )
+        ragInfo = {
+          chunksCreated: ragResult.chunksCreated,
+          collectionName: ragResult.collectionName
+        }
+        console.log(`✅ RAG processing completed: ${ragResult.chunksCreated} chunks created for URL`)
+      }
+    } catch (ragError) {
+      console.error('RAG processing failed (non-critical):', ragError)
+      // RAG failure is non-critical - document is still saved to MongoDB
+    }
 
     return {
       success: true,
@@ -105,7 +141,8 @@ export default defineEventHandler(async (event) => {
           _id: agent._id,
           name: agent.name,
           contextDocumentsCount: agent.contextDocuments.length
-        }
+        },
+        rag: ragInfo
       }
     }
 

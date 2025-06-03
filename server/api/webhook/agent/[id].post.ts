@@ -86,6 +86,7 @@ export default defineEventHandler(async (event) => {
     
     try {
       responseMessage = await aiService.generateResponse(
+        agent._id,
         agent.prompt,
         agent.contextDocuments || [],
         payload.message.content.trim(),
