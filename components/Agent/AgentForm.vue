@@ -67,6 +67,40 @@
     <div class="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
       <h2 class="text-lg font-medium text-gray-900 dark:text-white mb-6">AI Settings</h2>
       
+      <!-- LLM Model Selection -->
+      <div class="mb-6">
+        <div class="grid grid-cols-1 gap-6">
+          <div>
+            <label for="model" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              AI Model
+            </label>
+            <select
+              id="model"
+              v-model="selectedModelOption"
+              @change="onModelChange"
+              class="input-field"
+              :disabled="loadingConnections || !allAvailableModels.length"
+            >
+              <option value="">Use Default Model</option>
+              <option 
+                v-for="modelOption in allAvailableModels"
+                :key="`${modelOption.connectionId}-${modelOption.modelId}`"
+                :value="`${modelOption.connectionId}|${modelOption.modelId}`"
+              >
+                {{ modelOption.connectionName }} - {{ modelOption.modelName }}
+              </option>
+            </select>
+            <p class="text-xs text-gray-500 mt-1">
+              <span v-if="loadingConnections">Loading available models...</span>
+              <span v-else-if="selectedModelOption">Custom model selected</span>
+              <span v-else-if="defaultConnection">Default: {{ defaultConnection.connectionName }} - {{ defaultConnection.modelName }}</span>
+              <span v-else>No default model configured</span>
+            </p>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Existing AI Settings -->
       <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div>
           <label for="temperature" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -513,7 +547,9 @@ const form = reactive({
   settings: {
     temperature: props.agent?.settings?.temperature || 0.3,
     maxTokens: props.agent?.settings?.maxTokens || 500,
-    responseDelay: props.agent?.settings?.responseDelay || 0
+    responseDelay: props.agent?.settings?.responseDelay || 0,
+    connectionId: props.agent?.settings?.connectionId || '',
+    modelId: props.agent?.settings?.modelId || ''
   }
 })
 
@@ -546,6 +582,75 @@ const crawlOptions = reactive({
   sameDomainOnly: true
 })
 
+// AI Connections state
+const availableConnections = ref([])
+const defaultConnection = ref(null)
+const loadingConnections = ref(false)
+const selectedModelOption = ref('')
+
+// Computed properties for AI connections
+const allAvailableModels = computed(() => {
+  const models = []
+  
+  availableConnections.value.forEach(connection => {
+    connection.availableModels?.forEach(model => {
+      models.push({
+        connectionId: connection._id,
+        connectionName: connection.name,
+        modelId: model.id,
+        modelName: model.name || model.id,
+        provider: connection.provider
+      })
+    })
+  })
+  
+  return models
+})
+
+// Load AI connections
+const loadAIConnections = async () => {
+  loadingConnections.value = true
+  try {
+    const response = await agentsStore.fetchAIConnections()
+    availableConnections.value = response.connections || []
+    defaultConnection.value = response.defaultConnection || null
+    
+    // Set initial selection based on current agent settings
+    updateSelectedModelOption()
+  } catch (error) {
+    console.error('Failed to load AI connections:', error)
+    toast.error('Failed to load AI connections')
+  } finally {
+    loadingConnections.value = false
+  }
+}
+
+// Update selected model option based on form settings
+const updateSelectedModelOption = () => {
+  if (form.settings.connectionId && form.settings.modelId) {
+    selectedModelOption.value = `${form.settings.connectionId}|${form.settings.modelId}`
+  } else {
+    selectedModelOption.value = ''
+  }
+}
+
+// Handle model selection change
+const onModelChange = () => {
+  if (selectedModelOption.value) {
+    const [connectionId, modelId] = selectedModelOption.value.split('|')
+    form.settings.connectionId = connectionId
+    form.settings.modelId = modelId
+  } else {
+    form.settings.connectionId = ''
+    form.settings.modelId = ''
+  }
+}
+
+// Initialize AI connections on mount
+onMounted(() => {
+  loadAIConnections()
+})
+
 // Load context documents function (defined before watcher)
 const loadContextDocuments = async () => {
   if (!props.agent?._id) return
@@ -568,8 +673,13 @@ watch(() => props.agent, (newAgent) => {
     form.settings = {
       temperature: newAgent.settings?.temperature || 0.3,
       maxTokens: newAgent.settings?.maxTokens || 500,
-      responseDelay: newAgent.settings?.responseDelay || 0
+      responseDelay: newAgent.settings?.responseDelay || 0,
+      connectionId: newAgent.settings?.connectionId || '',
+      modelId: newAgent.settings?.modelId || ''
     }
+    
+    // Update selected model option
+    updateSelectedModelOption()
     
     // Load context documents if editing
     if (newAgent._id) {
@@ -577,6 +687,11 @@ watch(() => props.agent, (newAgent) => {
     }
   }
 }, { immediate: true })
+
+// Watch for available connections to update selected model option
+watch(() => availableConnections.value, () => {
+  updateSelectedModelOption()
+})
 
 // Validation
 const validateForm = () => {
@@ -622,7 +737,9 @@ const handleSubmit = async () => {
       settings: {
         temperature: Number(form.settings.temperature),
         maxTokens: Number(form.settings.maxTokens),
-        responseDelay: Number(form.settings.responseDelay)
+        responseDelay: Number(form.settings.responseDelay),
+        connectionId: form.settings.connectionId || null,
+        modelId: form.settings.modelId || null
       }
     }
 

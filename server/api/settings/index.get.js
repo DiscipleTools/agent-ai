@@ -15,10 +15,7 @@ export default defineEventHandler(async (event) => {
     // If no settings exist, create default settings
     if (!settings) {
       settings = new Settings({
-        predictionGuard: {
-          endpoint: 'https://api.predictionguard.com',
-          model: 'Hermes-3-Llama-3.1-8B'
-        },
+        aiConnections: [],
         server: {
           maxFileSize: 10485760,
           allowedFileTypes: ['pdf', 'txt', 'doc', 'docx']
@@ -29,13 +26,23 @@ export default defineEventHandler(async (event) => {
       await settings.populate('updatedBy', 'name email')
     }
 
-    // Don't send the actual API key, just indicate if it's set
+    // Don't send the actual API keys, just indicate if they're set
     const response = {
       ...settings.toObject(),
-      predictionGuard: {
-        ...settings.predictionGuard,
-        apiKey: settings.predictionGuard.apiKey ? '***HIDDEN***' : null
-      }
+      aiConnections: settings.aiConnections?.map(conn => ({
+        ...conn.toObject(),
+        apiKey: '***HIDDEN***'
+      })) || [],
+      email: settings.email ? {
+        ...settings.email,
+        smtp: settings.email.smtp ? {
+          ...settings.email.smtp,
+          auth: settings.email.smtp.auth ? {
+            user: settings.email.smtp.auth.user,
+            pass: settings.email.smtp.auth.pass ? '***HIDDEN***' : null
+          } : undefined
+        } : undefined
+      } : undefined
     }
 
     return {

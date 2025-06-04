@@ -7,6 +7,8 @@ interface AgentSettings {
   temperature?: number
   maxTokens?: number
   responseDelay?: number
+  connectionId?: string
+  modelId?: string
 }
 
 interface AgentDocument {
@@ -93,7 +95,9 @@ export default defineEventHandler(async (event) => {
         {
           temperature: agent.settings?.temperature,
           maxTokens: agent.settings?.maxTokens,
-          responseDelay: agent.settings?.responseDelay
+          responseDelay: agent.settings?.responseDelay,
+          connectionId: agent.settings?.connectionId,
+          modelId: agent.settings?.modelId
         }
       )
       

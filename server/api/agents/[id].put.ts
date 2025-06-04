@@ -52,6 +52,15 @@ export default defineEventHandler(async (event) => {
     if (body.settings) {
       const currentSettings = (agent as any).settings || {}
       Object.assign(currentSettings, body.settings)
+      
+      // Validate connectionId if provided
+      if (body.settings.connectionId && !mongoose.Types.ObjectId.isValid(body.settings.connectionId)) {
+        throw createError({
+          statusCode: 400,
+          statusMessage: 'Invalid connection ID format'
+        })
+      }
+      
       ;(agent as any).settings = currentSettings
     }
 

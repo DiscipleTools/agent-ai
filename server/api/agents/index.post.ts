@@ -2,6 +2,7 @@ import { connectDB } from '~/server/utils/db'
 import { requireAuth } from '~/server/utils/auth'
 import Agent from '~/server/models/Agent'
 import User from '~/server/models/User'
+import mongoose from 'mongoose'
 
 export default defineEventHandler(async (event) => {
   try {
@@ -57,6 +58,11 @@ export default defineEventHandler(async (event) => {
           errors.push('Response delay must be between 0 and 30 seconds')
         }
       }
+
+      // Validate connectionId and modelId if provided
+      if (body.settings.connectionId && !mongoose.Types.ObjectId.isValid(body.settings.connectionId)) {
+        errors.push('Invalid connection ID format')
+      }
     }
 
     if (errors.length > 0) {
@@ -74,7 +80,9 @@ export default defineEventHandler(async (event) => {
       settings: {
         temperature: body.settings?.temperature !== undefined ? Number(body.settings.temperature) : 0.3,
         maxTokens: body.settings?.maxTokens !== undefined ? Number(body.settings.maxTokens) : 500,
-        responseDelay: body.settings?.responseDelay !== undefined ? Number(body.settings.responseDelay) : 0
+        responseDelay: body.settings?.responseDelay !== undefined ? Number(body.settings.responseDelay) : 0,
+        connectionId: body.settings?.connectionId || null,
+        modelId: body.settings?.modelId || null
       },
       createdBy: user._id,
       isActive: true

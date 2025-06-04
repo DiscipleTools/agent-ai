@@ -317,6 +317,19 @@ export const useAgentsStore = defineStore('agents', () => {
     }
   }
 
+  // AI Connection management for agents
+  const fetchAIConnections = async () => {
+    try {
+      const response = await $api('/api/agents/ai-connections')
+      return response.data
+    } catch (err) {
+      console.error('Fetch AI connections error:', err)
+      const errorMessage = err.data?.message || err.message || 'Failed to fetch AI connections'
+      error.value = errorMessage
+      throw new Error(errorMessage)
+    }
+  }
+
   return {
     agents: readonly(agents),
     currentAgent: readonly(currentAgent),
@@ -337,6 +350,7 @@ export const useAgentsStore = defineStore('agents', () => {
     uploadContext,
     addContextUrl,
     testWebsite,
-    addContextWebsite
+    addContextWebsite,
+    fetchAIConnections
   }
 }) 

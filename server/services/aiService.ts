@@ -12,14 +12,16 @@ interface AISettings {
   temperature?: number
   maxTokens?: number
   responseDelay?: number
+  connectionId?: string  // Allow specifying a specific connection
+  modelId?: string       // Allow specifying a specific model
 }
 
-interface PredictionGuardMessage {
+interface OpenAIMessage {
   role: 'system' | 'user' | 'assistant'
   content: string
 }
 
-interface PredictionGuardResponse {
+interface OpenAIResponse {
   id: string
   object: string
   created: number
@@ -48,30 +50,30 @@ class AIService {
     settings: AISettings = {}
   ): Promise<string> {
     try {
-      // Get configuration from settings service (database first, then environment)
-      const config = await settingsService.getPredictionGuardConfig()
+      // Get AI connection and model to use
+      const aiConfig = await this.getAIConfig(settings.connectionId, settings.modelId)
 
-      if (!config.apiKey) {
-        throw new Error('Prediction Guard API key not configured. Please set it in Settings or PREDICTION_GUARD_API_KEY environment variable.')
+      if (!aiConfig.apiKey) {
+        throw new Error('No AI connection configured. Please set up an AI connection in Settings.')
       }
 
       // Use RAG to find relevant context instead of using all documents
       const systemPrompt = await this.buildSystemPromptWithRAG(agentId, prompt, userMessage, contextDocuments)
       
-      const messages: PredictionGuardMessage[] = [
+      const messages: OpenAIMessage[] = [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userMessage }
       ]
 
       const requestBody = {
-        model: config.model,
+        model: aiConfig.model,
         messages,
         temperature: settings.temperature || 0.3,
         max_tokens: settings.maxTokens || 500
       }
 
-      console.log('Sending request to Prediction Guard:', {
-        endpoint: `${config.endpoint}/chat/completions`,
+      console.log('Sending request to AI service:', {
+        endpoint: `${aiConfig.endpoint}/chat/completions`,
         model: requestBody.model,
         temperature: requestBody.temperature,
         max_tokens: requestBody.max_tokens,
@@ -79,10 +81,10 @@ class AIService {
         systemPromptLength: systemPrompt.length
       })
 
-      const response = await fetch(`${config.endpoint}/chat/completions`, {
+      const response = await fetch(`${aiConfig.endpoint}/chat/completions`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${config.apiKey}`,
+          'Authorization': `Bearer ${aiConfig.apiKey}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify(requestBody)
@@ -92,17 +94,17 @@ class AIService {
         let errorMessage = `HTTP ${response.status}: ${response.statusText}`
         try {
           const errorData = await response.text()
-          console.error('Prediction Guard API error response:', errorData)
+          console.error('AI API error response:', errorData)
           errorMessage = `${errorMessage} - ${errorData}`
         } catch (parseError) {
           console.error('Could not parse error response:', parseError)
         }
-        throw new Error(`Prediction Guard API error: ${errorMessage}`)
+        throw new Error(`AI API error: ${errorMessage}`)
       }
 
-      const data: PredictionGuardResponse = await response.json()
+      const data: OpenAIResponse = await response.json()
       
-      console.log('Prediction Guard API response:', {
+      console.log('AI API response:', {
         id: data.id,
         model: data.model,
         usage: data.usage,
@@ -110,14 +112,14 @@ class AIService {
       })
 
       if (!data.choices || !data.choices[0] || !data.choices[0].message) {
-        console.error('Invalid response format from Prediction Guard API:', data)
-        throw new Error('Invalid response format from Prediction Guard API - missing choices or message')
+        console.error('Invalid response format from AI API:', data)
+        throw new Error('Invalid response format from AI API - missing choices or message')
       }
 
       const generatedContent = data.choices[0].message.content
 
       if (!generatedContent || generatedContent.trim().length === 0) {
-        throw new Error('Empty response content from Prediction Guard API')
+        throw new Error('Empty response content from AI API')
       }
 
       console.log('AI response generated successfully:', {
@@ -135,16 +137,56 @@ class AIService {
       
       // Provide more specific error messages
       if (error.message.includes('401')) {
-        throw new Error('Invalid Prediction Guard API key. Please check your API key in Settings.')
+        throw new Error('Invalid API key. Please check your AI connection settings.')
       } else if (error.message.includes('403')) {
-        throw new Error('Access denied to Prediction Guard API. Please check your API key permissions.')
+        throw new Error('Access denied to AI API. Please check your API key permissions.')
       } else if (error.message.includes('429')) {
-        throw new Error('Rate limit exceeded for Prediction Guard API. Please try again later.')
+        throw new Error('Rate limit exceeded for AI API. Please try again later.')
       } else if (error.message.includes('500')) {
-        throw new Error('Prediction Guard API server error. Please try again later.')
+        throw new Error('AI API server error. Please try again later.')
       }
       
       throw new Error(`Failed to generate AI response: ${error.message}`)
+    }
+  }
+
+  private async getAIConfig(connectionId?: string, modelId?: string): Promise<{ apiKey: string; endpoint: string; model: string }> {
+    try {
+      // If specific connection requested, try to find it
+      if (connectionId) {
+        const connections = await settingsService.getAllAIConnections()
+        const connection = connections.find(conn => conn._id.toString() === connectionId && conn.isActive)
+        if (connection) {
+          const model = modelId ? 
+            connection.availableModels.find(m => m.id === modelId && m.enabled) :
+            connection.availableModels.find(m => m.enabled) || connection.availableModels[0]
+          
+          if (model) {
+            return {
+              apiKey: connection.apiKey,
+              endpoint: connection.endpoint,
+              model: model.id
+            }
+          }
+        }
+      }
+
+      // Try to get default connection
+      const defaultConnection = await settingsService.getDefaultAIConnection()
+      if (defaultConnection) {
+        return {
+          apiKey: defaultConnection.connection.apiKey,
+          endpoint: defaultConnection.connection.endpoint,
+          model: defaultConnection.modelId
+        }
+      }
+
+      // No connections available
+      throw new Error('No AI connections configured. Please add an AI connection in Settings.')
+
+    } catch (error: any) {
+      console.error('Failed to get AI config:', error.message)
+      throw new Error('No AI connections configured. Please add an AI connection in Settings.')
     }
   }
 
@@ -307,16 +349,16 @@ class AIService {
     return new Promise(resolve => setTimeout(resolve, ms))
   }
 
-  // Method to test API connectivity
-  async testConnection(): Promise<{ success: boolean; message: string; model?: string; endpoint?: string }> {
+  // Method to test AI connectivity
+  async testConnection(connectionId?: string): Promise<{ success: boolean; message: string; model?: string; endpoint?: string }> {
     try {
-      const config = await settingsService.getPredictionGuardConfig()
+      const aiConfig = await this.getAIConfig(connectionId)
       
-      if (!config.apiKey) {
+      if (!aiConfig.apiKey) {
         return { 
           success: false, 
           message: 'API key not configured in Settings or environment variables',
-          endpoint: config.endpoint
+          endpoint: aiConfig.endpoint
         }
       }
 
@@ -325,14 +367,14 @@ class AIService {
         'You are a helpful assistant.',
         [],
         'Say "Hello, I am working!" and nothing else.',
-        { temperature: 0.1, maxTokens: 50 }
+        { temperature: 0.1, maxTokens: 50, connectionId }
       )
 
       return { 
         success: true, 
         message: 'Connection successful', 
-        model: config.model,
-        endpoint: config.endpoint
+        model: aiConfig.model,
+        endpoint: aiConfig.endpoint
       }
     } catch (error: any) {
       return { 
@@ -342,19 +384,27 @@ class AIService {
     }
   }
 
-  // Method to get available models (for future use)
-  async getAvailableModels(): Promise<string[]> {
+  // Method to get available models for a specific connection
+  async getAvailableModels(connectionId?: string): Promise<string[]> {
     try {
-      const config = await settingsService.getPredictionGuardConfig()
+      const aiConfig = await this.getAIConfig(connectionId)
       
-      if (!config.apiKey) {
-        return [config.model] // Return default model if no API key
+      if (!aiConfig.apiKey) {
+        return [aiConfig.model] // Return default model if no API key
       }
 
-      const response = await fetch(`${config.endpoint}/models/chat-completion`, {
+      // Different endpoints for different providers
+      let modelsEndpoint = `${aiConfig.endpoint}/models`
+      
+      // For Prediction Guard, use specific endpoint
+      if (aiConfig.endpoint.includes('predictionguard.com')) {
+        modelsEndpoint = `${aiConfig.endpoint}/models/chat-completion`
+      }
+
+      const response = await fetch(modelsEndpoint, {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${config.apiKey}`,
+          'Authorization': `Bearer ${aiConfig.apiKey}`,
           'Content-Type': 'application/json'
         }
       })
@@ -364,11 +414,53 @@ class AIService {
       }
 
       const data = await response.json()
-      return data.data?.map((model: any) => model.id) || [config.model]
+      
+      // Handle different response formats
+      if (data.data && Array.isArray(data.data)) {
+        return data.data.map((model: any) => model.id || model.model || model.name).filter(Boolean)
+      } else if (Array.isArray(data)) {
+        return data.map((model: any) => model.id || model.model || model.name).filter(Boolean)
+      }
+      
+      return [aiConfig.model] // Return default model as fallback
     } catch (error: any) {
       console.error('Failed to fetch available models:', error)
-      const config = await settingsService.getPredictionGuardConfig()
-      return [config.model] // Return default model as fallback
+      const aiConfig = await this.getAIConfig(connectionId)
+      return [aiConfig.model] // Return default model as fallback
+    }
+  }
+
+  // Get all available models across all connections
+  async getAllAvailableModels(): Promise<{ connectionId: string; connectionName: string; models: string[] }[]> {
+    try {
+      const connections = await settingsService.getAllAIConnections()
+      const results = []
+
+      for (const connection of connections) {
+        if (connection.isActive) {
+          try {
+            const models = await this.getAvailableModels(connection._id)
+            results.push({
+              connectionId: connection._id,
+              connectionName: connection.name,
+              models
+            })
+          } catch (error) {
+            console.error(`Failed to fetch models for connection ${connection.name}:`, error)
+            // Include connection with its configured models as fallback
+            results.push({
+              connectionId: connection._id,
+              connectionName: connection.name,
+              models: connection.availableModels.map(m => m.id)
+            })
+          }
+        }
+      }
+
+      return results
+    } catch (error: any) {
+      console.error('Failed to get all available models:', error)
+      return []
     }
   }
 }

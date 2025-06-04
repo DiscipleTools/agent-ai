@@ -11,34 +11,6 @@ export default defineEventHandler(async (event) => {
     const user = event.context.user
     const body = await readBody(event)
 
-    // Validate required fields - API key is only required if not already set
-    const existingSettings = await Settings.findOne()
-    const hasExistingApiKey = existingSettings?.predictionGuard?.apiKey
-    
-    if (!body.predictionGuard?.endpoint) {
-      throw createError({
-        statusCode: 400,
-        statusMessage: 'API endpoint is required'
-      })
-    }
-    
-    if (!hasExistingApiKey && !body.predictionGuard?.apiKey) {
-      throw createError({
-        statusCode: 400,
-        statusMessage: 'API key is required for initial setup'
-      })
-    }
-
-    // Validate endpoint URL format
-    try {
-      new URL(body.predictionGuard.endpoint)
-    } catch {
-      throw createError({
-        statusCode: 400,
-        statusMessage: 'Invalid endpoint URL format'
-      })
-    }
-
     // Validate email configuration if provided
     if (body.email) {
       if (body.email.enabled && !body.email.from?.email) {
@@ -50,6 +22,7 @@ export default defineEventHandler(async (event) => {
 
       // Validate SMTP settings
       if (body.email.enabled) {
+        const existingSettings = await Settings.findOne()
         const hasExistingSmtpPass = existingSettings?.email?.smtp?.auth?.pass
         if (!body.email.smtp?.host || !body.email.smtp?.auth?.user || (!hasExistingSmtpPass && !body.email.smtp?.auth?.pass)) {
           throw createError({
@@ -61,16 +34,10 @@ export default defineEventHandler(async (event) => {
     }
 
     // Use the existing settings we already fetched for validation
-    let settings = existingSettings
+    let settings = await Settings.findOne()
 
     if (settings) {
-      // Update existing settings
-      settings.predictionGuard = {
-        apiKey: body.predictionGuard?.apiKey || settings.predictionGuard.apiKey,
-        endpoint: body.predictionGuard.endpoint,
-        model: body.predictionGuard.model || 'Hermes-3-Llama-3.1-8B'
-      }
-      
+      // Update email settings if provided
       if (body.email) {
         // Update email settings in place to avoid Mongoose validation issues
         
@@ -108,6 +75,16 @@ export default defineEventHandler(async (event) => {
         }
       }
       
+      // Update AI connections if provided
+      if (body.aiConnections) {
+        settings.aiConnections = body.aiConnections
+      }
+      
+      // Update default connection if provided
+      if (body.defaultConnection) {
+        settings.defaultConnection = body.defaultConnection
+      }
+      
       if (body.server) {
         settings.server = {
           ...settings.server,
@@ -117,13 +94,10 @@ export default defineEventHandler(async (event) => {
       
       settings.updatedBy = user._id
     } else {
-      // Create new settings (API key is required for new settings)
+      // Create new settings
       settings = new Settings({
-        predictionGuard: {
-          apiKey: body.predictionGuard.apiKey,
-          endpoint: body.predictionGuard.endpoint,
-          model: body.predictionGuard.model || 'Hermes-3-Llama-3.1-8B'
-        },
+        aiConnections: body.aiConnections || [],
+        defaultConnection: body.defaultConnection || null,
         email: body.email || {
           provider: 'smtp',
           enabled: false,
@@ -148,10 +122,10 @@ export default defineEventHandler(async (event) => {
     // Don't send sensitive data back
     const response = {
       ...settings.toObject(),
-      predictionGuard: {
-        ...settings.predictionGuard,
+      aiConnections: settings.aiConnections?.map(conn => ({
+        ...conn.toObject(),
         apiKey: '***HIDDEN***'
-      },
+      })) || [],
       email: settings.email ? {
         ...settings.email,
         smtp: settings.email.smtp ? {

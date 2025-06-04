@@ -65,6 +65,14 @@ const agentSchema = new mongoose.Schema({
       default: 0,
       min: [0, 'Response delay cannot be negative'],
       max: [30, 'Response delay cannot exceed 30 seconds']
+    },
+    connectionId: {
+      type: mongoose.Schema.Types.ObjectId,
+      required: false
+    },
+    modelId: {
+      type: String,
+      required: false
     }
   },
   createdBy: {

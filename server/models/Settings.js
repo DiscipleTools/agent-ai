@@ -1,20 +1,56 @@
 import mongoose from 'mongoose'
 
-const settingsSchema = new mongoose.Schema({
-  predictionGuard: {
-    apiKey: {
+const aiConnectionSchema = new mongoose.Schema({
+  name: {
+    type: String,
+    required: true
+  },
+  apiKey: {
+    type: String,
+    required: true
+  },
+  endpoint: {
+    type: String,
+    required: true
+  },
+  provider: {
+    type: String,
+    enum: ['openai', 'prediction-guard', 'custom'],
+    default: 'custom'
+  },
+  availableModels: [{
+    id: {
       type: String,
+      required: true
+    },
+    name: {
+      type: String,
+      required: true
+    },
+    enabled: {
+      type: Boolean,
+      default: true
+    }
+  }],
+  isActive: {
+    type: Boolean,
+    default: true
+  }
+}, {
+  _id: true
+})
+
+const settingsSchema = new mongoose.Schema({
+  // AI connections structure
+  aiConnections: [aiConnectionSchema],
+  defaultConnection: {
+    connectionId: {
+      type: mongoose.Schema.Types.ObjectId,
       required: false
     },
-    endpoint: {
+    modelId: {
       type: String,
-      required: false,
-      default: 'https://api.predictionguard.com'
-    },
-    model: {
-      type: String,
-      required: false,
-      default: 'Hermes-3-Llama-3.1-8B'
+      required: false
     }
   },
   email: {
