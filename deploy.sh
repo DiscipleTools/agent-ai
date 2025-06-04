@@ -60,6 +60,127 @@ if [ "$(pwd)" != "$APP_DIR" ]; then
     exit 1
 fi
 
+# Function to check and install prerequisites
+install_prerequisites() {
+    echo "🔍 Checking prerequisites..."
+    
+    # Update package lists first
+    echo "📋 Updating package lists..."
+    sudo apt update -qq
+    
+    # Check essential tools
+    MISSING_TOOLS=()
+    
+    # Check curl (needed for Docker installation and health checks)
+    if ! command -v curl &> /dev/null; then
+        MISSING_TOOLS+=("curl")
+    fi
+    
+    # Check openssl (needed for certificate generation and JWT secrets)
+    if ! command -v openssl &> /dev/null; then
+        MISSING_TOOLS+=("openssl")
+    fi
+    
+    # Check git (users might need it for updates)
+    if ! command -v git &> /dev/null; then
+        MISSING_TOOLS+=("git")
+    fi
+    
+    # Check wget (used in health checks)
+    if ! command -v wget &> /dev/null; then
+        MISSING_TOOLS+=("wget")
+    fi
+    
+    # Check netstat (used for port debugging)
+    if ! command -v netstat &> /dev/null; then
+        MISSING_TOOLS+=("net-tools")
+    fi
+    
+    # Check sed (used for .env file manipulation)
+    if ! command -v sed &> /dev/null; then
+        MISSING_TOOLS+=("sed")
+    fi
+    
+    # Install missing essential tools
+    if [ ${#MISSING_TOOLS[@]} -gt 0 ]; then
+        echo "📦 Installing essential tools: ${MISSING_TOOLS[*]}"
+        sudo apt install -y "${MISSING_TOOLS[@]}"
+        echo "✅ Essential tools installed"
+    else
+        echo "✅ All essential tools already installed"
+    fi
+    
+    # Check and install certbot (for SSL certificates)
+    if ! command -v certbot &> /dev/null; then
+        echo "📦 Installing certbot for SSL certificates..."
+        sudo apt install -y certbot
+        echo "✅ Certbot installed"
+    else
+        echo "✅ Certbot already installed"
+    fi
+    
+    # Check if Docker is installed
+    if ! command -v docker &> /dev/null; then
+        echo "📦 Installing Docker..."
+        curl -fsSL https://get.docker.com -o get-docker.sh
+        sudo sh get-docker.sh
+        sudo usermod -aG docker $USER
+        rm get-docker.sh
+        echo "✅ Docker installed"
+        
+        echo "⚠️  Note: You may need to log out and back in for Docker group permissions to take effect"
+        echo "      If deployment fails, try running: newgrp docker"
+    else
+        echo "✅ Docker already installed"
+    fi
+    
+    # Check if Docker Compose is available
+    if ! docker compose version &> /dev/null; then
+        echo "📦 Installing Docker Compose..."
+        sudo apt install -y docker-compose-plugin
+        echo "✅ Docker Compose installed"
+    else
+        echo "✅ Docker Compose already available"
+    fi
+    
+    # Start Docker service if not running
+    if ! sudo systemctl is-active --quiet docker; then
+        echo "🔄 Starting Docker service..."
+        sudo systemctl enable docker
+        sudo systemctl start docker
+        echo "✅ Docker service started"
+    else
+        echo "✅ Docker service already running"
+    fi
+    
+    # Check UFW firewall and suggest configuration
+    if command -v ufw &> /dev/null; then
+        if sudo ufw status | grep -q "Status: active"; then
+            echo "🔥 UFW firewall is active"
+            if ! sudo ufw status | grep -q "80/tcp\|443/tcp"; then
+                echo "⚠️  Firewall may block web traffic. Consider running:"
+                echo "      sudo ufw allow 80/tcp"
+                echo "      sudo ufw allow 443/tcp"
+                echo "      sudo ufw allow ssh"
+            else
+                echo "✅ Firewall appears to allow web traffic"
+            fi
+        else
+            echo "ℹ️  UFW firewall not active"
+        fi
+    fi
+    
+    # Check available disk space
+    AVAILABLE_SPACE=$(df /opt | tail -1 | awk '{print $4}')
+    if [ "$AVAILABLE_SPACE" -lt 2097152 ]; then  # Less than 2GB
+        echo "⚠️  Warning: Less than 2GB free space available"
+        echo "      Docker images and data require significant space"
+        echo "      Available: $(df -h /opt | tail -1 | awk '{print $4}')"
+    else
+        echo "✅ Sufficient disk space available"
+    fi
+}
+
 # Function to get user inputs upfront
 get_user_inputs() {
     echo ""
@@ -169,13 +290,6 @@ setup_ssl() {
             2)
                 echo "🌐 Setting up Let's Encrypt for $DOMAIN_NAME..."
                 
-                # Check if certbot is installed
-                if ! command -v certbot &> /dev/null; then
-                    echo "📦 Installing certbot..."
-                    sudo apt update
-                    sudo apt install -y certbot
-                fi
-                
                 echo "Make sure your domain points to this server's IP address."
                 echo "You can verify this by running: nslookup $DOMAIN_NAME"
                 read -p "Press Enter to continue when your domain is pointing to this server..."
@@ -228,11 +342,44 @@ deploy_app() {
     
     cd "$APP_DIR"
     
+    # Test Docker access
+    if ! docker ps &>/dev/null; then
+        echo "⚠️  Docker permission issue detected. Trying to fix..."
+        
+        # Try to activate docker group for current session
+        if command -v newgrp &>/dev/null; then
+            echo "🔄 Activating Docker group permissions..."
+            exec newgrp docker ./deploy.sh production
+        else
+            echo "❌ Docker group permissions not available for current session."
+            echo "Please run: sudo usermod -aG docker $USER"
+            echo "Then log out and back in, or run: newgrp docker"
+            echo "After that, run the deployment script again."
+            exit 1
+        fi
+    fi
+    
     # Stop existing services
-    docker compose down
+    echo "🛑 Stopping existing services..."
+    docker compose down 2>/dev/null || true
     
     # Build and start services
-    docker compose up -d --build
+    echo "🔨 Building and starting services..."
+    if ! docker compose up -d --build; then
+        echo "❌ Docker Compose failed. Checking for common issues..."
+        
+        # Check if ports are in use
+        echo "📊 Checking port usage..."
+        netstat -tulpn | grep -E ":(80|443|3000|27017|6333)" || true
+        
+        echo ""
+        echo "💡 Troubleshooting tips:"
+        echo "  1. Make sure no other services are using ports 80, 443, 3000, 27017, 6333"
+        echo "  2. Check Docker service status: sudo systemctl status docker"
+        echo "  3. Check Docker logs: docker compose logs"
+        echo "  4. Try running with sudo if group permissions are still an issue"
+        exit 1
+    fi
     
     # Wait for services to be ready
     echo "⏳ Waiting for services to start..."
@@ -293,6 +440,9 @@ main() {
     
     # Change to app directory
     cd "$APP_DIR"
+    
+    # Install prerequisites
+    install_prerequisites
     
     # Get user inputs upfront
     get_user_inputs
