@@ -1,12 +1,31 @@
 # Production Deployment Guide
 
-This guide covers deploying the Agent AI Server application to a DigitalOcean droplet using Docker Compose.
+This guide covers deploying the Agent AI Server application to any cloud server using Docker Compose.
+
+> 💡 **Quick Start**: For automated deployment, use the `deploy.sh` script instead:
+> ```bash
+> # 1. First clone the repository to /opt/agent-ai
+> sudo mkdir -p /opt/agent-ai
+> git clone <your-repo-url> /opt/agent-ai
+> sudo chown $USER:$USER /opt/agent-ai
+> cd /opt/agent-ai
+> 
+> # 2. Run the automated deployment script
+> ./deploy.sh production
+> ```
+> This script automates all the steps described in this guide, including:
+> - Interactive domain name configuration
+> - Automatic SSL certificate setup (Let's Encrypt or self-signed)
+> - Secure password and secret generation
+> - Complete environment configuration
+>
+> For development setup, see the [Quick Start section in README.md](README.md#-quick-start-development).
 
 ## Prerequisites
 
-- DigitalOcean droplet (Ubuntu 22.04 LTS recommended)
+- Linux server (Ubuntu 22.04 LTS recommended)
 - Docker and Docker Compose installed
-- Domain name pointed to your droplet's IP address
+- Domain name pointed to your server's IP address
 - SSL certificate (Let's Encrypt recommended)
 
 ## Server Setup
@@ -30,17 +49,37 @@ mkdir -p /opt/agent-ai
 cd /opt/agent-ai
 ```
 
-### 2. Upload Application Code
+### 2. Clone and Setup Application Code
 
-Upload your application code to `/opt/agent-ai` using git, rsync, or scp:
+**Important**: The application must be cloned to `/opt/agent-ai` for the deployment to work correctly.
 
 ```bash
-# Option 1: Git (recommended)
-git clone <your-repo-url> .
+# Create the application directory
+sudo mkdir -p /opt/agent-ai
+sudo chown $USER:$USER /opt/agent-ai
 
-# Option 2: Upload via rsync
-rsync -avz --exclude node_modules ./ user@your-server:/opt/agent-ai/
+# Clone the repository to the correct location
+git clone <your-repo-url> /opt/agent-ai
+
+# Change to the application directory
+cd /opt/agent-ai
+
+# Verify you're in the correct location with the right files
+ls -la
+# You should see: docker-compose.yml, nuxt.config.ts, package.json, etc.
 ```
+
+**Alternative upload methods** (if not using git):
+
+```bash
+# Option 2: Upload via rsync (from your local machine)
+rsync -avz --exclude node_modules ./ user@your-server:/opt/agent-ai/
+
+# Option 3: Upload via scp (from your local machine)
+scp -r ./ user@your-server:/opt/agent-ai/
+```
+
+**⚠️ Critical**: All subsequent commands in this guide assume you are in `/opt/agent-ai`. The Docker Compose configuration and deployment scripts expect this directory structure.
 
 ### 3. Environment Configuration
 
@@ -54,7 +93,8 @@ nano .env
 - `JWT_SECRET` - Generate a secure 32+ character secret
 - `JWT_REFRESH_SECRET` - Generate another secure 32+ character secret
 - `MONGO_ROOT_PASSWORD` - Set a strong MongoDB password
-- `PREDICTION_GUARD_API_KEY` - Your actual API key
+
+**Note**: AI provider configuration (API keys, endpoints, models) is now handled through the Settings interface in the application dashboard. No environment variables are required for AI configuration.
 
 ### 4. SSL Certificate Setup
 
@@ -253,7 +293,7 @@ docker system prune -f  # Clean up unused resources
 
 ## Performance Optimization
 
-1. **Resource Limits**: Consider adding resource limits to Docker services based on your droplet size
+1. **Resource Limits**: Consider adding resource limits to Docker services based on your server size
 2. **Database Indexes**: The MongoDB init script creates optimal indexes
 3. **Nginx Caching**: Static files are cached for 1 year
 4. **Gzip Compression**: Enabled for all text-based content
@@ -261,11 +301,35 @@ docker system prune -f  # Clean up unused resources
 ## Scaling Considerations
 
 For higher traffic, consider:
-1. Using DigitalOcean's managed MongoDB service
+1. Using managed database services (MongoDB Atlas, etc.)
 2. Using Qdrant Cloud for the vector database
 3. Adding load balancing with multiple app instances
 4. Using a CDN for static assets
 
 ## Environment Variables Reference
 
-See `env.production.example` for all available environment variables and their descriptions. 
+See `env.production.example` for all available environment variables and their descriptions.
+
+## Automated Deployment Alternative
+
+Instead of following this manual guide, you can use the automated deployment script:
+
+```bash
+./deploy.sh production
+```
+
+The script performs all the steps described in this guide automatically, including:
+- Interactive domain name and SSL configuration
+- Environment setup and secure secret generation
+- SSL certificate configuration (Let's Encrypt or self-signed)
+- Docker Compose deployment
+- Service health checks
+- Backup creation
+
+The script will prompt you for:
+- Your domain name (or localhost for local testing)
+- SSL certificate method (Let's Encrypt, self-signed, or manual setup)
+
+All other configuration is handled automatically with secure defaults.
+
+For more deployment options, see [README.md](README.md#-production-deployment). 

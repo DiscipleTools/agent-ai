@@ -31,7 +31,9 @@ A full-stack Nuxt.js application for managing AI agents that integrate with Chat
 - npm or yarn
 - Prediction Guard API key (for AI functionality)
 
-## 🚀 Quick Start
+## 🚀 Quick Start (Development)
+
+> ⚠️ **Note**: This Quick Start guide is for **development environment only**. For production deployment, see the [Production Deployment](#-production-deployment) section below.
 
 ### 1. Clone the Repository
 ```bash
@@ -110,6 +112,83 @@ The application will be available at:
 1. Log in to the dashboard
 2. Go to Settings
 3. Click "Test AI Connection" to verify Prediction Guard setup
+
+## 🏭 Production Deployment
+
+For production deployment, you have two options:
+
+### Option A: Automated Deployment (Recommended)
+
+Use the automated deployment script for the easiest setup:
+
+```bash
+# Step 1: Clone repository to the required production directory
+sudo mkdir -p /opt/agent-ai
+sudo chown $USER:$USER /opt/agent-ai
+git clone <repository-url> /opt/agent-ai
+cd /opt/agent-ai
+
+# Step 2: Make deployment script executable and run it
+chmod +x deploy.sh
+./deploy.sh production
+```
+
+**⚠️ Important**: The repository **must** be cloned to `/opt/agent-ai` for the deployment script to work correctly. The script expects this specific directory structure and will validate the location before proceeding.
+
+The deployment script will automatically:
+- Create backups of existing data
+- Setup environment from production template
+- Generate secure JWT secrets
+- Configure SSL certificates (Let's Encrypt or self-signed)
+- Deploy using Docker Compose with MongoDB, Qdrant, and Nginx
+- Display access information and management commands
+
+### Option B: Manual Docker Deployment
+
+For more control over the deployment process, follow the detailed step-by-step guide:
+
+**📖 See [DEPLOYMENT.md](./DEPLOYMENT.md) for complete manual deployment instructions**
+
+This includes:
+- Server setup and prerequisites
+- Repository cloning to the correct location (`/opt/agent-ai`)
+- SSL certificate configuration
+- Docker Compose service management
+- Monitoring and maintenance procedures
+- Troubleshooting common issues
+
+### Quick Production Setup
+
+If you prefer a minimal Docker setup:
+
+```bash
+# Clone to the required directory
+git clone <repository-url> /opt/agent-ai
+cd /opt/agent-ai
+
+# Copy production environment template
+cp env.production.example .env
+
+# Edit production configuration
+nano .env
+
+# Deploy with Docker Compose
+docker compose up -d
+```
+
+**Important**: 
+1. **Repository Location**: Must be cloned to `/opt/agent-ai` - this is where Docker Compose expects to find the application files
+2. **Environment Variables**: Update these values in `.env` before deployment:
+   - `JWT_SECRET` and `JWT_REFRESH_SECRET` (generate secure 32+ character secrets)
+   - `PREDICTION_GUARD_API_KEY` (your actual API key)
+   - `MONGO_ROOT_PASSWORD` (strong database password)
+
+### Production URLs
+
+After deployment, your application will be available at:
+- **Application**: https://your-domain.com
+- **Health Check**: https://your-domain.com/health
+- **API**: https://your-domain.com/api
 
 ## 🤖 AI Integration with Prediction Guard
 
@@ -232,29 +311,30 @@ Admins can:
 
 ## 🚀 Deployment
 
-### Production Build
+### Development Build
 ```bash
 npm run build
 npm run preview
 ```
 
-### Docker Deployment
-```bash
-# Build the image
-docker build -t agent-ai-server .
+### Production Deployment
 
-# Run the container
-docker run -p 3000:3000 -e MONGODB_URI=your-mongo-uri agent-ai-server
-```
+For production deployment, see the [Production Deployment](#-production-deployment) section above, which covers:
+
+- **Automated deployment** with `deploy.sh` script
+- **Manual deployment** following [DEPLOYMENT.md](./DEPLOYMENT.md)
+- **Docker Compose** setup with all required services
 
 ### Environment Variables for Production
 ```env
 NODE_ENV=production
-MONGODB_URI=mongodb://your-production-db/agent-ai-server
+MONGODB_URI=mongodb://mongodb:27017/agent-ai-server
 JWT_SECRET=your-production-jwt-secret
 JWT_REFRESH_SECRET=your-production-refresh-secret
 PREDICTION_GUARD_API_KEY=your-production-api-key
 ```
+
+For complete production environment configuration, see `env.production.example`.
 
 ## 🧪 Development
 
@@ -297,11 +377,13 @@ node scripts/debugUser.js
 ### Logs
 Application logs are available in the console during development.
 
-## 📚 Documentation
+## 📄 Documentation
 
+- [Production Deployment Guide](DEPLOYMENT.md) - Complete manual deployment instructions
 - [Project Specification](PROJECT_SPECIFICATION.md)
 - [Implementation Guide](IMPLEMENTATION_GUIDE.md)
 - [Frontend Implementation](FRONTEND_IMPLEMENTATION.md)
+- [Website Scraping Guide](WEBSITE_SCRAPING.md)
 
 ## 🤝 Contributing
 

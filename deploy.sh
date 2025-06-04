@@ -2,6 +2,20 @@
 
 # Agent AI Server Deployment Script
 # Usage: ./deploy.sh [environment]
+#
+# PREREQUISITES:
+# 1. Clone the repository to /opt/agent-ai:
+#    sudo mkdir -p /opt/agent-ai
+#    sudo chown $USER:$USER /opt/agent-ai
+#    git clone <your-repo-url> /opt/agent-ai
+#    cd /opt/agent-ai
+#
+# 2. Run this script from the repository directory:
+#    ./deploy.sh [production]
+#
+# This script automates the deployment process described in DEPLOYMENT.md
+# For manual deployment instructions, see: DEPLOYMENT.md
+# For development setup, see the Quick Start section in README.md
 
 set -e
 
@@ -10,13 +24,88 @@ ENVIRONMENT=${1:-production}
 APP_DIR="/opt/agent-ai"
 BACKUP_DIR="/opt/backups/agent-ai"
 
+# Global variables for user inputs
+DOMAIN_NAME=""
+SSL_METHOD=""
+
 echo "🚀 Starting Agent AI Server Deployment"
 echo "Environment: $ENVIRONMENT"
 echo "App Directory: $APP_DIR"
 
+# Verify we're running from the correct directory
+if [ ! -f "docker-compose.yml" ] || [ ! -f "nuxt.config.ts" ]; then
+    echo "❌ Error: This script must be run from the agent-ai repository directory"
+    echo ""
+    echo "Please ensure you have:"
+    echo "1. Cloned the repository to $APP_DIR"
+    echo "2. Changed to the repository directory: cd $APP_DIR"
+    echo "3. Run this script from there: ./deploy.sh"
+    echo ""
+    echo "Example setup:"
+    echo "  sudo mkdir -p $APP_DIR"
+    echo "  sudo chown \$USER:\$USER $APP_DIR"
+    echo "  git clone <your-repo-url> $APP_DIR"
+    echo "  cd $APP_DIR"
+    echo "  ./deploy.sh"
+    exit 1
+fi
+
+# Verify we're in the expected app directory
+if [ "$(pwd)" != "$APP_DIR" ]; then
+    echo "❌ Error: Script must be run from $APP_DIR"
+    echo "Current directory: $(pwd)"
+    echo "Expected directory: $APP_DIR"
+    echo ""
+    echo "Please run: cd $APP_DIR && ./deploy.sh"
+    exit 1
+fi
+
+# Function to get user inputs upfront
+get_user_inputs() {
+    echo ""
+    echo "📋 Configuration Setup"
+    echo "We need some information to configure your deployment:"
+    echo ""
+    
+    # Get domain name
+    read -p "Enter your domain name (e.g., example.com) or 'localhost' for local testing: " DOMAIN_NAME
+    if [ -z "$DOMAIN_NAME" ]; then
+        DOMAIN_NAME="localhost"
+        echo "Using default: localhost"
+    fi
+    
+    # Get SSL method
+    echo ""
+    echo "🔐 SSL Certificate Setup:"
+    echo "1) Generate self-signed certificate (for testing/development)"
+    echo "2) Use Let's Encrypt (for production with valid domain)"
+    echo "3) Skip SSL setup (manual setup required later)"
+    read -p "Choose SSL method [1-3]: " SSL_METHOD
+    
+    if [ -z "$SSL_METHOD" ]; then
+        SSL_METHOD="1"
+        echo "Using default: Self-signed certificate"
+    fi
+    
+    echo ""
+    echo "📝 Configuration Summary:"
+    echo "   Domain: $DOMAIN_NAME"
+    case $SSL_METHOD in
+        1) echo "   SSL: Self-signed certificate" ;;
+        2) echo "   SSL: Let's Encrypt" ;;
+        3) echo "   SSL: Manual setup" ;;
+    esac
+    echo ""
+}
+
 # Function to generate secure JWT secrets
 generate_jwt_secret() {
     openssl rand -base64 32
+}
+
+# Function to generate secure password
+generate_secure_password() {
+    openssl rand -base64 24 | tr -d "=+/" | cut -c1-20
 }
 
 # Function to backup data
@@ -38,21 +127,25 @@ setup_environment() {
         echo "📝 Creating .env file from template..."
         cp "$APP_DIR/env.production.example" "$APP_DIR/.env"
         
-        # Generate secure JWT secrets
+        # Generate secure secrets
         JWT_SECRET=$(generate_jwt_secret)
         JWT_REFRESH_SECRET=$(generate_jwt_secret)
+        MONGO_PASSWORD=$(generate_secure_password)
         
-        # Update the .env file with generated secrets
+        # Update the .env file with generated secrets and domain
         sed -i "s/your-super-secret-jwt-key-change-this-in-production-minimum-32-chars/$JWT_SECRET/" "$APP_DIR/.env"
         sed -i "s/your-super-secret-refresh-key-change-this-in-production-minimum-32-chars/$JWT_REFRESH_SECRET/" "$APP_DIR/.env"
+        sed -i "s/change-this-secure-password/$MONGO_PASSWORD/" "$APP_DIR/.env"
+        sed -i "s/your-domain.com/$DOMAIN_NAME/" "$APP_DIR/.env"
         
         echo "🔑 Generated secure JWT secrets"
-        echo "⚠️  IMPORTANT: Please edit $APP_DIR/.env and update:"
-        echo "   - PREDICTION_GUARD_API_KEY"
-        echo "   - MONGO_ROOT_PASSWORD"
-        echo "   - Domain name for SSL certificates"
+        echo "🔐 Generated secure MongoDB password"
+        echo "🌐 Set domain name to: $DOMAIN_NAME"
         echo ""
-        read -p "Press Enter to continue after updating .env file..."
+        echo "📝 AI provider configuration (API keys, endpoints, models) is done through"
+        echo "   the Settings interface after deployment is complete."
+        echo ""
+        echo "✅ Environment configuration completed automatically"
     else
         echo "✅ .env file already exists"
     fi
@@ -63,25 +156,17 @@ setup_ssl() {
     echo "🔐 Setting up SSL certificates..."
     
     if [ ! -f "$APP_DIR/docker/ssl/cert.pem" ]; then
-        echo "📜 SSL certificates not found. Choose an option:"
-        echo "1) Generate self-signed certificate (for testing)"
-        echo "2) Use Let's Encrypt (requires domain name)"
-        echo "3) Skip SSL setup (manual setup required)"
-        read -p "Enter choice [1-3]: " ssl_choice
-        
-        case $ssl_choice in
+        case $SSL_METHOD in
             1)
-                echo "🔨 Generating self-signed certificate..."
-                read -p "Enter domain name (or localhost): " domain
+                echo "🔨 Generating self-signed certificate for $DOMAIN_NAME..."
                 openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
                     -keyout "$APP_DIR/docker/ssl/key.pem" \
                     -out "$APP_DIR/docker/ssl/cert.pem" \
-                    -subj "/C=US/ST=State/L=City/O=Organization/CN=$domain"
+                    -subj "/C=US/ST=State/L=City/O=Organization/CN=$DOMAIN_NAME"
                 echo "✅ Self-signed certificate generated"
                 ;;
             2)
-                read -p "Enter your domain name: " domain
-                echo "🌐 Setting up Let's Encrypt for $domain..."
+                echo "🌐 Setting up Let's Encrypt for $DOMAIN_NAME..."
                 echo "Make sure your domain points to this server's IP address."
                 read -p "Press Enter to continue..."
                 
@@ -89,11 +174,11 @@ setup_ssl() {
                 docker compose down nginx 2>/dev/null || true
                 
                 # Get certificate
-                certbot certonly --standalone -d $domain
+                certbot certonly --standalone -d $DOMAIN_NAME
                 
                 # Copy certificates
-                cp /etc/letsencrypt/live/$domain/fullchain.pem "$APP_DIR/docker/ssl/cert.pem"
-                cp /etc/letsencrypt/live/$domain/privkey.pem "$APP_DIR/docker/ssl/key.pem"
+                cp /etc/letsencrypt/live/$DOMAIN_NAME/fullchain.pem "$APP_DIR/docker/ssl/cert.pem"
+                cp /etc/letsencrypt/live/$DOMAIN_NAME/privkey.pem "$APP_DIR/docker/ssl/key.pem"
                 chown $USER:$USER "$APP_DIR/docker/ssl/"*
                 echo "✅ Let's Encrypt certificate installed"
                 ;;
@@ -144,8 +229,13 @@ show_info() {
     docker compose ps
     echo ""
     echo "🔗 Access URLs:"
-    echo "   Application: https://your-domain.com"
-    echo "   Health Check: https://your-domain.com/health"
+    if [ "$DOMAIN_NAME" = "localhost" ]; then
+        echo "   Application: https://localhost"
+        echo "   Health Check: https://localhost/health"
+    else
+        echo "   Application: https://$DOMAIN_NAME"
+        echo "   Health Check: https://$DOMAIN_NAME/health"
+    fi
     echo ""
     echo "📝 Useful Commands:"
     echo "   View logs: docker compose logs -f"
@@ -153,7 +243,10 @@ show_info() {
     echo "   Stop all: docker compose down"
     echo "   Update app: docker compose up -d --build app"
     echo ""
-    echo "📚 For more information, see DEPLOYMENT.md"
+    echo "📚 For more information, see:"
+    echo "   - DEPLOYMENT.md for manual deployment instructions"
+    echo "   - README.md for development setup and general information"
+    echo "   - docker-compose.yml for service configuration"
 }
 
 # Main deployment flow
@@ -169,6 +262,9 @@ main() {
     
     # Change to app directory
     cd "$APP_DIR"
+    
+    # Get user inputs upfront
+    get_user_inputs
     
     # Backup existing data
     backup_data

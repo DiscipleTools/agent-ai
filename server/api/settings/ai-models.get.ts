@@ -9,10 +9,10 @@ export default defineEventHandler(async (event) => {
 
     console.log('Fetching available AI models...')
 
-    // Get current configuration
-    const config = await settingsService.getPredictionGuardConfig()
+    // Get current AI connections configuration
+    const defaultConnection = await settingsService.getDefaultAIConnection()
 
-    // Get available models from Prediction Guard
+    // Get available models using the AI service
     const models = await aiService.getAvailableModels()
 
     console.log('Available AI models:', models)
@@ -22,9 +22,9 @@ export default defineEventHandler(async (event) => {
       message: 'Models fetched successfully',
       data: {
         models,
-        defaultModel: config.model,
-        endpoint: config.endpoint,
-        hasApiKey: !!config.apiKey
+        defaultModel: defaultConnection?.modelId,
+        endpoint: defaultConnection?.connection.endpoint,
+        hasApiKey: !!defaultConnection?.connection.apiKey
       }
     }
 
@@ -33,16 +33,16 @@ export default defineEventHandler(async (event) => {
     
     // Try to get fallback configuration
     try {
-      const config = await settingsService.getPredictionGuardConfig()
+      const defaultConnection = await settingsService.getDefaultAIConnection()
       
       return {
         success: false,
         message: error.message || 'Failed to fetch AI models',
         data: {
-          models: [config.model],
-          defaultModel: config.model,
-          endpoint: config.endpoint,
-          hasApiKey: !!config.apiKey
+          models: defaultConnection?.modelId ? [defaultConnection.modelId] : [],
+          defaultModel: defaultConnection?.modelId,
+          endpoint: defaultConnection?.connection.endpoint,
+          hasApiKey: !!defaultConnection?.connection.apiKey
         }
       }
     } catch (configError) {

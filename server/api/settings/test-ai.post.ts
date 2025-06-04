@@ -9,9 +9,9 @@ export default defineEventHandler(async (event) => {
 
     console.log('Testing AI service connection...')
 
-    // Get current configuration
-    const config = await settingsService.getPredictionGuardConfig()
-    const dbSettings = await settingsService.getAllSettings()
+    // Get current AI connections configuration
+    const defaultConnection = await settingsService.getDefaultAIConnection()
+    const allConnections = await settingsService.getAllAIConnections()
 
     // Test the AI service connection
     const result = await aiService.testConnection()
@@ -22,15 +22,16 @@ export default defineEventHandler(async (event) => {
       success: result.success,
       message: result.message,
       data: {
-        model: result.model || config.model,
-        endpoint: result.endpoint || config.endpoint,
-        hasApiKey: !!config.apiKey,
+        model: result.model || defaultConnection?.modelId,
+        endpoint: result.endpoint || defaultConnection?.connection.endpoint,
+        hasApiKey: !!defaultConnection?.connection.apiKey,
         configSource: {
-          apiKey: dbSettings?.predictionGuard?.apiKey ? 'database' : (process.env.PREDICTION_GUARD_API_KEY ? 'environment' : 'none'),
-          endpoint: dbSettings?.predictionGuard?.endpoint ? 'database' : 'environment/default',
-          model: dbSettings?.predictionGuard?.model ? 'database' : 'environment/default'
+          apiKey: allConnections.length > 0 ? 'database' : (process.env.PREDICTION_GUARD_API_KEY ? 'environment' : 'none'),
+          endpoint: allConnections.length > 0 ? 'database' : 'environment/default',
+          model: allConnections.length > 0 ? 'database' : 'environment/default'
         },
-        databaseConfigured: !!dbSettings?.predictionGuard?.apiKey
+        databaseConfigured: allConnections.length > 0,
+        connectionsCount: allConnections.length
       }
     }
 
@@ -39,21 +40,22 @@ export default defineEventHandler(async (event) => {
     
     // Still try to get configuration info for debugging
     try {
-      const config = await settingsService.getPredictionGuardConfig()
-      const dbSettings = await settingsService.getAllSettings()
+      const defaultConnection = await settingsService.getDefaultAIConnection()
+      const allConnections = await settingsService.getAllAIConnections()
       
       return {
         success: false,
         message: error.message || 'Failed to test AI service',
         data: {
-          endpoint: config.endpoint,
-          hasApiKey: !!config.apiKey,
+          endpoint: defaultConnection?.connection.endpoint,
+          hasApiKey: !!defaultConnection?.connection.apiKey,
           configSource: {
-            apiKey: dbSettings?.predictionGuard?.apiKey ? 'database' : (process.env.PREDICTION_GUARD_API_KEY ? 'environment' : 'none'),
-            endpoint: dbSettings?.predictionGuard?.endpoint ? 'database' : 'environment/default',
-            model: dbSettings?.predictionGuard?.model ? 'database' : 'environment/default'
+            apiKey: allConnections.length > 0 ? 'database' : (process.env.PREDICTION_GUARD_API_KEY ? 'environment' : 'none'),
+            endpoint: allConnections.length > 0 ? 'database' : 'environment/default',
+            model: allConnections.length > 0 ? 'database' : 'environment/default'
           },
-          databaseConfigured: !!dbSettings?.predictionGuard?.apiKey
+          databaseConfigured: allConnections.length > 0,
+          connectionsCount: allConnections.length
         }
       }
     } catch (configError) {
@@ -68,7 +70,8 @@ export default defineEventHandler(async (event) => {
             endpoint: 'environment/default',
             model: 'environment/default'
           },
-          databaseConfigured: false
+          databaseConfigured: false,
+          connectionsCount: 0
         }
       }
     }
