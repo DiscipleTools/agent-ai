@@ -26,9 +26,9 @@ export default defineEventHandler(async (event) => {
         endpoint: result.endpoint || defaultConnection?.connection.endpoint,
         hasApiKey: !!defaultConnection?.connection.apiKey,
         configSource: {
-          apiKey: allConnections.length > 0 ? 'database' : (process.env.PREDICTION_GUARD_API_KEY ? 'environment' : 'none'),
-          endpoint: allConnections.length > 0 ? 'database' : 'environment/default',
-          model: allConnections.length > 0 ? 'database' : 'environment/default'
+          apiKey: allConnections.length > 0 ? 'database' : 'none',
+          endpoint: allConnections.length > 0 ? 'database' : 'none',
+          model: allConnections.length > 0 ? 'database' : 'none'
         },
         databaseConfigured: allConnections.length > 0,
         connectionsCount: allConnections.length
@@ -50,9 +50,9 @@ export default defineEventHandler(async (event) => {
           endpoint: defaultConnection?.connection.endpoint,
           hasApiKey: !!defaultConnection?.connection.apiKey,
           configSource: {
-            apiKey: allConnections.length > 0 ? 'database' : (process.env.PREDICTION_GUARD_API_KEY ? 'environment' : 'none'),
-            endpoint: allConnections.length > 0 ? 'database' : 'environment/default',
-            model: allConnections.length > 0 ? 'database' : 'environment/default'
+            apiKey: allConnections.length > 0 ? 'database' : 'none',
+            endpoint: allConnections.length > 0 ? 'database' : 'none',
+            model: allConnections.length > 0 ? 'database' : 'none'
           },
           databaseConfigured: allConnections.length > 0,
           connectionsCount: allConnections.length
@@ -63,12 +63,12 @@ export default defineEventHandler(async (event) => {
         success: false,
         message: error.message || 'Failed to test AI service',
         data: {
-          endpoint: process.env.PREDICTION_GUARD_ENDPOINT || 'https://api.predictionguard.com',
-          hasApiKey: !!process.env.PREDICTION_GUARD_API_KEY,
+          endpoint: null,
+          hasApiKey: false,
           configSource: {
-            apiKey: process.env.PREDICTION_GUARD_API_KEY ? 'environment' : 'none',
-            endpoint: 'environment/default',
-            model: 'environment/default'
+            apiKey: 'none',
+            endpoint: 'none',
+            model: 'none'
           },
           databaseConfigured: false,
           connectionsCount: 0

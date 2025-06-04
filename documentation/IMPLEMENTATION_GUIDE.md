@@ -83,10 +83,6 @@ JWT_REFRESH_SECRET=your-super-secret-refresh-key
 JWT_EXPIRE=1h
 JWT_REFRESH_EXPIRE=7d
 
-# Prediction Guard API
-PREDICTION_GUARD_API_KEY=your-prediction-guard-api-key
-PREDICTION_GUARD_ENDPOINT=https://api.predictionguard.com/v1
-
 # Chatwoot Integration
 CHATWOOT_URL=https://your-chatwoot-instance.com
 CHATWOOT_API_TOKEN=your-chatwoot-api-token
@@ -355,8 +351,7 @@ const axios = require('axios');
 
 class AIService {
   constructor() {
-    this.apiKey = process.env.PREDICTION_GUARD_API_KEY;
-    this.endpoint = process.env.PREDICTION_GUARD_ENDPOINT;
+    // AI configuration will be handled through database settings
   }
 
   async generateResponse(prompt, context, userMessage, settings = {}) {

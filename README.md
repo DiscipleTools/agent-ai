@@ -66,11 +66,6 @@ JWT_REFRESH_SECRET=your-super-secret-refresh-key
 JWT_EXPIRE=1h
 JWT_REFRESH_EXPIRE=7d
 
-# Prediction Guard AI Configuration
-PREDICTION_GUARD_API_KEY=your-prediction-guard-api-key
-PREDICTION_GUARD_ENDPOINT=https://api.predictionguard.com
-PREDICTION_GUARD_DEFAULT_MODEL=Hermes-3-Llama-3.1-8B
-
 # Chatwoot Integration (optional)
 CHATWOOT_URL=https://your-chatwoot-instance.com
 CHATWOOT_API_TOKEN=your-chatwoot-api-token
@@ -180,7 +175,6 @@ docker compose up -d
 1. **Repository Location**: Must be cloned to `/opt/agent-ai` - this is where Docker Compose expects to find the application files
 2. **Environment Variables**: Update these values in `.env` before deployment:
    - `JWT_SECRET` and `JWT_REFRESH_SECRET` (generate secure 32+ character secrets)
-   - `PREDICTION_GUARD_API_KEY` (your actual API key)
    - `MONGO_ROOT_PASSWORD` (strong database password)
 
 ### Production URLs
@@ -331,7 +325,6 @@ NODE_ENV=production
 MONGODB_URI=mongodb://mongodb:27017/agent-ai-server
 JWT_SECRET=your-production-jwt-secret
 JWT_REFRESH_SECRET=your-production-refresh-secret
-PREDICTION_GUARD_API_KEY=your-production-api-key
 ```
 
 For complete production environment configuration, see `env.production.example`.

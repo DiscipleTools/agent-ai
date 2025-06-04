@@ -50,10 +50,10 @@ export default defineEventHandler(async (event) => {
         success: false,
         message: error.message || 'Failed to fetch AI models',
         data: {
-          models: [process.env.PREDICTION_GUARD_DEFAULT_MODEL || 'Hermes-3-Llama-3.1-8B'],
-          defaultModel: process.env.PREDICTION_GUARD_DEFAULT_MODEL || 'Hermes-3-Llama-3.1-8B',
-          endpoint: process.env.PREDICTION_GUARD_ENDPOINT || 'https://api.predictionguard.com',
-          hasApiKey: !!process.env.PREDICTION_GUARD_API_KEY
+          models: [],
+          defaultModel: null,
+          endpoint: null,
+          hasApiKey: false
         }
       }
     }

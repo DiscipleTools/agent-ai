@@ -29,9 +29,6 @@ JWT_REFRESH_EXPIRE=7d
 # Application
 APP_NAME=Agent AI Server
 NODE_ENV=development
-
-# Prediction Guard API (optional)
-PREDICTION_GUARD_API_KEY=your-prediction-guard-api-key
 `
     fs.writeFileSync(envPath, basicEnv)
     console.log('✅ Basic .env file created')

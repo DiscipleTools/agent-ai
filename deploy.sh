@@ -244,20 +244,94 @@ backup_data() {
 setup_environment() {
     echo "🔧 Setting up environment..."
     
+    # Debug: Show current directory and file status
+    echo "📍 Current directory: $(pwd)"
+    echo "📁 App directory: $APP_DIR"
+    echo "📄 Checking for .env file at: $APP_DIR/.env"
+    
     if [ ! -f "$APP_DIR/.env" ]; then
         echo "📝 Creating .env file from template..."
-        cp "$APP_DIR/env.production.example" "$APP_DIR/.env"
+        
+        # Check if template exists
+        if [ ! -f "$APP_DIR/env.production.example" ]; then
+            echo "❌ Error: Template file not found at $APP_DIR/env.production.example"
+            echo "Available files in $APP_DIR:"
+            ls -la "$APP_DIR"
+            exit 1
+        fi
+        
+        # Copy template
+        if ! cp "$APP_DIR/env.production.example" "$APP_DIR/.env"; then
+            echo "❌ Error: Failed to copy template file"
+            exit 1
+        fi
+        
+        # Verify file was created
+        if [ ! -f "$APP_DIR/.env" ]; then
+            echo "❌ Error: .env file was not created successfully"
+            exit 1
+        fi
+        
+        echo "✅ .env file created from template"
         
         # Generate secure secrets
+        echo "🔑 Generating secure secrets..."
         JWT_SECRET=$(generate_jwt_secret)
         JWT_REFRESH_SECRET=$(generate_jwt_secret)
         MONGO_PASSWORD=$(generate_secure_password)
         
+        # Debug: Show what we're about to replace
+        echo "🔍 Generated secrets (first 8 chars):"
+        echo "   JWT_SECRET: ${JWT_SECRET:0:8}..."
+        echo "   JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:0:8}..."
+        echo "   MONGO_PASSWORD: ${MONGO_PASSWORD:0:8}..."
+        echo "   DOMAIN_NAME: $DOMAIN_NAME"
+        
         # Update the .env file with generated secrets and domain
-        sed -i "s/your-super-secret-jwt-key-change-this-in-production-minimum-32-chars/$JWT_SECRET/" "$APP_DIR/.env"
-        sed -i "s/your-super-secret-refresh-key-change-this-in-production-minimum-32-chars/$JWT_REFRESH_SECRET/" "$APP_DIR/.env"
-        sed -i "s/change-this-secure-password/$MONGO_PASSWORD/" "$APP_DIR/.env"
-        sed -i "s/your-domain.com/$DOMAIN_NAME/" "$APP_DIR/.env"
+        # Using | as delimiter to avoid conflicts with / in base64 encoded secrets
+        echo "🔧 Updating .env file with generated values..."
+        
+        if ! sed -i "s|your-super-secret-jwt-key-change-this-in-production-minimum-32-chars|$JWT_SECRET|" "$APP_DIR/.env"; then
+            echo "❌ Error: Failed to update JWT_SECRET"
+            exit 1
+        fi
+        
+        if ! sed -i "s|your-super-secret-refresh-key-change-this-in-production-minimum-32-chars|$JWT_REFRESH_SECRET|" "$APP_DIR/.env"; then
+            echo "❌ Error: Failed to update JWT_REFRESH_SECRET"
+            exit 1
+        fi
+        
+        if ! sed -i "s|change-this-secure-password|$MONGO_PASSWORD|" "$APP_DIR/.env"; then
+            echo "❌ Error: Failed to update MONGO_PASSWORD"
+            exit 1
+        fi
+        
+        if ! sed -i "s|your-domain.com|$DOMAIN_NAME|" "$APP_DIR/.env"; then
+            echo "❌ Error: Failed to update DOMAIN_NAME"
+            exit 1
+        fi
+        
+        # Verify the replacements worked
+        echo "🔍 Verifying replacements..."
+        if grep -q "your-super-secret-jwt-key-change-this-in-production-minimum-32-chars" "$APP_DIR/.env"; then
+            echo "❌ Error: JWT_SECRET was not replaced properly"
+            exit 1
+        fi
+        
+        if grep -q "your-super-secret-refresh-key-change-this-in-production-minimum-32-chars" "$APP_DIR/.env"; then
+            echo "❌ Error: JWT_REFRESH_SECRET was not replaced properly"
+            exit 1
+        fi
+        
+        if grep -q "change-this-secure-password" "$APP_DIR/.env"; then
+            echo "❌ Error: MONGO_PASSWORD was not replaced properly"
+            exit 1
+        fi
+        
+        if grep -q "your-domain.com" "$APP_DIR/.env"; then
+            echo "❌ Error: DOMAIN_NAME was not replaced properly"
+            exit 1
+        fi
         
         echo "🔑 Generated secure JWT secrets"
         echo "🔐 Generated secure MongoDB password"
@@ -268,7 +342,15 @@ setup_environment() {
         echo ""
         echo "✅ Environment configuration completed automatically"
     else
-        echo "✅ .env file already exists"
+        echo "✅ .env file already exists at: $APP_DIR/.env"
+        echo "🔍 File size: $(wc -c < "$APP_DIR/.env") bytes"
+        echo "🔍 Last modified: $(stat -c %y "$APP_DIR/.env" 2>/dev/null || stat -f %Sm "$APP_DIR/.env" 2>/dev/null || echo "unknown")"
+        
+        # Check if the file contains default values that need to be replaced
+        if grep -q "your-super-secret-jwt-key-change-this-in-production-minimum-32-chars\|your-super-secret-refresh-key-change-this-in-production-minimum-32-chars\|change-this-secure-password" "$APP_DIR/.env"; then
+            echo "⚠️  Warning: .env file contains default values that should be replaced"
+            echo "   Consider deleting .env file and re-running this script, or manually update the file"
+        fi
     fi
 }
 
