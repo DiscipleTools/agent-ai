@@ -1,5 +1,5 @@
 import { pipeline } from '@xenova/transformers'
-import type { TextEmbeddingPipeline } from '@xenova/transformers'
+import type { Pipeline } from '@xenova/transformers'
 import crypto from 'crypto'
 
 interface ChunkData {
@@ -29,7 +29,7 @@ interface QdrantPoint {
 }
 
 class RAGService {
-  private embeddingModel: TextEmbeddingPipeline | null = null
+  private embeddingModel: any = null
   private qdrantUrl: string
   private modelName = 'Xenova/all-MiniLM-L12-v2' // Multilingual model
   private isInitialized = false
@@ -57,12 +57,24 @@ class RAGService {
     const collectionName = `agent_${agentId}`
     
     try {
+      // Add timeout for Qdrant requests
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 10000) // 10 second timeout
+      
       // Check if collection exists
-      const response = await fetch(`${this.qdrantUrl}/collections/${collectionName}`)
+      const response = await fetch(`${this.qdrantUrl}/collections/${collectionName}`, {
+        signal: controller.signal
+      })
+      
+      clearTimeout(timeoutId)
       
       if (response.status === 404) {
         // Create collection
         console.log(`Creating Qdrant collection for agent: ${agentId}`)
+        
+        const createController = new AbortController()
+        const createTimeoutId = setTimeout(() => createController.abort(), 15000) // 15 second timeout for creation
+        
         const createResponse = await fetch(`${this.qdrantUrl}/collections/${collectionName}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
@@ -75,8 +87,11 @@ class RAGService {
               default_segment_number: 2
             },
             replication_factor: 1
-          })
+          }),
+          signal: createController.signal
         })
+        
+        clearTimeout(createTimeoutId)
 
         if (!createResponse.ok) {
           const error = await createResponse.text()
@@ -84,7 +99,10 @@ class RAGService {
         }
         console.log(`✅ Collection ${collectionName} created successfully`)
       }
-    } catch (error) {
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+        throw new Error('Qdrant connection timeout - please check if Qdrant is running and accessible')
+      }
       console.error('Error ensuring collection exists:', error)
       throw error
     }
@@ -198,13 +216,21 @@ class RAGService {
       
       // Batch insert to Qdrant
       const collectionName = `agent_${agentId}`
+      
+      // Add timeout for Qdrant connection
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout
+      
       const insertResponse = await fetch(`${this.qdrantUrl}/collections/${collectionName}/points`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           points: points
-        })
+        }),
+        signal: controller.signal
       })
+      
+      clearTimeout(timeoutId)
       
       if (!insertResponse.ok) {
         const error = await insertResponse.text()
@@ -356,8 +382,15 @@ class RAGService {
     error?: string 
   }> {
     try {
-      // Check Qdrant connection
-      const qdrantResponse = await fetch(`${this.qdrantUrl}/health`)
+      // Check Qdrant connection - use root endpoint instead of /health
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 5000) // 5 second timeout
+      
+      const qdrantResponse = await fetch(`${this.qdrantUrl}/`, {
+        signal: controller.signal
+      })
+      clearTimeout(timeoutId)
+      
       const qdrantConnected = qdrantResponse.ok
       
       // Check embedding model

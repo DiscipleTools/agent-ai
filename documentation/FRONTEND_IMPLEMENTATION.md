@@ -792,7 +792,7 @@ const props = defineProps({
       description: '',
       prompt: '',
       settings: {
-        temperature: 0.7,
+        temperature: 0.3,
         maxTokens: 500,
         responseDelay: 0
       }

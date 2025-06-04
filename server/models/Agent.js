@@ -50,7 +50,7 @@ const agentSchema = new mongoose.Schema({
   settings: {
     temperature: {
       type: Number,
-      default: 0.7,
+      default: 0.3,
       min: [0, 'Temperature must be between 0 and 1'],
       max: [1, 'Temperature must be between 0 and 1']
     },

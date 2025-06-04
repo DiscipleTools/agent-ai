@@ -119,7 +119,7 @@ class WebScrapingService {
         return { isValid: false, error: 'Private IP addresses are not allowed' }
       }
 
-      // Normalize URL - keep it simple to avoid query string issues
+      // Normalize URL - remove fragment and keep it simple to avoid query string issues
       const normalizedUrl = `${parsedUrl.protocol}//${parsedUrl.host}${parsedUrl.pathname}`
 
       return { isValid: true, normalizedUrl }
@@ -641,8 +641,10 @@ class WebScrapingService {
         if (href) {
           try {
             // Convert relative URLs to absolute
-            const absoluteUrl = new URL(href, baseUrl).toString()
-            links.push(absoluteUrl)
+            const absoluteUrl = new URL(href, baseUrl)
+            // Remove fragment (hash) to prevent treating same page with different anchors as separate pages
+            absoluteUrl.hash = ''
+            links.push(absoluteUrl.toString())
           } catch (error) {
             // Skip invalid URLs
             continue
@@ -667,6 +669,9 @@ class WebScrapingService {
     return urls.filter(url => {
       try {
         const parsedUrl = new URL(url)
+        // Remove fragment for consistent comparison
+        parsedUrl.hash = ''
+        const normalizedUrl = parsedUrl.toString()
         
         // Same domain check
         if (options.sameDomainOnly && parsedUrl.hostname !== baseDomain) {
@@ -688,18 +693,18 @@ class WebScrapingService {
         }
 
         // Exclude patterns
-        if (options.excludePatterns?.some(pattern => url.includes(pattern))) {
+        if (options.excludePatterns?.some(pattern => normalizedUrl.includes(pattern))) {
           return false
         }
 
         // Include patterns (if specified, URL must match at least one)
         if (options.includePatterns?.length && 
-            !options.includePatterns.some(pattern => url.includes(pattern))) {
+            !options.includePatterns.some(pattern => normalizedUrl.includes(pattern))) {
           return false
         }
 
         // Basic validation
-        return this.validateUrl(url).isValid
+        return this.validateUrl(normalizedUrl).isValid
       } catch (error) {
         return false
       }

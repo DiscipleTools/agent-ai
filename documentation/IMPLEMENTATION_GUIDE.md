@@ -213,7 +213,7 @@ const agentSchema = new mongoose.Schema({
   settings: {
     temperature: {
       type: Number,
-      default: 0.7,
+      default: 0.3,
       min: 0,
       max: 1
     },
@@ -372,7 +372,7 @@ class AIService {
         {
           model: 'Neural-Chat-7B',
           messages,
-          temperature: settings.temperature || 0.7,
+          temperature: settings.temperature || 0.3,
           max_tokens: settings.maxTokens || 500
         },
         {

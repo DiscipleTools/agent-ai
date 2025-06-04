@@ -125,10 +125,10 @@
         <div
           v-for="doc in contextDocuments"
           :key="doc._id"
-          class="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg"
+          class="flex items-start justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg overflow-hidden"
         >
-          <div class="flex items-center space-x-3 flex-1">
-            <div class="flex-shrink-0">
+          <div class="flex items-start space-x-3 flex-1 min-w-0">
+            <div class="flex-shrink-0 mt-0.5">
               <DocumentIcon v-if="doc.type === 'file'" class="h-5 w-5 text-gray-400" />
               <LinkIcon v-else-if="doc.type === 'url'" class="h-5 w-5 text-gray-400" />
               <svg v-else-if="doc.type === 'website'" class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -138,25 +138,25 @@
             <div class="flex-1 min-w-0">
               <p class="text-sm font-medium text-gray-900 dark:text-white truncate">
                 {{ doc.filename || doc.url }}
+                <span v-if="doc.type === 'website' && doc.metadata?.totalPages" class="font-normal text-gray-500">
+                  ({{ doc.metadata.totalPages }} pages)
+                </span>
               </p>
-              <p class="text-xs text-gray-500">
+              <p class="text-xs text-gray-500 break-words">
                 {{ doc.type === 'file' ? 'File' : doc.type === 'url' ? 'URL' : 'Website' }} • 
                 {{ formatDate(doc.uploadedAt) }} • 
                 {{ formatContentLength(doc.contentLength) }}
-                <span v-if="doc.type === 'website' && doc.metadata?.totalPages">
-                  • {{ doc.metadata.totalPages }} pages
-                </span>
               </p>
-              <p v-if="doc.contentPreview" class="text-xs text-gray-600 dark:text-gray-400 mt-1 truncate">
+              <p v-if="doc.contentPreview" class="text-xs text-gray-600 dark:text-gray-400 mt-1 line-clamp-2">
                 {{ doc.contentPreview }}
               </p>
             </div>
           </div>
-          <div class="flex items-center space-x-2">
+          <div class="flex flex-col sm:flex-row items-start sm:items-center space-y-1 sm:space-y-0 sm:space-x-2 ml-3 flex-shrink-0">
             <button
               type="button"
               @click="viewContextDocument(doc._id)"
-              class="text-blue-600 hover:text-blue-700 text-sm"
+              class="text-blue-600 hover:text-blue-700 text-sm whitespace-nowrap"
               title="View content"
             >
               View
@@ -166,7 +166,7 @@
               type="button"
               @click="refreshContextDocument(doc._id)"
               :disabled="refreshingDocs.has(doc._id)"
-              class="text-green-600 hover:text-green-700 text-sm disabled:opacity-50"
+              class="text-green-600 hover:text-green-700 text-sm disabled:opacity-50 whitespace-nowrap"
               :title="doc.type === 'website' ? 'Re-crawl website' : 'Refresh URL content'"
             >
               <span v-if="refreshingDocs.has(doc._id)">
@@ -180,7 +180,7 @@
               type="button"
               @click="removeContextDocument(doc._id)"
               :disabled="deletingDocs.has(doc._id)"
-              class="text-red-600 hover:text-red-700 text-sm disabled:opacity-50"
+              class="text-red-600 hover:text-red-700 text-sm disabled:opacity-50 whitespace-nowrap"
               title="Remove document"
             >
               <span v-if="deletingDocs.has(doc._id)">Removing...</span>
@@ -234,37 +234,39 @@
           
           <!-- URL Input -->
           <div v-if="showUrlInput" class="mt-4 space-y-3">
-            <div class="flex space-x-2">
+            <div class="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
               <input
                 v-model="urlInput"
                 type="url"
                 placeholder="https://example.com/document"
-                class="input-field flex-1"
+                class="input-field flex-1 min-w-0"
                 :disabled="urlTesting || urlAdding"
                 @keyup.enter="addContextUrl"
               />
-              <button
-                type="button"
-                @click="testUrlBeforeAdd"
-                :disabled="!urlInput.trim() || urlTesting || urlAdding"
-                class="btn-secondary text-sm"
-              >
-                <span v-if="urlTesting">Testing...</span>
-                <span v-else>Test</span>
-              </button>
-              <button
-                type="button"
-                @click="addContextUrl"
-                :disabled="!urlInput.trim() || urlTesting || urlAdding"
-                class="btn-primary text-sm"
-              >
-                <span v-if="urlAdding">Adding...</span>
-                <span v-else>Add</span>
-              </button>
+              <div class="flex space-x-2">
+                <button
+                  type="button"
+                  @click="testUrlBeforeAdd"
+                  :disabled="!urlInput.trim() || urlTesting || urlAdding"
+                  class="btn-secondary text-sm whitespace-nowrap"
+                >
+                  <span v-if="urlTesting">Testing...</span>
+                  <span v-else>Test</span>
+                </button>
+                <button
+                  type="button"
+                  @click="addContextUrl"
+                  :disabled="!urlInput.trim() || urlTesting || urlAdding"
+                  class="btn-primary text-sm whitespace-nowrap"
+                >
+                  <span v-if="urlAdding">Adding...</span>
+                  <span v-else>Add</span>
+                </button>
+              </div>
             </div>
             
             <!-- URL Test Results -->
-            <div v-if="urlTestResult" class="text-left">
+            <div v-if="urlTestResult" class="text-left overflow-hidden">
               <div v-if="urlTestResult.success" class="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-md">
                 <div class="flex">
                   <div class="flex-shrink-0">
@@ -272,13 +274,13 @@
                       <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
                     </svg>
                   </div>
-                  <div class="ml-3">
+                  <div class="ml-3 min-w-0 flex-1">
                     <h4 class="text-sm font-medium text-green-800 dark:text-green-200">URL is accessible</h4>
                     <div class="mt-1 text-sm text-green-700 dark:text-green-300">
-                      <p v-if="urlTestResult.data?.title">Title: {{ urlTestResult.data.title }}</p>
+                      <p v-if="urlTestResult.data?.title" class="break-words">Title: {{ urlTestResult.data.title }}</p>
                       <p>Content Type: {{ urlTestResult.data?.contentType || 'Unknown' }}</p>
                       <p v-if="urlTestResult.data?.contentLength">Content Length: {{ formatContentLength(urlTestResult.data.contentLength) }}</p>
-                      <p v-if="urlTestResult.data?.contentPreview" class="mt-2 text-xs">
+                      <p v-if="urlTestResult.data?.contentPreview" class="mt-2 text-xs break-words">
                         Preview: {{ urlTestResult.data.contentPreview }}
                       </p>
                     </div>
@@ -293,11 +295,11 @@
                       <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
                     </svg>
                   </div>
-                  <div class="ml-3">
+                  <div class="ml-3 min-w-0 flex-1">
                     <h4 class="text-sm font-medium text-red-800 dark:text-red-200">URL is not accessible</h4>
-                    <p class="mt-1 text-sm text-red-700 dark:text-red-300">{{ urlTestResult.data?.error || 'Unknown error' }}</p>
-                    <ul v-if="urlTestResult.data?.suggestions" class="mt-2 text-xs text-red-600 dark:text-red-400 list-disc list-inside">
-                      <li v-for="suggestion in urlTestResult.data.suggestions" :key="suggestion">{{ suggestion }}</li>
+                    <p class="mt-1 text-sm text-red-700 dark:text-red-300 break-words">{{ urlTestResult.data?.error || 'Unknown error' }}</p>
+                    <ul v-if="urlTestResult.data?.suggestions" class="mt-2 text-xs text-red-600 dark:text-red-400 list-disc list-inside space-y-1">
+                      <li v-for="suggestion in urlTestResult.data.suggestions" :key="suggestion" class="break-words">{{ suggestion }}</li>
                     </ul>
                   </div>
                 </div>
@@ -308,39 +310,41 @@
           <!-- Website Input -->
           <div v-if="showWebsiteInput" class="mt-4 space-y-4">
             <div class="space-y-3">
-              <div class="flex space-x-2">
+              <div class="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
                 <input
                   v-model="websiteInput"
                   type="url"
                   placeholder="https://example.com"
-                  class="input-field flex-1"
+                  class="input-field flex-1 min-w-0"
                   :disabled="websiteTesting || websiteAdding"
                   @keyup.enter="testWebsiteBeforeAdd"
                 />
-                <button
-                  type="button"
-                  @click="testWebsiteBeforeAdd"
-                  :disabled="!websiteInput.trim() || websiteTesting || websiteAdding"
-                  class="btn-secondary text-sm"
-                >
-                  <span v-if="websiteTesting">Testing...</span>
-                  <span v-else>Test</span>
-                </button>
-                <button
-                  type="button"
-                  @click="addContextWebsite"
-                  :disabled="!websiteInput.trim() || websiteTesting || websiteAdding || !websiteTestResult?.success"
-                  class="btn-primary text-sm"
-                >
-                  <span v-if="websiteAdding">Crawling...</span>
-                  <span v-else>Crawl Website</span>
-                </button>
+                <div class="flex space-x-2">
+                  <button
+                    type="button"
+                    @click="testWebsiteBeforeAdd"
+                    :disabled="!websiteInput.trim() || websiteTesting || websiteAdding"
+                    class="btn-secondary text-sm whitespace-nowrap"
+                  >
+                    <span v-if="websiteTesting">Testing...</span>
+                    <span v-else>Test</span>
+                  </button>
+                  <button
+                    type="button"
+                    @click="addContextWebsite"
+                    :disabled="!websiteInput.trim() || websiteTesting || websiteAdding || !websiteTestResult?.success"
+                    class="btn-primary text-sm whitespace-nowrap"
+                  >
+                    <span v-if="websiteAdding">Crawling...</span>
+                    <span v-else>Crawl Website</span>
+                  </button>
+                </div>
               </div>
 
               <!-- Crawl Options -->
-              <div v-if="websiteTestResult?.success" class="bg-gray-50 dark:bg-gray-700 p-4 rounded-md space-y-3">
+              <div v-if="websiteTestResult?.success" class="bg-gray-50 dark:bg-gray-700 p-4 rounded-md space-y-3 overflow-hidden">
                 <h4 class="text-sm font-medium text-gray-900 dark:text-white">Crawl Options</h4>
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   <div>
                     <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
                       Max Pages
@@ -367,7 +371,7 @@
                     />
                     <p class="text-xs text-gray-500 mt-1">How deep to follow links (1-3)</p>
                   </div>
-                  <div>
+                  <div class="sm:col-span-2 lg:col-span-1">
                     <label class="flex items-center space-x-2">
                       <input
                         v-model="crawlOptions.sameDomainOnly"
@@ -383,7 +387,7 @@
             </div>
             
             <!-- Website Test Results -->
-            <div v-if="websiteTestResult" class="text-left">
+            <div v-if="websiteTestResult" class="text-left overflow-hidden">
               <div v-if="websiteTestResult.success" class="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-md">
                 <div class="flex">
                   <div class="flex-shrink-0">
@@ -391,16 +395,16 @@
                       <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
                     </svg>
                   </div>
-                  <div class="ml-3">
+                  <div class="ml-3 min-w-0 flex-1">
                     <h4 class="text-sm font-medium text-green-800 dark:text-green-200">Website is accessible for crawling</h4>
                     <div class="mt-1 text-sm text-green-700 dark:text-green-300">
                       <p>Estimated pages: {{ websiteTestResult.data?.estimatedPages || 'Unknown' }}</p>
                       <p>Robots.txt: {{ websiteTestResult.data?.robotsAllowed ? 'Allows crawling' : 'Restricts crawling' }}</p>
-                      <p v-if="websiteTestResult.data?.estimatedProcessingTime">{{ websiteTestResult.data.estimatedProcessingTime }}</p>
+                      <p v-if="websiteTestResult.data?.estimatedProcessingTime" class="break-words">{{ websiteTestResult.data.estimatedProcessingTime }}</p>
                       <div v-if="websiteTestResult.data?.sampleLinks?.length" class="mt-2">
                         <p class="text-xs font-medium">Sample pages found:</p>
-                        <ul class="text-xs list-disc list-inside ml-2">
-                          <li v-for="link in websiteTestResult.data.sampleLinks.slice(0, 3)" :key="link">
+                        <ul class="text-xs list-disc list-inside ml-2 space-y-1">
+                          <li v-for="link in websiteTestResult.data.sampleLinks.slice(0, 3)" :key="link" class="break-all">
                             {{ getUrlPath(link) }}
                           </li>
                         </ul>
@@ -417,11 +421,11 @@
                       <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
                     </svg>
                   </div>
-                  <div class="ml-3">
+                  <div class="ml-3 min-w-0 flex-1">
                     <h4 class="text-sm font-medium text-red-800 dark:text-red-200">Website is not accessible for crawling</h4>
-                    <p class="mt-1 text-sm text-red-700 dark:text-red-300">{{ websiteTestResult.data?.error || 'Unknown error' }}</p>
-                    <ul v-if="websiteTestResult.data?.suggestions" class="mt-2 text-xs text-red-600 dark:text-red-400 list-disc list-inside">
-                      <li v-for="suggestion in websiteTestResult.data.suggestions" :key="suggestion">{{ suggestion }}</li>
+                    <p class="mt-1 text-sm text-red-700 dark:text-red-300 break-words">{{ websiteTestResult.data?.error || 'Unknown error' }}</p>
+                    <ul v-if="websiteTestResult.data?.suggestions" class="mt-2 text-xs text-red-600 dark:text-red-400 list-disc list-inside space-y-1">
+                      <li v-for="suggestion in websiteTestResult.data.suggestions" :key="suggestion" class="break-words">{{ suggestion }}</li>
                     </ul>
                   </div>
                 </div>
@@ -507,7 +511,7 @@ const form = reactive({
   description: props.agent?.description || '',
   prompt: props.agent?.prompt || '',
   settings: {
-    temperature: props.agent?.settings?.temperature || 0.7,
+    temperature: props.agent?.settings?.temperature || 0.3,
     maxTokens: props.agent?.settings?.maxTokens || 500,
     responseDelay: props.agent?.settings?.responseDelay || 0
   }
@@ -562,7 +566,7 @@ watch(() => props.agent, (newAgent) => {
     form.description = newAgent.description || ''
     form.prompt = newAgent.prompt || ''
     form.settings = {
-      temperature: newAgent.settings?.temperature || 0.7,
+      temperature: newAgent.settings?.temperature || 0.3,
       maxTokens: newAgent.settings?.maxTokens || 500,
       responseDelay: newAgent.settings?.responseDelay || 0
     }
@@ -881,5 +885,12 @@ const getUrlPath = (url) => {
 
 .btn-secondary {
   @apply bg-white text-gray-700 border border-gray-300 px-4 py-2 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:bg-gray-700 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-600;
+}
+
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 </style> 

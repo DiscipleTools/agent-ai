@@ -101,7 +101,7 @@ When creating an agent, you can configure:
   description: "Handles customer inquiries",
   prompt: "You are a helpful customer support agent...",
   settings: {
-    temperature: 0.7,        // Response creativity (0.0-1.0)
+    temperature: 0.3,        // Response creativity (0.0-1.0)
     maxTokens: 500,          // Maximum response length
     responseDelay: 0         // Delay before responding (seconds)
   }

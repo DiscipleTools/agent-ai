@@ -66,7 +66,7 @@ export default defineEventHandler(async (event) => {
     }
 
     // Check if website already exists in context documents
-    const existingWebsiteDoc = agent.contextDocuments.find(doc => 
+    const existingWebsiteDoc = agent.contextDocuments.find((doc: any) => 
       doc.type === 'website' && doc.url === url
     )
 

@@ -72,7 +72,7 @@ export default defineEventHandler(async (event) => {
       description: body.description?.trim() || '',
       prompt: body.prompt.trim(),
       settings: {
-        temperature: body.settings?.temperature !== undefined ? Number(body.settings.temperature) : 0.7,
+        temperature: body.settings?.temperature !== undefined ? Number(body.settings.temperature) : 0.3,
         maxTokens: body.settings?.maxTokens !== undefined ? Number(body.settings.maxTokens) : 500,
         responseDelay: body.settings?.responseDelay !== undefined ? Number(body.settings.responseDelay) : 0
       },

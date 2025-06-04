@@ -66,7 +66,7 @@ class AIService {
       const requestBody = {
         model: config.model,
         messages,
-        temperature: settings.temperature || 0.7,
+        temperature: settings.temperature || 0.3,
         max_tokens: settings.maxTokens || 500
       }
 
