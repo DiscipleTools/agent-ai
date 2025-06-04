@@ -1,9 +1,63 @@
 version: '3.8'
 
 services:
+  # Nuxt.js Application
+  app:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    container_name: agent-ai-app
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - MONGODB_URI=mongodb://mongodb:27017/agent-ai-server
+      - QDRANT_URL=http://qdrant:6333
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}
+      - JWT_EXPIRE=${JWT_EXPIRE:-1h}
+      - JWT_REFRESH_EXPIRE=${JWT_REFRESH_EXPIRE:-7d}
+      - PREDICTION_GUARD_API_KEY=${PREDICTION_GUARD_API_KEY}
+      - PREDICTION_GUARD_ENDPOINT=${PREDICTION_GUARD_ENDPOINT:-https://api.predictionguard.com}
+      - PREDICTION_GUARD_DEFAULT_MODEL=${PREDICTION_GUARD_DEFAULT_MODEL:-Hermes-3-Llama-3.1-8B}
+      - APP_NAME=${APP_NAME:-Agent AI Server}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+    depends_on:
+      - mongodb
+      - qdrant
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # MongoDB Database
+  mongodb:
+    image: mongo:7.0
+    container_name: agent-ai-mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=${MONGO_ROOT_USER:-admin}
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_ROOT_PASSWORD:-password}
+      - MONGO_INITDB_DATABASE=agent-ai-server
+    volumes:
+      - mongodb_data:/data/db
+      - ./docker/mongodb/init:/docker-entrypoint-initdb.d:ro
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
   # Qdrant Vector Database Service
   qdrant:
     image: qdrant/qdrant:latest
+    container_name: agent-ai-qdrant
     ports:
       - "6333:6333"
       - "6334:6334"
@@ -14,12 +68,44 @@ services:
       - QDRANT__SERVICE__GRPC_PORT=6334
       - QDRANT__LOG_LEVEL=INFO
     restart: unless-stopped
+    networks:
+      - app-network
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:6333/health"]
       interval: 30s
       timeout: 10s
       retries: 3
 
+  # Nginx Reverse Proxy
+  nginx:
+    image: nginx:alpine
+    container_name: agent-ai-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./docker/nginx/ssl:/etc/nginx/ssl:ro
+      - nginx_logs:/var/log/nginx
+    depends_on:
+      - app
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  app-network:
+    driver: bridge
+
 volumes:
   qdrant_data:
+    driver: local
+  mongodb_data:
+    driver: local
+  nginx_logs:
     driver: local 

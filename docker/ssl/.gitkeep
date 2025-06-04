@@ -1,0 +1,3 @@
+# This directory will contain SSL certificates
+# Place your cert.pem and key.pem files here for production
+# Do not commit actual certificates to git 
