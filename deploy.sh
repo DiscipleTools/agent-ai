@@ -159,6 +159,7 @@ setup_ssl() {
         case $SSL_METHOD in
             1)
                 echo "🔨 Generating self-signed certificate for $DOMAIN_NAME..."
+                mkdir -p "$APP_DIR/docker/ssl"
                 openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
                     -keyout "$APP_DIR/docker/ssl/key.pem" \
                     -out "$APP_DIR/docker/ssl/cert.pem" \
@@ -167,23 +168,53 @@ setup_ssl() {
                 ;;
             2)
                 echo "🌐 Setting up Let's Encrypt for $DOMAIN_NAME..."
-                echo "Make sure your domain points to this server's IP address."
-                read -p "Press Enter to continue..."
                 
-                # Stop any existing web servers
+                # Check if certbot is installed
+                if ! command -v certbot &> /dev/null; then
+                    echo "📦 Installing certbot..."
+                    sudo apt update
+                    sudo apt install -y certbot
+                fi
+                
+                echo "Make sure your domain points to this server's IP address."
+                echo "You can verify this by running: nslookup $DOMAIN_NAME"
+                read -p "Press Enter to continue when your domain is pointing to this server..."
+                
+                # Stop any existing web servers that might use port 80
                 docker compose down nginx 2>/dev/null || true
+                sudo systemctl stop nginx 2>/dev/null || true
+                sudo systemctl stop apache2 2>/dev/null || true
                 
                 # Get certificate
-                certbot certonly --standalone -d $DOMAIN_NAME
-                
-                # Copy certificates
-                cp /etc/letsencrypt/live/$DOMAIN_NAME/fullchain.pem "$APP_DIR/docker/ssl/cert.pem"
-                cp /etc/letsencrypt/live/$DOMAIN_NAME/privkey.pem "$APP_DIR/docker/ssl/key.pem"
-                chown $USER:$USER "$APP_DIR/docker/ssl/"*
-                echo "✅ Let's Encrypt certificate installed"
+                echo "🔑 Requesting SSL certificate from Let's Encrypt..."
+                if sudo certbot certonly --standalone -d $DOMAIN_NAME --non-interactive --agree-tos --email admin@$DOMAIN_NAME; then
+                    # Create SSL directory
+                    mkdir -p "$APP_DIR/docker/ssl"
+                    
+                    # Copy certificates
+                    sudo cp /etc/letsencrypt/live/$DOMAIN_NAME/fullchain.pem "$APP_DIR/docker/ssl/cert.pem"
+                    sudo cp /etc/letsencrypt/live/$DOMAIN_NAME/privkey.pem "$APP_DIR/docker/ssl/key.pem"
+                    sudo chown $USER:$USER "$APP_DIR/docker/ssl/"*
+                    echo "✅ Let's Encrypt certificate installed"
+                else
+                    echo "❌ Let's Encrypt certificate request failed!"
+                    echo "This could be because:"
+                    echo "  - Domain doesn't point to this server"
+                    echo "  - Port 80 is blocked by firewall"
+                    echo "  - Another service is using port 80"
+                    echo ""
+                    echo "Falling back to self-signed certificate..."
+                    mkdir -p "$APP_DIR/docker/ssl"
+                    openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+                        -keyout "$APP_DIR/docker/ssl/key.pem" \
+                        -out "$APP_DIR/docker/ssl/cert.pem" \
+                        -subj "/C=US/ST=State/L=City/O=Organization/CN=$DOMAIN_NAME"
+                    echo "✅ Self-signed certificate generated as fallback"
+                fi
                 ;;
             3)
                 echo "⚠️  SSL setup skipped. Please manually place cert.pem and key.pem in docker/ssl/"
+                mkdir -p "$APP_DIR/docker/ssl"
                 ;;
         esac
     else
