@@ -10,11 +10,21 @@ export default defineEventHandler(async (event) => {
     const connections = await settingsService.getAllAIConnections()
     const defaultConnection = await settingsService.getDefaultAIConnection()
 
-    // Don't send sensitive API keys
-    const safeConnections = connections.map(conn => ({
-      ...conn,
-      apiKey: '***HIDDEN***'
-    }))
+    // Don't send sensitive API keys - properly serialize Mongoose documents
+    const safeConnections = connections.map(conn => {
+      // Convert Mongoose document to plain object if needed
+      const plainConn = (conn as any).toObject ? (conn as any).toObject() : conn
+      
+      return {
+        _id: plainConn._id,
+        name: plainConn.name,
+        provider: plainConn.provider,
+        endpoint: plainConn.endpoint,
+        availableModels: plainConn.availableModels || [],
+        isActive: plainConn.isActive,
+        apiKey: '***HIDDEN***'
+      }
+    })
 
     return {
       success: true,

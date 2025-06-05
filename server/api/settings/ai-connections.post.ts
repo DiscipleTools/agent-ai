@@ -59,27 +59,51 @@ export default defineEventHandler(async (event) => {
 
     // Get the newly created connection (with _id)
     const createdConnection = updatedSettings.aiConnections[updatedSettings.aiConnections.length - 1]
+    
+    if (!createdConnection) {
+      throw createError({
+        statusCode: 500,
+        statusMessage: 'Failed to create AI connection - connection not found after creation'
+      })
+    }
 
     // Try to fetch models from the new connection
+    // TEMPORARILY DISABLED FOR DEBUGGING - Let's see if this is causing the 500 error
+    /*
     try {
       const models = await aiService.getAvailableModels(createdConnection._id.toString())
       
-      // Update connection with fetched models
-      createdConnection.availableModels = models.map(modelId => ({
-        id: modelId,
-        name: modelId,
-        enabled: true
-      }))
-      
-      await updatedSettings.save()
+      // Only update if we have valid models
+      if (models && models.length > 0) {
+        // Update connection with fetched models, ensuring each model has proper id and name
+        const validModels = models
+          .filter(modelId => modelId && typeof modelId === 'string' && modelId.trim())
+          .map(modelId => ({
+            id: modelId.trim(),
+            name: modelId.trim(),
+            enabled: true
+          }))
+        
+        if (validModels.length > 0) {
+          createdConnection.availableModels = validModels
+          
+          await updatedSettings.save()
+        }
+      }
     } catch (modelError) {
       console.warn('Could not fetch models for new connection:', modelError)
       // Connection is still created, just without auto-discovered models
     }
+    */
 
-    // Don't send API key back
+    // Safely create response object without toObject() call
     const safeConnection = {
-      ...createdConnection.toObject(),
+      _id: createdConnection._id,
+      name: createdConnection.name,
+      provider: createdConnection.provider,
+      endpoint: createdConnection.endpoint,
+      availableModels: createdConnection.availableModels || [],
+      isActive: createdConnection.isActive,
       apiKey: '***HIDDEN***'
     }
 
@@ -90,9 +114,15 @@ export default defineEventHandler(async (event) => {
     }
   } catch (error: any) {
     console.error('Failed to create AI connection:', error)
+    
+    // Log more detailed error information
+    if (error.name === 'ValidationError') {
+      console.error('Mongoose validation error details:', error.errors)
+    }
+    
     throw createError({
       statusCode: error.statusCode || 500,
-      statusMessage: error.statusMessage || 'Failed to create AI connection'
+      statusMessage: error.statusMessage || error.message || 'Failed to create AI connection'
     })
   }
 }) 

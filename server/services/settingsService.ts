@@ -65,6 +65,8 @@ class SettingsService {
 
   async getAllAIConnections(): Promise<AIConnection[]> {
     try {
+      // Force a fresh fetch when specifically asking for AI connections
+      this.clearCache()
       const settings = await this.getAllSettings()
       return settings?.aiConnections || []
     } catch (error: any) {
@@ -144,8 +146,18 @@ class SettingsService {
 
         return settings
       }
-    } catch (error) {
-      console.error('Failed to update settings:', error)
+    } catch (error: any) {
+      console.error('SettingsService: Failed to update settings:', error)
+      console.error('SettingsService: Error name:', error.name)
+      console.error('SettingsService: Error message:', error.message)
+      
+      if (error.name === 'ValidationError') {
+        console.error('SettingsService: Validation errors:', error.errors)
+      }
+      if (error.name === 'CastError') {
+        console.error('SettingsService: Cast error details:', error)
+      }
+      
       throw error
     }
   }

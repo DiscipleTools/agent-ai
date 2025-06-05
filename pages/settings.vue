@@ -465,7 +465,7 @@
               {{ editingConnection ? 'Edit' : 'Add' }} AI Connection
             </h3>
             
-            <form @submit.prevent="saveConnection" class="space-y-4">
+            <form @submit.prevent class="space-y-4">
               <div>
                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Connection Name *
@@ -550,10 +550,10 @@
           <div class="bg-gray-50 dark:bg-gray-700 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
             <button
               @click="saveConnection"
-              :disabled="settingsStore.loading || !isConnectionFormValid"
+              :disabled="settingsStore.loading || !isConnectionFormValid || submittingConnection"
               class="btn-primary w-full sm:ml-3 sm:w-auto"
             >
-              <span v-if="settingsStore.loading" class="flex items-center">
+              <span v-if="settingsStore.loading || submittingConnection" class="flex items-center">
                 <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
                 {{ editingConnection ? 'Updating...' : 'Creating...' }}
               </span>
@@ -591,6 +591,7 @@ const editingConnection = ref(null)
 const showConnectionApiKey = ref(false)
 const expandedConnections = ref(new Set())
 const updatingConnections = ref(new Set())
+const submittingConnection = ref(false)
 
 // AI Connection form data
 const connectionForm = reactive({
@@ -642,7 +643,7 @@ const isEmailFormValid = computed(() => {
   if (emailForm.enabled) {
     const hasHost = emailForm.smtp.host.trim().length > 0
     const hasUser = emailForm.smtp.user.trim().length > 0
-    const hasPass = emailForm.smtp.pass.trim().length > 0 || hasSmtpPassword.value
+    const hasPass = emailForm.smtp.pass.trim().length > 0 || showSmtpPassword.value
     return hasFromEmail && hasHost && hasUser && hasPass
   }
   
@@ -689,6 +690,13 @@ const closeConnectionModal = () => {
 }
 
 const saveConnection = async () => {
+  // Prevent double submission
+  if (submittingConnection.value) {
+    return
+  }
+
+  submittingConnection.value = true
+
   let toast
   try {
     toast = useNuxtApp().$toast
@@ -721,6 +729,8 @@ const saveConnection = async () => {
   } catch (error) {
     console.error('AI connection save error:', error)
     if (toast) toast.error(error.message)
+  } finally {
+    submittingConnection.value = false
   }
 }
 
@@ -961,7 +971,12 @@ const resetEmailForm = () => {
 // General methods
 const fetchSettings = async () => {
   try {
-    await settingsStore.fetchSettings()
+    // Fetch both settings and AI connections
+    await Promise.all([
+      settingsStore.fetchSettings(),
+      settingsStore.fetchAIConnections()
+    ])
+    
     if (settingsStore.settings) {
       // Populate email settings
       if (settingsStore.settings.email) {

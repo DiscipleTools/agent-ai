@@ -88,9 +88,10 @@ export const useSettingsStore = defineStore('settings', () => {
   // AI Connections methods
   const fetchAIConnections = async () => {
     try {
-      const { data } = await $api('/api/settings/ai-connections')
-      aiConnections.value = data.connections || []
-      return data
+      const response = await $api('/api/settings/ai-connections')
+      const connections = response.data?.connections || []
+      aiConnections.value = connections
+      return response.data
     } catch (err) {
       console.error('AI connections fetch error:', err)
       throw new Error(err.data?.message || err.message || 'Failed to fetch AI connections')
