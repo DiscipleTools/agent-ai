@@ -311,6 +311,12 @@ setup_environment() {
             exit 1
         fi
         
+        # Update MongoDB URI with authentication credentials
+        if ! sed -i "s|mongodb://mongodb:27017/agent-ai-server|mongodb://admin:$MONGO_PASSWORD@mongodb:27017/agent-ai-server?authSource=admin|" "$APP_DIR/.env"; then
+            echo "❌ Error: Failed to update MONGODB_URI with authentication"
+            exit 1
+        fi
+        
         # Verify the replacements worked
         echo "🔍 Verifying replacements..."
         if grep -q "your-super-secret-jwt-key-change-this-in-production-minimum-32-chars" "$APP_DIR/.env"; then

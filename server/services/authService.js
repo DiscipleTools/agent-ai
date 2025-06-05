@@ -14,9 +14,9 @@ class AuthService {
         userId,
         type: 'access'
       },
-      useRuntimeConfig().jwtSecret,
+      process.env.JWT_SECRET,
       { 
-        expiresIn: useRuntimeConfig().jwtExpire || '1h',
+        expiresIn: process.env.JWT_EXPIRE || '1h',
         issuer: 'agent-ai-server',
         audience: 'agent-ai-client'
       }
@@ -28,9 +28,9 @@ class AuthService {
         type: 'refresh',
         tokenId: crypto.randomBytes(16).toString('hex')
       },
-      useRuntimeConfig().jwtRefreshSecret,
+      process.env.JWT_REFRESH_SECRET,
       { 
-        expiresIn: useRuntimeConfig().jwtRefreshExpire || '7d',
+        expiresIn: process.env.JWT_REFRESH_EXPIRE || '7d',
         issuer: 'agent-ai-server',
         audience: 'agent-ai-client'
       }
@@ -46,7 +46,7 @@ class AuthService {
    */
   async verifyAccessToken(token) {
     try {
-      const decoded = jwt.verify(token, useRuntimeConfig().jwtSecret, {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET, {
         issuer: 'agent-ai-server',
         audience: 'agent-ai-client'
       });
@@ -73,7 +73,7 @@ class AuthService {
    */
   async verifyRefreshToken(token) {
     try {
-      const decoded = jwt.verify(token, useRuntimeConfig().jwtRefreshSecret, {
+      const decoded = jwt.verify(token, process.env.JWT_REFRESH_SECRET, {
         issuer: 'agent-ai-server',
         audience: 'agent-ai-client'
       });
