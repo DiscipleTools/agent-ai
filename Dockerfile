@@ -1,5 +1,5 @@
-# Use Node.js 18 Alpine as base image
-FROM node:18-alpine AS base
+# Use Node.js 22 Alpine as base image
+FROM node:22-alpine AS base
 
 # Install dependencies only when needed
 FROM base AS deps
@@ -35,8 +35,6 @@ RUN adduser --system --uid 1001 nuxtjs
 # Copy the build output
 COPY --from=builder --chown=nuxtjs:nodejs /app/.output /app/.output
 COPY --from=builder --chown=nuxtjs:nodejs /app/package.json /app/package.json
-# Copy scripts directory for user management
-COPY --from=builder --chown=nuxtjs:nodejs /app/scripts /app/scripts
 
 USER nuxtjs
 

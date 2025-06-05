@@ -18,6 +18,7 @@ This guide covers deploying the Agent AI Server application to any cloud server 
 > - Automatic SSL certificate setup (Let's Encrypt or self-signed)
 > - Secure password and secret generation
 > - Complete environment configuration
+> - **Automatic admin user creation**
 >
 > For development setup, see the [Quick Start section in README.md](README.md#-quick-start-development).
 
@@ -325,11 +326,31 @@ The script performs all the steps described in this guide automatically, includi
 - Docker Compose deployment
 - Service health checks
 - Backup creation
+- **Automatic admin user creation**
 
 The script will prompt you for:
 - Your domain name (or localhost for local testing)
 - SSL certificate method (Let's Encrypt, self-signed, or manual setup)
 
 All other configuration is handled automatically with secure defaults.
+
+### Admin User Creation
+
+The deployment script automatically creates an admin user with these default credentials:
+- **Email:** `admin@example.com`
+- **Password:** `AdminPassword123`
+- **Role:** `admin` (full system access)
+
+⚠️ **Important**: Change the password immediately after first login for security!
+
+If automatic admin creation fails, you can create the user manually:
+
+```bash
+# Using temporary container (recommended)
+docker run --rm --network agent-ai_app-network --env-file .env -v $(pwd):/app -w /app node:22-alpine sh -c "npm install && npm run create-admin"
+
+# Using host machine (if Node.js available)
+npm run create-admin
+```
 
 For more deployment options, see [README.md](README.md#-production-deployment). 

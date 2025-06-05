@@ -1,0 +1,19 @@
+# Admin/Scripts Container - includes all dependencies for running management scripts
+FROM node:22-alpine
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apk add --no-cache git
+
+# Copy package files
+COPY package.json package-lock.json* ./
+
+# Install ALL dependencies (including dev dependencies)
+RUN npm ci
+
+# Copy source code
+COPY . .
+
+# Keep container running for script execution
+CMD ["sleep", "infinity"] 

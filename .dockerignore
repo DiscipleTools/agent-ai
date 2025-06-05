@@ -99,6 +99,5 @@ dist
 
 # Development files
 documentation/
-scripts/
 .cursor/
 .rules/ 

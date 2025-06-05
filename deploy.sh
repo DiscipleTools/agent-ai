@@ -480,6 +480,58 @@ deploy_app() {
     fi
 }
 
+# Function to create admin user automatically
+setup_admin_user() {
+    echo "👤 Setting up admin user..."
+    
+    # Wait a bit more for database to be fully ready
+    echo "⏳ Waiting for database to be ready..."
+    sleep 10
+    
+    # Try to create admin user using temporary container approach
+    echo "🔧 Creating admin user with temporary container..."
+    
+    # Create admin user using a temporary container that shares the network
+    ADMIN_OUTPUT=$(docker run --rm \
+        --network agent-ai_app-network \
+        --env-file "$APP_DIR/.env" \
+        -v "$APP_DIR":/app \
+        -w /app \
+        node:22-alpine \
+        sh -c "npm install --silent >/dev/null 2>&1 && npm run create-admin" 2>&1)
+    
+    ADMIN_EXIT_CODE=$?
+    
+    if [ $ADMIN_EXIT_CODE -eq 0 ]; then
+        if echo "$ADMIN_OUTPUT" | grep -q "Admin user already exists"; then
+            echo "ℹ️  Admin user already exists"
+            EXISTING_EMAIL=$(echo "$ADMIN_OUTPUT" | grep "Admin user already exists:" | cut -d':' -f2 | tr -d ' ')
+            echo "   📧 Email: $EXISTING_EMAIL"
+            echo "   🔐 Password: AdminPassword123 (if unchanged)"
+        else
+            echo "✅ Admin user created successfully!"
+            echo ""
+            echo "🔑 Default Admin Credentials:"
+            echo "   📧 Email: admin@example.com"
+            echo "   🔐 Password: AdminPassword123"
+        fi
+        echo ""
+        echo "⚠️  IMPORTANT: Please change the password after first login!"
+        echo ""
+    else
+        echo "⚠️  Admin user creation failed"
+        echo "   Error details:"
+        echo "$ADMIN_OUTPUT" | head -5
+        echo ""
+        echo "   You can create the admin user manually after deployment:"
+        echo "   docker run --rm --network agent-ai_app-network --env-file .env -v \$(pwd):/app -w /app node:22-alpine sh -c \"npm install && npm run create-admin\""
+        echo ""
+        echo "   Or if you have Node.js installed locally:"
+        echo "   npm run create-admin"
+        echo ""
+    fi
+}
+
 # Function to show deployment info
 show_info() {
     echo ""
@@ -540,6 +592,9 @@ main() {
     
     # Deploy application
     deploy_app
+    
+    # Setup admin user
+    setup_admin_user
     
     # Show deployment info
     show_info

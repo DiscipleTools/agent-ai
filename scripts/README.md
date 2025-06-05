@@ -15,6 +15,8 @@ Creates an admin user with full system access.
 - Password: `AdminPassword123`
 - Role: `admin`
 
+**Note**: This script is automatically executed during deployment via `deploy.sh`. Manual execution is only needed if automatic creation fails or for additional admin users.
+
 ### 2. Create Regular User
 ```bash
 npm run create-user

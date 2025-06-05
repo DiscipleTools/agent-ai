@@ -27,6 +27,28 @@ services:
       timeout: 10s
       retries: 3
 
+  # Admin/Scripts Container (only for running scripts)
+  admin:
+    build:
+      context: .
+      dockerfile: Dockerfile.admin
+    container_name: agent-ai-admin
+    environment:
+      - NODE_ENV=development
+      - MONGODB_URI=mongodb://mongodb:27017/agent-ai-server
+      - QDRANT_URL=http://qdrant:6333
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}
+    depends_on:
+      - mongodb
+    networks:
+      - app-network
+    profiles:
+      - admin  # Only start when explicitly requested
+    volumes:
+      - .:/app
+    command: sleep infinity  # Keep container running for script execution
+
   # MongoDB Database
   mongodb:
     image: mongo:7.0

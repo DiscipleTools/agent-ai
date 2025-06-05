@@ -136,6 +136,7 @@ The deployment script will automatically:
 - Generate secure JWT secrets
 - Configure SSL certificates (Let's Encrypt or self-signed)
 - Deploy using Docker Compose with MongoDB, Qdrant, and Nginx
+- **Create admin user automatically with default credentials**
 - Display access information and management commands
 
 ### Option B: Manual Docker Deployment
@@ -251,10 +252,22 @@ The application uses JWT-based authentication with:
 - **Secure cookies**: HTTP-only cookies for token storage
 
 ### Default Admin Credentials
+
+The deployment script automatically creates an admin user with these credentials:
 - **Email**: admin@example.com
 - **Password**: AdminPassword123
+- **Role**: admin (full system access)
 
-⚠️ **Important**: Change the default password after first login!
+⚠️ **Important**: Change the default password immediately after first login for security!
+
+If the admin user wasn't created automatically, you can create one manually:
+```bash
+# Using temporary container (recommended)
+docker run --rm --network agent-ai_app-network --env-file .env -v $(pwd):/app -w /app node:22-alpine sh -c "npm install && npm run create-admin"
+
+# Using host machine (if Node.js available)
+npm run create-admin
+```
 
 ## 🤖 Agent Management
 
