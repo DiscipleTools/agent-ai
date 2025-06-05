@@ -13,7 +13,12 @@ export async function requireAuth(event: any) {
 
   try {
     // Verify token with same options as AuthService for consistency
-    const decoded = jwt.verify(token, useRuntimeConfig().jwtSecret, {
+    const jwtSecret = process.env.JWT_SECRET
+    if (!jwtSecret) {
+      throw new Error('JWT_SECRET environment variable not configured')
+    }
+    
+    const decoded = jwt.verify(token, jwtSecret, {
       issuer: 'agent-ai-server',
       audience: 'agent-ai-client'
     }) as any
