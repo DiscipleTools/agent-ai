@@ -1,10 +1,15 @@
-# Use Node.js 22 Alpine as base image
-FROM node:22-alpine AS base
+# Use Node.js 22 Debian as base image (instead of Alpine for glibc compatibility)
+FROM node:22-slim AS base
 
 # Install dependencies only when needed
 FROM base AS deps
-# Check https://github.com/nodejs/docker-node/tree/b4117f9333da4138b03a546ec926ef50a31506c3#nodealpine to understand why libc6-compat might be needed.
-RUN apk add --no-cache libc6-compat
+# Install system dependencies needed for native modules
+RUN apt-get update && apt-get install -y \
+    python3 \
+    make \
+    g++ \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 # Install dependencies based on the preferred package manager
@@ -26,11 +31,11 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 
-# Install wget for health checks
-RUN apk add --no-cache wget
+# Install wget for health checks and ensure glibc is available
+RUN apt-get update && apt-get install -y wget && rm -rf /var/lib/apt/lists/*
 
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nuxtjs
+RUN groupadd --system --gid 1001 nodejs
+RUN useradd --system --uid 1001 nuxtjs
 
 # Copy the build output
 COPY --from=builder --chown=nuxtjs:nodejs /app/.output /app/.output
