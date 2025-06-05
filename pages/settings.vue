@@ -643,7 +643,7 @@ const isEmailFormValid = computed(() => {
   if (emailForm.enabled) {
     const hasHost = emailForm.smtp.host.trim().length > 0
     const hasUser = emailForm.smtp.user.trim().length > 0
-    const hasPass = emailForm.smtp.pass.trim().length > 0 || showSmtpPassword.value
+    const hasPass = emailForm.smtp.pass.trim().length > 0 || hasSmtpPassword.value
     return hasFromEmail && hasHost && hasUser && hasPass
   }
   
@@ -834,10 +834,6 @@ const handleEmailSubmit = async () => {
 
   try {
     const updateData = {
-      predictionGuard: {
-        endpoint: form.endpoint,
-        model: form.model
-      },
       email: {
         enabled: emailForm.enabled,
         from: {
@@ -857,6 +853,7 @@ const handleEmailSubmit = async () => {
         }
       }
       
+      // Only include password if one is provided, otherwise preserve existing
       if (emailForm.smtp.pass.trim()) {
         updateData.email.smtp.auth.pass = emailForm.smtp.pass
       }
@@ -868,7 +865,10 @@ const handleEmailSubmit = async () => {
       toast.success('Email settings saved successfully!')
     }
     
-    emailForm.smtp.pass = ''
+    // Only clear the password field, don't clear if we're preserving the existing one
+    if (emailForm.smtp.pass.trim()) {
+      emailForm.smtp.pass = ''
+    }
     showSmtpPassword.value = false
     
   } catch (error) {

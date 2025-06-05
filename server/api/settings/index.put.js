@@ -65,12 +65,25 @@ export default defineEventHandler(async (event) => {
           if (!settings.email.smtp) {
             settings.email.smtp = {}
           }
-          Object.assign(settings.email.smtp, body.email.smtp)
+          
+          // Preserve existing values and update with new ones
+          if (body.email.smtp.host !== undefined) settings.email.smtp.host = body.email.smtp.host
+          if (body.email.smtp.port !== undefined) settings.email.smtp.port = body.email.smtp.port  
+          if (body.email.smtp.secure !== undefined) settings.email.smtp.secure = body.email.smtp.secure
+          
           if (body.email.smtp.auth) {
             if (!settings.email.smtp.auth) {
               settings.email.smtp.auth = {}
             }
-            Object.assign(settings.email.smtp.auth, body.email.smtp.auth)
+            
+            // Update auth fields individually to preserve existing password
+            if (body.email.smtp.auth.user !== undefined) {
+              settings.email.smtp.auth.user = body.email.smtp.auth.user
+            }
+            // Only update password if one is provided
+            if (body.email.smtp.auth.pass !== undefined) {
+              settings.email.smtp.auth.pass = body.email.smtp.auth.pass
+            }
           }
         }
       }

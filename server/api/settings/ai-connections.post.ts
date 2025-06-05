@@ -68,8 +68,6 @@ export default defineEventHandler(async (event) => {
     }
 
     // Try to fetch models from the new connection
-    // TEMPORARILY DISABLED FOR DEBUGGING - Let's see if this is causing the 500 error
-    /*
     try {
       const models = await aiService.getAvailableModels(createdConnection._id.toString())
       
@@ -86,7 +84,6 @@ export default defineEventHandler(async (event) => {
         
         if (validModels.length > 0) {
           createdConnection.availableModels = validModels
-          
           await updatedSettings.save()
         }
       }
@@ -94,7 +91,6 @@ export default defineEventHandler(async (event) => {
       console.warn('Could not fetch models for new connection:', modelError)
       // Connection is still created, just without auto-discovered models
     }
-    */
 
     // Safely create response object without toObject() call
     const safeConnection = {
