@@ -58,7 +58,7 @@ export default defineEventHandler(async (event) => {
     }
 
     // Check if URL already exists in context documents
-    const existingDoc = agent.contextDocuments.find(doc => 
+    const existingDoc = agent.contextDocuments.find((doc: any) => 
       doc.type === 'url' && doc.url === url
     )
 
@@ -118,10 +118,36 @@ export default defineEventHandler(async (event) => {
           chunksCreated: ragResult.chunksCreated,
           collectionName: ragResult.collectionName
         }
+        
+        // Update document metadata with RAG status
+        const docIndex = agent.contextDocuments.length - 1
+        agent.contextDocuments[docIndex].metadata = {
+          ...agent.contextDocuments[docIndex].metadata,
+          rag: {
+            processed: true,
+            chunksCreated: ragResult.chunksCreated,
+            processedAt: new Date()
+          }
+        }
+        await agent.save()
+        
         console.log(`✅ RAG processing completed: ${ragResult.chunksCreated} chunks created for URL`)
       }
-    } catch (ragError) {
+    } catch (ragError: any) {
       console.error('RAG processing failed (non-critical):', ragError)
+      
+      // Update document metadata to indicate RAG processing failed
+      const docIndex = agent.contextDocuments.length - 1
+      agent.contextDocuments[docIndex].metadata = {
+        ...agent.contextDocuments[docIndex].metadata,
+        rag: {
+          processed: false,
+          error: ragError.message || 'RAG processing failed',
+          attemptedAt: new Date()
+        }
+      }
+      await agent.save()
+      
       // RAG failure is non-critical - document is still saved to MongoDB
     }
 

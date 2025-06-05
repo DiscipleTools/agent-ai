@@ -376,6 +376,53 @@ class RAGService {
     }
   }
 
+  async getDocumentRAGStatus(agentId: string, documentId: string): Promise<{
+    inRAG: boolean;
+    chunksCount: number;
+  }> {
+    try {
+      const collectionName = `agent_${agentId}`
+      
+      // Check if collection exists first
+      const collectionInfo = await this.getCollectionInfo(agentId)
+      if (!collectionInfo.exists) {
+        return { inRAG: false, chunksCount: 0 }
+      }
+      
+      // Search for chunks with this documentId
+      const searchResponse = await fetch(`${this.qdrantUrl}/collections/${collectionName}/points/scroll`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          filter: {
+            must: [
+              { key: 'agentId', match: { value: agentId } },
+              { key: 'documentId', match: { value: documentId } }
+            ]
+          },
+          limit: 1000, // Sufficient to count chunks for a single document
+          with_payload: false // We only need the count
+        })
+      })
+      
+      if (!searchResponse.ok) {
+        console.error('Failed to check document RAG status')
+        return { inRAG: false, chunksCount: 0 }
+      }
+      
+      const searchResults = await searchResponse.json()
+      const chunksCount = searchResults.result?.points?.length || 0
+      
+      return {
+        inRAG: chunksCount > 0,
+        chunksCount
+      }
+    } catch (error) {
+      console.error('Error checking document RAG status:', error)
+      return { inRAG: false, chunksCount: 0 }
+    }
+  }
+
   async healthCheck(): Promise<{ 
     qdrantConnected: boolean; 
     embeddingModelLoaded: boolean;

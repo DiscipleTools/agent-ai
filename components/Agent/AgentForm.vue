@@ -152,7 +152,27 @@
 
     <!-- Context Documents (if editing) -->
     <div v-if="agent && agent._id" class="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
-      <h2 class="text-lg font-medium text-gray-900 dark:text-white mb-6">Context Documents</h2>
+      <div class="flex justify-between items-start mb-6">
+        <h2 class="text-lg font-medium text-gray-900 dark:text-white">Context Documents</h2>
+        
+        <!-- RAG Summary -->
+        <div v-if="ragSummary" class="text-right">
+          <div class="text-sm text-gray-600 dark:text-gray-400">
+            <div class="flex items-center space-x-2">
+              <svg class="h-4 w-4 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM3 10a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6zM14 9a1 1 0 00-1 1v6a1 1 0 001 1h2a1 1 0 001-1v-6a1 1 0 00-1-1h-2z" />
+              </svg>
+              <span class="font-medium">Vector DB:</span>
+              <span :class="ragSummary.documentsInRAG > 0 ? 'text-green-600 dark:text-green-400' : 'text-gray-500'">
+                {{ ragSummary.documentsInRAG }}/{{ ragSummary.totalDocuments }} docs
+              </span>
+              <span v-if="ragSummary.totalChunks > 0" class="text-gray-500">
+                ({{ ragSummary.totalChunks }} chunks)
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
       
       <!-- Existing Documents -->
       <div v-if="contextDocuments && contextDocuments.length > 0" class="space-y-3 mb-6">
@@ -176,11 +196,36 @@
                   ({{ doc.metadata.totalPages }} pages)
                 </span>
               </p>
-              <p class="text-xs text-gray-500 break-words">
-                {{ doc.type === 'file' ? 'File' : doc.type === 'url' ? 'URL' : 'Website' }} • 
-                {{ formatDate(doc.uploadedAt) }} • 
-                {{ formatContentLength(doc.contentLength) }}
-              </p>
+              <div class="flex items-center space-x-2 text-xs text-gray-500 break-words">
+                <span>{{ doc.type === 'file' ? 'File' : doc.type === 'url' ? 'URL' : 'Website' }}</span>
+                <span>•</span>
+                <span>{{ formatDate(doc.uploadedAt) }}</span>
+                <span>•</span>
+                <span>{{ formatContentLength(doc.contentLength) }}</span>
+                <span>•</span>
+                <div class="flex items-center space-x-1">
+                  <div 
+                    v-if="doc.rag?.inRAG" 
+                    class="flex items-center space-x-1 text-green-600 dark:text-green-400"
+                    :title="`Vector Database: ${doc.rag.chunksCount} chunks stored`"
+                  >
+                    <svg class="h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
+                      <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                    </svg>
+                    <span class="text-xs font-medium">RAG</span>
+                  </div>
+                  <div 
+                    v-else 
+                    class="flex items-center space-x-1 text-gray-400 dark:text-gray-500"
+                    title="Not indexed in vector database"
+                  >
+                    <svg class="h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
+                      <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+                    </svg>
+                    <span class="text-xs">No RAG</span>
+                  </div>
+                </div>
+              </div>
               <p v-if="doc.contentPreview" class="text-xs text-gray-600 dark:text-gray-400 mt-1 line-clamp-2">
                 {{ doc.contentPreview }}
               </p>
@@ -372,6 +417,51 @@
                     <span v-if="websiteAdding">Crawling...</span>
                     <span v-else>Crawl Website</span>
                   </button>
+                </div>
+              </div>
+
+              <!-- Crawling Progress Display -->
+              <div v-if="crawlingProgress.isActive" class="mt-4 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md">
+                <h4 class="text-sm font-medium text-blue-900 dark:text-blue-200 mb-3">
+                  Crawling Progress
+                </h4>
+                
+                <!-- Progress Bar -->
+                <div class="mb-3">
+                  <div class="flex justify-between items-center mb-1">
+                    <span class="text-xs text-blue-700 dark:text-blue-300">
+                      {{ crawlingProgress.message }}
+                    </span>
+                    <span class="text-xs font-medium text-blue-700 dark:text-blue-300">
+                      {{ crawlingProgress.percentage }}%
+                    </span>
+                  </div>
+                  <div class="w-full bg-blue-200 dark:bg-blue-800 rounded-full h-2">
+                    <div 
+                      class="bg-blue-600 h-2 rounded-full transition-all duration-300 ease-out"
+                      :style="{ width: `${crawlingProgress.percentage}%` }"
+                    ></div>
+                  </div>
+                </div>
+                
+                <!-- Status Details -->
+                <div class="grid grid-cols-2 gap-4 text-xs">
+                  <div>
+                    <span class="font-medium text-blue-900 dark:text-blue-200">Phase:</span>
+                    <span class="text-blue-700 dark:text-blue-300 ml-1 capitalize">{{ crawlingProgress.phase }}</span>
+                  </div>
+                  <div>
+                    <span class="font-medium text-blue-900 dark:text-blue-200">Pages:</span>
+                    <span class="text-blue-700 dark:text-blue-300 ml-1">
+                      {{ crawlingProgress.currentPage }}/{{ crawlingProgress.totalPages }}
+                    </span>
+                  </div>
+                </div>
+                
+                <!-- Current URL being crawled -->
+                <div v-if="crawlingProgress.currentUrl && crawlingProgress.phase === 'crawling'" class="mt-2 text-xs">
+                  <span class="font-medium text-blue-900 dark:text-blue-200">Current URL:</span>
+                  <span class="text-blue-700 dark:text-blue-300 ml-1 break-all">{{ crawlingProgress.currentUrl }}</span>
                 </div>
               </div>
 
@@ -574,6 +664,7 @@ const fileUploadProgress = ref(0)
 const contextDocuments = ref([])
 const refreshingDocs = ref(new Set())
 const deletingDocs = ref(new Set())
+const ragSummary = ref(null)
 
 // Crawl options
 const crawlOptions = reactive({
@@ -658,6 +749,7 @@ const loadContextDocuments = async () => {
   try {
     const response = await agentsStore.fetchContextDocuments(props.agent._id)
     contextDocuments.value = response.contextDocuments || []
+    ragSummary.value = response.ragSummary || null
   } catch (error) {
     console.error('Failed to load context documents:', error)
     toast.error('Failed to load context documents')
@@ -948,13 +1040,69 @@ const testWebsiteBeforeAdd = async () => {
   }
 }
 
+// Add reactive variables for progress tracking
+const crawlingProgress = reactive({
+  isActive: false,
+  phase: '',
+  message: '',
+  currentPage: 0,
+  totalPages: 0,
+  percentage: 0,
+  currentUrl: ''
+})
+
 const addContextWebsite = async () => {
   if (!websiteInput.value.trim() || !props.agent?._id) return
   
   websiteAdding.value = true
   
+  // Reset progress
+  Object.assign(crawlingProgress, {
+    isActive: true,
+    phase: 'starting',
+    message: 'Initializing website crawl...',
+    currentPage: 0,
+    totalPages: crawlOptions.maxPages,
+    percentage: 0,
+    currentUrl: ''
+  })
+  
   try {
-    await agentsStore.addContextWebsite(props.agent._id, websiteInput.value.trim(), crawlOptions)
+    // Try progress version first
+    try {
+      await agentsStore.addContextWebsiteWithProgress(
+        props.agent._id, 
+        websiteInput.value.trim(), 
+        crawlOptions,
+        (progress) => {
+          // Update progress state
+          Object.assign(crawlingProgress, {
+            phase: progress.phase,
+            message: progress.message,
+            currentPage: progress.currentPage || 0,
+            totalPages: progress.totalPages || crawlOptions.maxPages,
+            percentage: progress.percentage || 0,
+            currentUrl: progress.currentUrl || ''
+          })
+        }
+      )
+    } catch (progressError) {
+      console.warn('Progress version failed, falling back to standard method:', progressError)
+      
+      // Update progress to show fallback
+      Object.assign(crawlingProgress, {
+        phase: 'crawling',
+        message: 'Crawling website (progress not available)...',
+        currentPage: 0,
+        totalPages: crawlOptions.maxPages,
+        percentage: 50, // Show indeterminate progress
+        currentUrl: ''
+      })
+      
+      // Fallback to original method
+      await agentsStore.addContextWebsite(props.agent._id, websiteInput.value.trim(), crawlOptions)
+    }
+    
     toast.success('Website content added successfully')
     websiteInput.value = ''
     showWebsiteInput.value = false
@@ -965,6 +1113,7 @@ const addContextWebsite = async () => {
     toast.error(error.message || 'Failed to add website content')
   } finally {
     websiteAdding.value = false
+    crawlingProgress.isActive = false
   }
 }
 

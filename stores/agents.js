@@ -317,6 +317,125 @@ export const useAgentsStore = defineStore('agents', () => {
     }
   }
 
+  const addContextWebsiteWithProgress = async (agentId, url, options = {}, onProgress) => {
+    try {
+      // Create EventSource for SSE
+      const params = new URLSearchParams({ stream: 'true' })
+      const eventSourceUrl = `/api/agents/${agentId}/context/website?${params}`
+      
+      return new Promise((resolve, reject) => {
+        const eventSource = new EventSource(eventSourceUrl, {
+          method: 'POST' // Note: EventSource only supports GET, we'll handle this differently
+        })
+        
+        // Note: EventSource doesn't support POST, so we need to use fetch with streaming
+        // Let's use fetch with streaming instead
+        resolve(addContextWebsiteWithFetch(agentId, url, options, onProgress))
+      })
+    } catch (err) {
+      error.value = err.data?.message || 'Failed to add website context with progress'
+      throw err
+    }
+  }
+
+  const addContextWebsiteWithFetch = async (agentId, url, options = {}, onProgress) => {
+    try {
+      // Get authentication headers from the current context
+      const headers = {
+        'Content-Type': 'application/json'
+      }
+      
+      // In client-side, use browser's built-in cookie handling
+      // In server-side, this won't work anyway since SSE is client-only
+      const response = await fetch(`/api/agents/${agentId}/context/website?stream=true`, {
+        method: 'POST',
+        headers,
+        credentials: 'include', // This will include cookies automatically
+        body: JSON.stringify({ url, options })
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        let errorMessage = `HTTP error! status: ${response.status}`
+        
+        try {
+          const errorData = JSON.parse(errorText)
+          errorMessage = errorData.statusMessage || errorData.message || errorMessage
+        } catch {
+          // If not JSON, use the text as error message if it's short enough
+          if (errorText && errorText.length < 200) {
+            errorMessage = errorText
+          }
+        }
+        
+        throw new Error(errorMessage)
+      }
+
+      const reader = response.body?.getReader()
+      const decoder = new TextDecoder()
+
+      if (!reader) {
+        throw new Error('No response body')
+      }
+
+      let finalResult = null
+      let buffer = ''
+      
+      while (true) {
+        const { done, value } = await reader.read()
+        
+        if (done) break
+        
+        const chunk = decoder.decode(value, { stream: true })
+        buffer += chunk
+        
+        // Process complete lines from buffer
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || '' // Keep incomplete line in buffer
+        
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const data = line.slice(6).trim()
+            
+            if (data === '[DONE]') {
+              break
+            }
+            
+            if (data) {
+              try {
+                const parsed = JSON.parse(data)
+                
+                if (parsed.type === 'progress' && onProgress) {
+                  onProgress(parsed)
+                } else if (parsed.type === 'complete') {
+                  finalResult = parsed
+                  if (onProgress) {
+                    onProgress(parsed)
+                  }
+                } else if (parsed.type === 'error') {
+                  throw new Error(parsed.message || 'Crawling failed')
+                }
+              } catch (parseError) {
+                console.warn('Failed to parse SSE data:', data, parseError)
+              }
+            }
+          }
+        }
+      }
+
+      // Update current agent if it's loaded
+      if (currentAgent.value?._id === agentId) {
+        await fetchAgent(agentId)
+      }
+      
+      return finalResult?.data || { success: true, message: 'Website crawling completed' }
+    } catch (err) {
+      console.error('Website crawling with progress failed:', err)
+      error.value = err.message || 'Failed to add website context with progress'
+      throw err
+    }
+  }
+
   // AI Connection management for agents
   const fetchAIConnections = async () => {
     try {
@@ -351,6 +470,8 @@ export const useAgentsStore = defineStore('agents', () => {
     addContextUrl,
     testWebsite,
     addContextWebsite,
+    addContextWebsiteWithProgress,
+    addContextWebsiteWithFetch,
     fetchAIConnections
   }
 }) 

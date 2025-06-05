@@ -449,11 +449,28 @@ class WebScrapingService {
   }
 
   /**
-   * Calculate similarity between two text strings using simple word overlap
+   * Calculate similarity between two text strings using optimized word overlap
+   * CPU-optimized version with early exits and length limits
    */
   private calculateSimilarity(text1: string, text2: string): number {
-    const words1 = new Set(text1.toLowerCase().split(/\s+/).filter(word => word.length > 3))
-    const words2 = new Set(text2.toLowerCase().split(/\s+/).filter(word => word.length > 3))
+    // Early exit for identical texts
+    if (text1 === text2) return 1
+    
+    // Early exit for very different lengths (likely different content)
+    const lengthRatio = Math.min(text1.length, text2.length) / Math.max(text1.length, text2.length)
+    if (lengthRatio < 0.3) return 0
+    
+    // Limit text size for comparison to prevent CPU overload
+    const maxChars = 5000
+    const t1 = text1.length > maxChars ? text1.substring(0, maxChars) : text1
+    const t2 = text2.length > maxChars ? text2.substring(0, maxChars) : text2
+    
+    const words1 = new Set(t1.toLowerCase().split(/\s+/).filter(word => word.length > 3))
+    const words2 = new Set(t2.toLowerCase().split(/\s+/).filter(word => word.length > 3))
+    
+    // Early exit for very different word counts
+    const wordCountRatio = Math.min(words1.size, words2.size) / Math.max(words1.size, words2.size)
+    if (wordCountRatio < 0.2) return 0
     
     const intersection = new Set([...words1].filter(word => words2.has(word)))
     const union = new Set([...words1, ...words2])
@@ -462,30 +479,27 @@ class WebScrapingService {
   }
 
   /**
-   * Remove duplicate or very similar content from pages
+   * Remove duplicate URLs from pages (URL-only deduplication for CPU efficiency)
    */
   private deduplicateContent(pages: ScrapedContent[]): ScrapedContent[] {
+    console.log(`Starting URL deduplication for ${pages.length} pages...`)
+    
+    const seenUrls = new Set<string>()
     const uniquePages: ScrapedContent[] = []
-    const similarityThreshold = 0.7 // 70% similarity threshold
+    let skippedCount = 0
     
     for (const page of pages) {
-      let isDuplicate = false
-      
-      for (const existingPage of uniquePages) {
-        const similarity = this.calculateSimilarity(page.content, existingPage.content)
-        if (similarity > similarityThreshold) {
-          console.log(`Skipping duplicate content: ${page.url} (${(similarity * 100).toFixed(1)}% similar to ${existingPage.url})`)
-          isDuplicate = true
-          break
-        }
+      if (seenUrls.has(page.url)) {
+        console.log(`Skipping duplicate URL: ${page.url}`)
+        skippedCount++
+        continue
       }
       
-      if (!isDuplicate) {
-        uniquePages.push(page)
-      }
+      seenUrls.add(page.url)
+      uniquePages.push(page)
     }
     
-    console.log(`Content deduplication: ${pages.length} pages → ${uniquePages.length} unique pages`)
+    console.log(`URL deduplication complete: ${pages.length} pages → ${uniquePages.length} unique pages (${skippedCount} duplicate URLs removed)`)
     return uniquePages
   }
 
@@ -825,8 +839,124 @@ class WebScrapingService {
           }
         }
 
-        // Add delay between requests to be respectful
-        await new Promise(resolve => setTimeout(resolve, 100))
+        // Add delay between requests to be respectful and reduce CPU load
+        await new Promise(resolve => setTimeout(resolve, 1000))
+        
+      } catch (error) {
+        console.warn(`Failed to scrape ${url}:`, error)
+        // Continue with other pages even if one fails
+      }
+    }
+
+    if (scrapedPages.length === 0) {
+      throw new Error('No pages could be scraped from the website')
+    }
+
+    // Remove duplicate/similar content between pages
+    const uniquePages = this.deduplicateContent(scrapedPages)
+    const finalContentLength = uniquePages.reduce((sum, page) => sum + page.content.length, 0)
+
+    // Generate summary
+    const summary = this.generateWebsiteSummary(uniquePages, normalizedBaseUrl)
+
+    console.log(`Website crawl completed: ${uniquePages.length} unique pages (${scrapedPages.length} total), ${finalContentLength} total characters`)
+
+    return {
+      baseUrl: normalizedBaseUrl,
+      pages: uniquePages,
+      totalPages: uniquePages.length,
+      totalContentLength: finalContentLength,
+      scrapedAt: new Date(),
+      summary
+    }
+  }
+
+  /**
+   * Crawl a website with progress callbacks for real-time updates
+   */
+  async crawlWebsiteWithProgress(
+    baseUrl: string, 
+    options: Partial<CrawlOptions> = {},
+    onProgress?: (progress: {
+      message: string;
+      currentPage: number;
+      estimatedTotal: number;
+      currentUrl: string;
+    }) => void | Promise<void>
+  ): Promise<WebsiteContent> {
+    const mergedOptions = { ...this.defaultCrawlOptions, ...options }
+    
+    // Validate base URL
+    const validation = this.validateUrl(baseUrl)
+    if (!validation.isValid) {
+      throw new Error(`Base URL validation failed: ${validation.error}`)
+    }
+
+    const normalizedBaseUrl = validation.normalizedUrl!
+    
+    // Check robots.txt
+    const robotsAllowed = await this.checkRobotsTxt(normalizedBaseUrl)
+    if (!robotsAllowed) {
+      throw new Error('Crawling is disallowed by robots.txt')
+    }
+
+    const visitedUrls = new Set<string>()
+    const urlsToVisit: Array<{ url: string; depth: number }> = [{ url: normalizedBaseUrl, depth: 0 }]
+    const scrapedPages: ScrapedContent[] = []
+    let totalContentLength = 0
+
+    console.log(`Starting website crawl with progress: ${normalizedBaseUrl}`)
+    console.log(`Options: maxPages=${mergedOptions.maxPages}, maxDepth=${mergedOptions.maxDepth}`)
+
+    // Log path filtering if active
+    const basePath = new URL(normalizedBaseUrl).pathname
+    if (basePath && basePath !== '/' && basePath !== '') {
+      console.log(`Path filtering active: only crawling subpages of ${basePath}`)
+    }
+
+    while (urlsToVisit.length > 0 && scrapedPages.length < mergedOptions.maxPages!) {
+      const { url, depth } = urlsToVisit.shift()!
+      
+      if (visitedUrls.has(url) || depth > mergedOptions.maxDepth!) {
+        continue
+      }
+
+      visitedUrls.add(url)
+      
+      try {
+        console.log(`Crawling page ${scrapedPages.length + 1}/${mergedOptions.maxPages}: ${url} (depth: ${depth})`)
+        
+        // Send progress update
+        if (onProgress) {
+          await onProgress({
+            message: `Crawling page ${scrapedPages.length + 1}`,
+            currentPage: scrapedPages.length + 1,
+            estimatedTotal: Math.min(urlsToVisit.length + scrapedPages.length + 1, mergedOptions.maxPages!),
+            currentUrl: url
+          })
+        }
+        
+        // Scrape the current page
+        const scrapedContent = await this.scrapeUrl(url)
+        scrapedPages.push(scrapedContent)
+        totalContentLength += scrapedContent.content.length
+
+        // Extract links for next level if we haven't reached max depth
+        if (depth < mergedOptions.maxDepth!) {
+          const { content } = await this.fetchContent(url, this.defaultOptions)
+          const links = this.extractLinks(content, url)
+          const filteredLinks = this.filterUrls(links, normalizedBaseUrl, mergedOptions)
+          
+          // Add new URLs to visit
+          for (const link of filteredLinks) {
+            if (!visitedUrls.has(link) && !urlsToVisit.some(item => item.url === link)) {
+              urlsToVisit.push({ url: link, depth: depth + 1 })
+            }
+          }
+        }
+
+        // Add delay between requests to be respectful and reduce CPU load
+        await new Promise(resolve => setTimeout(resolve, 1000))
         
       } catch (error) {
         console.warn(`Failed to scrape ${url}:`, error)
