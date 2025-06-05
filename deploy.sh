@@ -358,14 +358,14 @@ setup_environment() {
 setup_ssl() {
     echo "🔐 Setting up SSL certificates..."
     
-    if [ ! -f "$APP_DIR/docker/ssl/cert.pem" ]; then
+    if [ ! -f "$APP_DIR/docker/nginx/ssl/cert.pem" ]; then
         case $SSL_METHOD in
             1)
                 echo "🔨 Generating self-signed certificate for $DOMAIN_NAME..."
-                mkdir -p "$APP_DIR/docker/ssl"
+                mkdir -p "$APP_DIR/docker/nginx/ssl"
                 openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
-                    -keyout "$APP_DIR/docker/ssl/key.pem" \
-                    -out "$APP_DIR/docker/ssl/cert.pem" \
+                    -keyout "$APP_DIR/docker/nginx/ssl/key.pem" \
+                    -out "$APP_DIR/docker/nginx/ssl/cert.pem" \
                     -subj "/C=US/ST=State/L=City/O=Organization/CN=$DOMAIN_NAME"
                 echo "✅ Self-signed certificate generated"
                 ;;
@@ -385,12 +385,12 @@ setup_ssl() {
                 echo "🔑 Requesting SSL certificate from Let's Encrypt..."
                 if sudo certbot certonly --standalone -d $DOMAIN_NAME --non-interactive --agree-tos --email admin@$DOMAIN_NAME; then
                     # Create SSL directory
-                    mkdir -p "$APP_DIR/docker/ssl"
+                    mkdir -p "$APP_DIR/docker/nginx/ssl"
                     
                     # Copy certificates
-                    sudo cp /etc/letsencrypt/live/$DOMAIN_NAME/fullchain.pem "$APP_DIR/docker/ssl/cert.pem"
-                    sudo cp /etc/letsencrypt/live/$DOMAIN_NAME/privkey.pem "$APP_DIR/docker/ssl/key.pem"
-                    sudo chown $USER:$USER "$APP_DIR/docker/ssl/"*
+                    sudo cp /etc/letsencrypt/live/$DOMAIN_NAME/fullchain.pem "$APP_DIR/docker/nginx/ssl/cert.pem"
+                    sudo cp /etc/letsencrypt/live/$DOMAIN_NAME/privkey.pem "$APP_DIR/docker/nginx/ssl/key.pem"
+                    sudo chown $USER:$USER "$APP_DIR/docker/nginx/ssl/"*
                     echo "✅ Let's Encrypt certificate installed"
                 else
                     echo "❌ Let's Encrypt certificate request failed!"
@@ -400,17 +400,17 @@ setup_ssl() {
                     echo "  - Another service is using port 80"
                     echo ""
                     echo "Falling back to self-signed certificate..."
-                    mkdir -p "$APP_DIR/docker/ssl"
+                    mkdir -p "$APP_DIR/docker/nginx/ssl"
                     openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
-                        -keyout "$APP_DIR/docker/ssl/key.pem" \
-                        -out "$APP_DIR/docker/ssl/cert.pem" \
+                        -keyout "$APP_DIR/docker/nginx/ssl/key.pem" \
+                        -out "$APP_DIR/docker/nginx/ssl/cert.pem" \
                         -subj "/C=US/ST=State/L=City/O=Organization/CN=$DOMAIN_NAME"
                     echo "✅ Self-signed certificate generated as fallback"
                 fi
                 ;;
             3)
-                echo "⚠️  SSL setup skipped. Please manually place cert.pem and key.pem in docker/ssl/"
-                mkdir -p "$APP_DIR/docker/ssl"
+                echo "⚠️  SSL setup skipped. Please manually place cert.pem and key.pem in docker/nginx/ssl/"
+                mkdir -p "$APP_DIR/docker/nginx/ssl"
                 ;;
         esac
     else

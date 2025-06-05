@@ -108,9 +108,9 @@ sudo apt install certbot -y
 sudo certbot certonly --standalone -d your-domain.com
 
 # Copy certificates to Docker volume
-sudo cp /etc/letsencrypt/live/your-domain.com/fullchain.pem docker/ssl/cert.pem
-sudo cp /etc/letsencrypt/live/your-domain.com/privkey.pem docker/ssl/key.pem
-sudo chown $USER:$USER docker/ssl/*
+sudo cp /etc/letsencrypt/live/your-domain.com/fullchain.pem docker/nginx/ssl/cert.pem
+sudo cp /etc/letsencrypt/live/your-domain.com/privkey.pem docker/nginx/ssl/key.pem
+sudo chown $USER:$USER docker/nginx/ssl/*
 ```
 
 #### Option B: Self-Signed (Development Only)
@@ -118,8 +118,8 @@ sudo chown $USER:$USER docker/ssl/*
 ```bash
 # Generate self-signed certificate
 openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
-    -keyout docker/ssl/key.pem \
-    -out docker/ssl/cert.pem \
+    -keyout docker/nginx/ssl/key.pem \
+    -out docker/nginx/ssl/cert.pem \
     -subj "/C=US/ST=State/L=City/O=Organization/CN=your-domain.com"
 ```
 
@@ -206,8 +206,8 @@ docker run --rm -v agent-ai_qdrant_data:/data -v $(pwd):/backup ubuntu tar czf /
 sudo certbot renew
 
 # Copy renewed certificates
-sudo cp /etc/letsencrypt/live/your-domain.com/fullchain.pem docker/ssl/cert.pem
-sudo cp /etc/letsencrypt/live/your-domain.com/privkey.pem docker/ssl/key.pem
+sudo cp /etc/letsencrypt/live/your-domain.com/fullchain.pem docker/nginx/ssl/cert.pem
+sudo cp /etc/letsencrypt/live/your-domain.com/privkey.pem docker/nginx/ssl/key.pem
 
 # Restart nginx to load new certificates
 docker compose restart nginx
@@ -242,9 +242,9 @@ sudo ufw enable
 
 1. **Permission Denied for SSL files**:
 ```bash
-sudo chown $USER:$USER docker/ssl/*
-sudo chmod 644 docker/ssl/cert.pem
-sudo chmod 600 docker/ssl/key.pem
+sudo chown $USER:$USER docker/nginx/ssl/*
+sudo chmod 644 docker/nginx/ssl/cert.pem
+sudo chmod 600 docker/nginx/ssl/key.pem
 ```
 
 2. **MongoDB Connection Issues**:

@@ -35,6 +35,8 @@ RUN adduser --system --uid 1001 nuxtjs
 # Copy the build output
 COPY --from=builder --chown=nuxtjs:nodejs /app/.output /app/.output
 COPY --from=builder --chown=nuxtjs:nodejs /app/package.json /app/package.json
+# Copy scripts directory for user management
+COPY --from=builder --chown=nuxtjs:nodejs /app/scripts /app/scripts
 
 USER nuxtjs
 
