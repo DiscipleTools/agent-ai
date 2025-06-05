@@ -32,7 +32,7 @@
                 autocomplete="email"
                 class="input-field mt-1"
                 :class="{ 'border-red-500': errorMessage }"
-                placeholder="admin@example.com"
+                placeholder="Enter your email"
               />
               <p v-if="errorMessage" class="text-red-600 text-sm mt-1">
                 {{ errorMessage }}
@@ -56,7 +56,7 @@
                 autocomplete="current-password"
                 class="input-field mt-1"
                 :class="{ 'border-red-500': errorMessage }"
-                placeholder="AdminPassword123"
+                placeholder="Enter your password"
               />
               <p v-if="errorMessage" class="text-red-600 text-sm mt-1">
                 {{ errorMessage }}
@@ -76,12 +76,6 @@
             </span>
             {{ authStore.loading ? 'Signing in...' : 'Sign in' }}
           </button>
-        </div>
-        
-        <div class="text-center">
-          <p class="text-xs text-gray-500 dark:text-gray-400">
-            Demo credentials: admin@example.com / AdminPassword123
-          </p>
         </div>
       </Form>
     </div>
