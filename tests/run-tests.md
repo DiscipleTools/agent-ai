@@ -41,7 +41,15 @@ This test suite provides comprehensive integration testing for all API endpoints
 - **PUT /api/agents/[id]/context/[docId]**: Context updates with permissions
 - **GET /api/agents/[id]/context/[docId]**: Context access with permissions
 
-#### 5. Settings Tests (`tests/integration/settings.test.ts`)
+#### 5. Profile Management Tests (`tests/integration/profile.test.ts`)
+- **PUT /api/auth/profile**: Authenticated user profile updates
+  - Name updates with validation
+  - Email updates with format and uniqueness validation
+  - Password changes with current password verification
+  - Combined field updates
+  - Input validation and error handling
+
+#### 6. Settings Tests (`tests/integration/settings.test.ts`)
 - **GET /api/settings**: Admin-only access
 - **PUT /api/settings**: Admin-only updates
 - **GET /api/settings/ai-models**: Authenticated access
@@ -73,6 +81,8 @@ This test suite provides comprehensive integration testing for all API endpoints
 | POST /api/agents/[id]/context/* | ❌ | ✅* | ✅ | *Agent access required |
 | PUT /api/agents/[id]/context/* | ❌ | ✅* | ✅ | *Agent access required |
 | DELETE /api/agents/[id]/context/* | ❌ | ✅* | ✅ | *Agent access required |
+| **Profile Management** |
+| PUT /api/auth/profile | ❌ | ✅ | ✅ | User can update own profile |
 | **Settings** |
 | GET /api/settings | ❌ | ❌ | ✅ | Admin only |
 | PUT /api/settings | ❌ | ❌ | ✅ | Admin only |
@@ -143,6 +153,8 @@ Each test validates:
 3. **Resource Access**: Users can only access assigned agents
 4. **Data Isolation**: Users can't access other users' data
 5. **Admin Privileges**: Admin-only operations are protected
+6. **Input Validation**: Proper validation of required fields and formats
+7. **Data Integrity**: Password verification and email uniqueness checks
 
 ## Expected Failures
 If any tests fail, it indicates:
@@ -156,4 +168,6 @@ When adding new endpoints:
 1. Add tests to the appropriate category file
 2. Test all permission levels (unauthenticated, user, admin)
 3. Verify data isolation for multi-tenant features
-4. Update this documentation 
+4. Test input validation and error scenarios
+5. Verify data integrity constraints
+6. Update this documentation 

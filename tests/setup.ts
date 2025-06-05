@@ -74,6 +74,9 @@ export const testAgents = {
 // Update user agent access
 testUsers.user.agentAccess = [testAgents.userAgent._id]
 
+// Track agents created during tests for cleanup
+export const createdAgentIds: mongoose.Types.ObjectId[] = []
+
 // Helper function to generate JWT tokens using the same secrets as the server
 export function generateTestToken(userId: string, type: 'access' | 'refresh' = 'access'): string {
   const secret = type === 'access' ? JWT_SECRET : JWT_REFRESH_SECRET
@@ -127,6 +130,16 @@ async function cleanTestData() {
     const deletedAgents = await Agent.deleteMany({
       _id: { $in: testAgentIds }
     })
+    
+    // Also clean up any agents created during tests
+    if (createdAgentIds.length > 0) {
+      const deletedCreatedAgents = await Agent.deleteMany({
+        _id: { $in: createdAgentIds }
+      })
+      console.log(`Also cleaned ${deletedCreatedAgents.deletedCount} agents created during tests`)
+      // Clear the tracking array
+      createdAgentIds.length = 0
+    }
     
     // Wait a bit to ensure deletion is complete
     await new Promise(resolve => setTimeout(resolve, 100))

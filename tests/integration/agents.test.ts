@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { $fetch } from 'ofetch'
-import { testUsers, testAgents, getAuthHeaders } from '../setup'
+import mongoose from 'mongoose'
+import { testUsers, testAgents, getAuthHeaders, createdAgentIds } from '../setup'
 
 const BASE_URL = 'http://localhost:3000'
 
@@ -15,7 +16,14 @@ describe('Agents API', () => {
 
       expect(response.success).toBe(true)
       expect(Array.isArray(response.data)).toBe(true)
-      expect(response.data.length).toBe(2) // Should see both agents
+      
+      // Admin should see at least the 2 test agents, but may also see real agents
+      expect(response.data.length).toBeGreaterThanOrEqual(2)
+      
+      // Verify that both test agents are present
+      const testAgentNames = response.data.map((a: any) => a.name)
+      expect(testAgentNames).toContain('Public Agent')
+      expect(testAgentNames).toContain('User Agent')
     })
 
     it('should show only accessible agents to regular users', async () => {
@@ -55,6 +63,11 @@ describe('Agents API', () => {
 
       expect(response.success).toBe(true)
       expect(response.data.name).toBe('New Test Agent')
+      
+      // Track the created agent for cleanup
+      if (response.data._id) {
+        createdAgentIds.push(new mongoose.Types.ObjectId(response.data._id))
+      }
     })
 
     it('should reject unauthenticated agent creation', async () => {

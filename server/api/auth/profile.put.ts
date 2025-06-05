@@ -1,10 +1,15 @@
 import User from '~/server/models/User'
 import { requireAuth } from '~/server/utils/auth'
+import { connectDB } from '~/server/utils/db'
 import bcrypt from 'bcryptjs'
 
 export default defineEventHandler(async (event) => {
-  // Require authentication 
-  const authUser = await requireAuth(event)
+  try {
+    // Connect to database
+    await connectDB()
+
+    // Require authentication 
+    const authUser = await requireAuth(event)
 
   const body = await readBody(event)
   const { name, email, currentPassword, newPassword } = body
@@ -59,16 +64,18 @@ export default defineEventHandler(async (event) => {
 
   // Update email if provided
   if (email !== undefined) {
-    if (!email.trim()) {
+    const trimmedEmail = email.trim()
+    
+    if (!trimmedEmail) {
       throw createError({
         statusCode: 400,
         statusMessage: 'Email cannot be empty'
       })
     }
 
-    // Validate email format
-    const emailRegex = /^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/
-    if (!emailRegex.test(email)) {
+    // Validate email format (more lenient regex)
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(trimmedEmail)) {
       throw createError({
         statusCode: 400,
         statusMessage: 'Please enter a valid email address'
@@ -77,7 +84,7 @@ export default defineEventHandler(async (event) => {
 
     // Check if email is already taken by another user
     const existingUser = await User.findOne({ 
-      email: email.toLowerCase(),
+      email: trimmedEmail.toLowerCase(),
       _id: { $ne: user._id }
     })
 
@@ -88,7 +95,7 @@ export default defineEventHandler(async (event) => {
       })
     }
 
-    user.email = email.toLowerCase()
+    user.email = trimmedEmail.toLowerCase()
   }
 
   try {
@@ -119,6 +126,16 @@ export default defineEventHandler(async (event) => {
       })
     }
 
+    throw createError({
+      statusCode: 500,
+      statusMessage: 'Failed to update profile'
+    })
+  }
+  } catch (error: any) {
+    if (error.statusCode) {
+      throw error
+    }
+    
     throw createError({
       statusCode: 500,
       statusMessage: 'Failed to update profile'
