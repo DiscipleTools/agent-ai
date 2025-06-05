@@ -41,21 +41,28 @@
         
         <div class="p-4 border-t border-gray-200 dark:border-gray-700">
           <div class="flex items-center">
-            <div class="flex-shrink-0">
-              <div class="w-10 h-10 bg-primary-100 dark:bg-primary-900 rounded-full flex items-center justify-center">
-                <span class="text-sm font-medium text-primary-600 dark:text-primary-400">
-                  {{ authStore.user?.name?.charAt(0).toUpperCase() }}
-                </span>
+            <NuxtLink 
+              to="/profile" 
+              @click="closeMobileMenu"
+              class="flex items-center flex-1 min-w-0 p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors group"
+              title="Go to profile"
+            >
+              <div class="flex-shrink-0">
+                <div class="w-10 h-10 bg-primary-100 dark:bg-primary-900 rounded-full flex items-center justify-center group-hover:bg-primary-200 dark:group-hover:bg-primary-800 transition-colors">
+                  <span class="text-sm font-medium text-primary-600 dark:text-primary-400">
+                    {{ authStore.user?.name?.charAt(0).toUpperCase() }}
+                  </span>
+                </div>
               </div>
-            </div>
-            <div class="ml-3 flex-1 min-w-0">
-              <p class="text-sm font-medium text-gray-900 dark:text-white truncate">
-                {{ authStore.user?.name }}
-              </p>
-              <p class="text-xs text-gray-500 dark:text-gray-400 truncate">
-                {{ authStore.user?.email }}
-              </p>
-            </div>
+              <div class="ml-3 flex-1 min-w-0">
+                <p class="text-sm font-medium text-gray-900 dark:text-white truncate group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">
+                  {{ authStore.user?.name }}
+                </p>
+                <p class="text-xs text-gray-500 dark:text-gray-400 truncate">
+                  {{ authStore.user?.email }}
+                </p>
+              </div>
+            </NuxtLink>
             <button
               @click="authStore.logout"
               class="ml-2 flex items-center px-3 py-2 text-sm font-medium text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900 rounded-md transition-colors"
@@ -105,21 +112,27 @@
           <!-- User Profile -->
           <div class="flex-shrink-0 p-4 border-t border-gray-200 dark:border-gray-700">
             <div class="flex items-center">
-              <div class="flex-shrink-0">
-                <div class="w-10 h-10 bg-primary-100 dark:bg-primary-900 rounded-full flex items-center justify-center">
-                  <span class="text-sm font-medium text-primary-600 dark:text-primary-400">
-                    {{ authStore.user?.name?.charAt(0).toUpperCase() }}
-                  </span>
+              <NuxtLink 
+                to="/profile" 
+                class="flex items-center flex-1 min-w-0 p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors group"
+                title="Go to profile"
+              >
+                <div class="flex-shrink-0">
+                  <div class="w-10 h-10 bg-primary-100 dark:bg-primary-900 rounded-full flex items-center justify-center group-hover:bg-primary-200 dark:group-hover:bg-primary-800 transition-colors">
+                    <span class="text-sm font-medium text-primary-600 dark:text-primary-400">
+                      {{ authStore.user?.name?.charAt(0).toUpperCase() }}
+                    </span>
+                  </div>
                 </div>
-              </div>
-              <div class="ml-3 flex-1 min-w-0">
-                <p class="text-sm font-medium text-gray-900 dark:text-white truncate">
-                  {{ authStore.user?.name }}
-                </p>
-                <p class="text-xs text-gray-500 dark:text-gray-400 truncate">
-                  {{ authStore.user?.role === 'admin' ? 'Administrator' : 'User' }}
-                </p>
-              </div>
+                <div class="ml-3 flex-1 min-w-0">
+                  <p class="text-sm font-medium text-gray-900 dark:text-white truncate group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">
+                    {{ authStore.user?.name }}
+                  </p>
+                  <p class="text-xs text-gray-500 dark:text-gray-400 truncate">
+                    {{ authStore.user?.role === 'admin' ? 'Administrator' : 'User' }}
+                  </p>
+                </div>
+              </NuxtLink>
               <div class="ml-2 flex space-x-1">
                 <!-- Theme toggle button hidden
                 <button
@@ -273,6 +286,7 @@ import {
   CpuChipIcon,
   UsersIcon,
   CogIcon,
+  UserIcon,
   ArrowRightOnRectangleIcon,
   Bars3Icon,
   XMarkIcon,
@@ -298,6 +312,7 @@ const navigation = computed(() => [
     badge: agentsStore.agents.length > 0 ? agentsStore.agents.length.toString() : undefined 
   },
   ...(authStore.isAdmin ? [{ name: 'Users', href: '/users', icon: UsersIcon }] : []),
+  { name: 'Profile', href: '/profile', icon: UserIcon },
   ...(authStore.isAdmin ? [{ name: 'Settings', href: '/settings', icon: CogIcon }] : [])
 ])
 
@@ -305,6 +320,7 @@ const currentPageName = computed(() => {
   const path = route.path
   if (path.includes('/agents')) return 'Agents'
   if (path.includes('/users')) return 'Users'
+  if (path.includes('/profile')) return 'Profile'
   if (path.includes('/settings')) return 'Settings'
   return 'Agents'
 })

@@ -191,7 +191,15 @@ const validateInvitation = async () => {
     }
 
     const response = await $api(`/api/users/validate-invitation?token=${token}`)
-    invitationData.value = response.data
+    
+    // Handle response structure according to workspace rules
+    if (response.success !== undefined) {
+      // Response already has correct structure
+      invitationData.value = response.data
+    } else {
+      // Response data is already unwrapped
+      invitationData.value = response
+    }
     
   } catch (err) {
     console.error('Invitation validation error:', err)
@@ -218,23 +226,32 @@ const handleSubmit = async () => {
       }
     })
 
-    // Check if the response indicates success
-    if (response.success) {
+    // Handle response structure according to workspace rules
+    let result
+    if (response.success !== undefined) {
+      // Response already has correct structure
+      result = response
+    } else {
+      // Wrap response if needed
+      result = { success: true, data: response }
+    }
+
+    if (result.success) {
       // Show success message
       const { $toast } = useNuxtApp()
-      $toast.success(response.message || 'Account setup completed successfully! Please sign in.')
+      $toast.success(result.message || 'Account setup completed successfully! Please sign in.')
 
       // Redirect to login
       await router.push('/login')
     } else {
-      throw new Error(response.message || 'Account setup failed')
+      throw new Error(result.message || 'Account setup failed')
     }
     
   } catch (err) {
     console.error('Account setup error:', err)
     
     const { $toast } = useNuxtApp()
-    const errorMessage = err.data?.message || err.statusMessage || err.message || 'Failed to complete account setup'
+    const errorMessage = err.data?.message || err.message || 'Failed to complete account setup'
     $toast.error(errorMessage)
     
   } finally {

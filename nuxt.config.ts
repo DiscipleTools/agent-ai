@@ -18,6 +18,12 @@ export default defineNuxtConfig({
     host: 'localhost'
   },
 
+  vite: {
+    server: {
+      strictPort: true
+    }
+  },
+
   runtimeConfig: {
     // Private keys (only available on server-side)
     mongodbUri: process.env.MONGODB_URI,

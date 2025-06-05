@@ -125,4 +125,8 @@ When something doesn't work:
 
 
 ## Server.
-Server is always running on port 3000. Try to kill this server before starting a new server
+Server is always running on port 3000. Try to kill this server before starting a new server.
+Never run `npm run dev` before checking for existing servers first.
+# Always check for existing servers first
+lsof -ti:3000 -ti:3001 || echo "No servers running"
+# Or use: ps aux | grep "npm run dev\|nuxt dev" | grep -v grep
