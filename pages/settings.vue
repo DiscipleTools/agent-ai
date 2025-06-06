@@ -94,13 +94,13 @@
                 <button 
                   v-if="connection.availableModels?.length"
                   @click="toggleConnectionModels(connection._id)" 
-                  class="btn-secondary text-sm"
+                  class="btn-secondary text-sm flex items-center"
                   title="Show/hide models for this connection"
                 >
-                  <svg class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg class="h-4 w-4 mr-1 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
                   </svg>
-                  {{ expandedConnections.has(connection._id) ? 'Hide Models' : 'Manage Models' }}
+                  <span>{{ expandedConnections.has(connection._id) ? 'Hide Models' : 'Manage Models' }}</span>
                 </button>
                 <button @click="editConnection(connection)" class="btn-secondary text-sm">
                   Edit
@@ -120,18 +120,27 @@
                 </span>
               </div>
               
-              <!-- Collapsed view - just show model names -->
+              <!-- Collapsed view - clickable model badges -->
               <div v-if="!expandedConnections.has(connection._id)" class="flex flex-wrap gap-2">
-                <span v-for="model in connection.availableModels" :key="model.id" :class="[
-                  'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium',
-                  model.enabled ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
-                ]">
-                  {{ model.name || model.id }}
+                <button 
+                  v-for="(model, index) in connection.availableModels" 
+                  :key="model.id" 
+                  @click="toggleModelEnabledInMain(connection, index)"
+                  :disabled="updatingConnections.has(connection._id)"
+                  :class="[
+                    'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium cursor-pointer transition-colors duration-200 hover:opacity-80',
+                    model.enabled ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 hover:bg-green-200 dark:hover:bg-green-800' : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600',
+                    updatingConnections.has(connection._id) ? 'opacity-50 cursor-not-allowed' : ''
+                  ]"
+                  :title="`Click to ${model.enabled ? 'disable' : 'enable'} ${model.name || model.id}`"
+                >
+                  <span>{{ model.name || model.id }}</span>
                   <button 
                     v-if="!isDefaultModel(connection._id, model.id)"
-                    @click="setAsDefault(connection._id, model.id)" 
+                    @click.stop="setAsDefault(connection._id, model.id)" 
                     class="ml-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
                     title="Set as default"
+                    :disabled="updatingConnections.has(connection._id)"
                   >
                     <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
@@ -142,14 +151,52 @@
                       <path d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
                     </svg>
                   </span>
-                </span>
+                </button>
               </div>
               
               <!-- Expanded view - model management -->
               <div v-else class="space-y-2">
-                <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">
-                  Click to enable/disable models for use by agents. At least one model must be enabled.
-                </p>
+                <div class="flex items-center justify-between mb-3">
+                  <p class="text-xs text-gray-500 dark:text-gray-400">
+                    Click to enable/disable models for use by agents. At least one model must be enabled.
+                  </p>
+                  <div class="flex items-center space-x-2">
+                    <button
+                      @click="refreshConnectionModels(connection)"
+                      :disabled="updatingConnections.has(connection._id)"
+                      class="text-xs btn-secondary flex items-center"
+                      title="Refresh model list from API"
+                    >
+                      <svg v-if="!updatingConnections.has(connection._id)" class="h-3 w-3 mr-1 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                      <div v-else class="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600 mr-1 flex-shrink-0"></div>
+                      <span>Refresh</span>
+                    </button>
+                    <button
+                      @click="disableAllModels(connection)"
+                      :disabled="updatingConnections.has(connection._id) || connection.availableModels.every(m => !m.enabled)"
+                      class="text-xs btn-secondary flex items-center"
+                      title="Disable all models"
+                    >
+                      <svg class="h-3 w-3 mr-1 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636m12.728 12.728L18.364 5.636M5.636 18.364l12.728-12.728" />
+                      </svg>
+                      <span>Disable All</span>
+                    </button>
+                    <button
+                      @click="enableAllModels(connection)"
+                      :disabled="updatingConnections.has(connection._id) || connection.availableModels.every(m => m.enabled)"
+                      class="text-xs btn-secondary flex items-center"
+                      title="Enable all models"
+                    >
+                      <svg class="h-3 w-3 mr-1 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <span>Enable All</span>
+                    </button>
+                  </div>
+                </div>
                 <div class="space-y-2 max-h-40 overflow-y-auto">
                   <div 
                     v-for="(model, index) in connection.availableModels" 
@@ -817,6 +864,124 @@ const toggleModelEnabledInMain = async (connection, modelIndex) => {
   } catch (error) {
     console.error('Toggle model error:', error)
     if (toast) toast.error(error.message)
+  } finally {
+    // Remove loading state
+    updatingConnections.value.delete(connection._id)
+  }
+}
+
+const refreshConnectionModels = async (connection) => {
+  let toast
+  try {
+    toast = useNuxtApp().$toast
+  } catch (e) {
+    console.error('Could not get toast:', e)
+  }
+
+  try {
+    // Mark this connection as updating
+    updatingConnections.value.add(connection._id)
+    
+    // Store the expanded state before update
+    const wasExpanded = expandedConnections.value.has(connection._id)
+    
+    // Call the refresh API endpoint
+    await settingsStore.refreshConnectionModels(connection._id)
+    
+    // Restore the expanded state after update
+    if (wasExpanded) {
+      expandedConnections.value.add(connection._id)
+    }
+    
+    if (toast) toast.success('Models refreshed successfully!')
+    
+  } catch (error) {
+    console.error('Refresh models error:', error)
+    if (toast) toast.error(error.message || 'Failed to refresh models')
+  } finally {
+    // Remove loading state
+    updatingConnections.value.delete(connection._id)
+  }
+}
+
+const disableAllModels = async (connection) => {
+  let toast
+  try {
+    toast = useNuxtApp().$toast
+  } catch (e) {
+    console.error('Could not get toast:', e)
+  }
+
+  try {
+    // Mark this connection as updating
+    updatingConnections.value.add(connection._id)
+    
+    // Store the expanded state before update
+    const wasExpanded = expandedConnections.value.has(connection._id)
+    
+    // Disable all models
+    const updatedModels = connection.availableModels.map(model => ({
+      ...model,
+      enabled: false
+    }))
+    
+    // Update the connection
+    await settingsStore.updateAIConnection(connection._id, {
+      availableModels: updatedModels
+    })
+    
+    // Restore the expanded state after update
+    if (wasExpanded) {
+      expandedConnections.value.add(connection._id)
+    }
+    
+    if (toast) toast.success('All models disabled')
+    
+  } catch (error) {
+    console.error('Disable all models error:', error)
+    if (toast) toast.error(error.message || 'Failed to disable all models')
+  } finally {
+    // Remove loading state
+    updatingConnections.value.delete(connection._id)
+  }
+}
+
+const enableAllModels = async (connection) => {
+  let toast
+  try {
+    toast = useNuxtApp().$toast
+  } catch (e) {
+    console.error('Could not get toast:', e)
+  }
+
+  try {
+    // Mark this connection as updating
+    updatingConnections.value.add(connection._id)
+    
+    // Store the expanded state before update
+    const wasExpanded = expandedConnections.value.has(connection._id)
+    
+    // Enable all models
+    const updatedModels = connection.availableModels.map(model => ({
+      ...model,
+      enabled: true
+    }))
+    
+    // Update the connection
+    await settingsStore.updateAIConnection(connection._id, {
+      availableModels: updatedModels
+    })
+    
+    // Restore the expanded state after update
+    if (wasExpanded) {
+      expandedConnections.value.add(connection._id)
+    }
+    
+    if (toast) toast.success('All models enabled')
+    
+  } catch (error) {
+    console.error('Enable all models error:', error)
+    if (toast) toast.error(error.message || 'Failed to enable all models')
   } finally {
     // Remove loading state
     updatingConnections.value.delete(connection._id)

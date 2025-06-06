@@ -157,15 +157,34 @@ class AIService {
         const connections = await settingsService.getAllAIConnections()
         const connection = connections.find(conn => conn._id.toString() === connectionId && conn.isActive)
         if (connection) {
-          const model = modelId ? 
-            connection.availableModels.find(m => m.id === modelId && m.enabled) :
-            connection.availableModels.find(m => m.enabled) || connection.availableModels[0]
+          // If a specific model is requested, try to find it
+          if (modelId) {
+            const model = connection.availableModels.find(m => m.id === modelId && m.enabled)
+            if (model) {
+              return {
+                apiKey: connection.apiKey,
+                endpoint: connection.endpoint,
+                model: model.id
+              }
+            }
+          }
           
-          if (model) {
+          // For model fetching purposes, we should still return the connection config
+          // even if no models are configured yet
+          if (connection.availableModels.length > 0) {
+            const model = connection.availableModels.find(m => m.enabled) || connection.availableModels[0]
             return {
               apiKey: connection.apiKey,
               endpoint: connection.endpoint,
               model: model.id
+            }
+          } else {
+            // For new connections without models, return a default model name
+            // This allows the connection to be used for fetching its available models
+            return {
+              apiKey: connection.apiKey,
+              endpoint: connection.endpoint,
+              model: 'default' // Temporary placeholder for model fetching
             }
           }
         }

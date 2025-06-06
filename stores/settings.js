@@ -191,6 +191,39 @@ export const useSettingsStore = defineStore('settings', () => {
     }
   }
 
+  const refreshConnectionModels = async (connectionId) => {
+    loading.value = true
+    try {
+      const response = await $api(`/api/settings/ai-connections/${connectionId}/refresh-models`, {
+        method: 'POST'
+      })
+      
+      // Update the specific connection with refreshed models
+      if (response && response.data) {
+        const connectionIndex = aiConnections.value.findIndex(conn => conn._id === connectionId)
+        if (connectionIndex !== -1) {
+          // Create new array to maintain reactivity
+          const newConnections = [...aiConnections.value]
+          newConnections[connectionIndex] = response.data
+          aiConnections.value = newConnections
+        } else {
+          // Fallback to full refresh if connection not found
+          await fetchAIConnections()
+        }
+      } else {
+        // Fallback to full refresh if no response data
+        await fetchAIConnections()
+      }
+      
+      return response
+    } catch (err) {
+      console.error('Refresh connection models error:', err)
+      throw new Error(err.data?.message || err.message || 'Failed to refresh models')
+    } finally {
+      loading.value = false
+    }
+  }
+
   // Computed properties
   const hasApiKey = computed(() => {
     return aiConnections.value?.length > 0
@@ -229,6 +262,7 @@ export const useSettingsStore = defineStore('settings', () => {
     createAIConnection,
     updateAIConnection,
     deleteAIConnection,
-    setDefaultAI
+    setDefaultAI,
+    refreshConnectionModels
   }
 }) 
