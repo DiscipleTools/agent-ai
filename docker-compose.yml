@@ -16,6 +16,8 @@ services:
       - JWT_REFRESH_EXPIRE=${JWT_REFRESH_EXPIRE:-7d}
       - APP_NAME=${APP_NAME:-Agent AI Server}
       - LOG_LEVEL=${LOG_LEVEL:-info}
+      - CHATWOOT_URL=${CHATWOOT_URL}
+      - CHATWOOT_API_TOKEN=${CHATWOOT_API_TOKEN}
     depends_on:
       - mongodb
       - qdrant

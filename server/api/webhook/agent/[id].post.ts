@@ -55,24 +55,47 @@ export default defineEventHandler(async (event) => {
     // Get webhook payload
     const payload = await readBody(event)
 
-    // Validate Chatwoot webhook payload
-    if (!payload.message || !payload.conversation) {
+    // Validate ChatWoot webhook payload
+    if (!payload || typeof payload !== 'object') {
       throw createError({
         statusCode: 400,
-        statusMessage: 'Invalid webhook payload'
+        statusMessage: 'Invalid webhook payload: not an object'
       })
     }
 
-    // Skip if message is outgoing (from agent)
-    if (payload.message.message_type === 'outgoing') {
+    // Skip if this is not a message_created event
+    if (payload.event !== 'message_created') {
+      console.log('Received non-message event:', payload.event || 'unknown')
       return {
         success: true,
-        message: 'Skipped outgoing message'
+        message: `Skipped ${payload.event || 'unknown'} event`
+      }
+    }
+
+    // ChatWoot sends the message data directly in the payload for message_created events
+    if (!payload.conversation) {
+      throw createError({
+        statusCode: 400,
+        statusMessage: 'Invalid webhook payload: missing conversation data'
+      })
+    }
+
+    // Extract message and conversation data from ChatWoot payload
+    // In ChatWoot, the message data is at the top level, conversation is nested
+    const messageContent = payload.content || ''
+    const conversationObj = payload.conversation
+    const accountId = payload.account?.id || conversationObj?.account_id || 1
+
+    // Skip if message is outgoing or template (from agent/bot/system)
+    if (payload.message_type === 'outgoing' || payload.message_type === 'template') {
+      return {
+        success: true,
+        message: `Skipped ${payload.message_type} message`
       }
     }
 
     // Skip if no message content
-    if (!payload.message.content || !payload.message.content.trim()) {
+    if (!messageContent || !messageContent.trim()) {
       return {
         success: true,
         message: 'Skipped empty message'
@@ -80,8 +103,9 @@ export default defineEventHandler(async (event) => {
     }
 
     console.log('Webhook received for agent:', agent.name)
-    console.log('Message:', payload.message.content)
-    console.log('Conversation ID:', payload.conversation.id)
+    console.log('Message:', messageContent)
+    console.log('Conversation ID:', conversationObj?.id || 'unknown')
+    console.log('Account ID:', accountId)
 
     // Generate AI response using the agent's prompt and context
     let responseMessage: string
@@ -91,7 +115,7 @@ export default defineEventHandler(async (event) => {
         agent._id,
         agent.prompt,
         agent.contextDocuments || [],
-        payload.message.content.trim(),
+        messageContent.trim(),
         {
           temperature: agent.settings?.temperature,
           maxTokens: agent.settings?.maxTokens,
@@ -104,7 +128,7 @@ export default defineEventHandler(async (event) => {
       console.log('AI response generated:', {
         agentName: agent.name,
         responseLength: responseMessage.length,
-        originalMessage: payload.message.content.substring(0, 100) + (payload.message.content.length > 100 ? '...' : '')
+        originalMessage: messageContent.substring(0, 100) + (messageContent.length > 100 ? '...' : '')
       })
       
     } catch (aiError: any) {
@@ -118,7 +142,7 @@ export default defineEventHandler(async (event) => {
         agentId: agent._id,
         agentName: agent.name,
         error: aiError.message,
-        userMessage: payload.message.content
+        userMessage: messageContent
       })
     }
 
@@ -131,8 +155,8 @@ export default defineEventHandler(async (event) => {
     // Send response back to Chatwoot
     try {
       await chatwootService.sendMessage(
-        payload.conversation.account_id,
-        payload.conversation.id,
+        accountId,
+        conversationObj?.id || 0,
         responseMessage
       )
 
@@ -144,10 +168,10 @@ export default defineEventHandler(async (event) => {
         data: {
           agentId: agent._id,
           agentName: agent.name,
-          originalMessage: payload.message.content,
+          originalMessage: messageContent,
           responseMessage,
-          conversationId: payload.conversation.id,
-          accountId: payload.conversation.account_id,
+          conversationId: conversationObj?.id || 0,
+          accountId: accountId,
           responseLength: responseMessage.length,
           hasContextDocuments: (agent.contextDocuments || []).length > 0
         }
@@ -164,7 +188,7 @@ export default defineEventHandler(async (event) => {
         data: {
           agentId: agent._id,
           agentName: agent.name,
-          originalMessage: payload.message.content,
+          originalMessage: messageContent,
           responseMessage
         }
       }

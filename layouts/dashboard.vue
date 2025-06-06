@@ -162,40 +162,6 @@
       <div class="flex-1 flex flex-col min-w-0 md:ml-64">
         <!-- Top header -->
         <header class="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
-          <!-- RAG Status Warning Banner -->
-          <div 
-            v-if="!ragStore.isConnected && !ragStore.isChecking" 
-            class="bg-yellow-50 dark:bg-yellow-900 border-b border-yellow-200 dark:border-yellow-700"
-          >
-            <div class="px-4 sm:px-6 lg:px-8">
-              <div class="flex items-center justify-between h-12">
-                <div class="flex items-center">
-                  <ExclamationTriangleIcon class="w-5 h-5 text-yellow-600 dark:text-yellow-400 mr-2" />
-                  <span class="text-sm font-medium text-yellow-800 dark:text-yellow-200">
-                    RAG System Offline - Documents will use traditional context instead of smart search
-                  </span>
-                </div>
-                <div class="flex items-center space-x-2">
-                  <button
-                    @click="ragStore.checkStatus"
-                    class="text-sm text-yellow-700 dark:text-yellow-300 hover:text-yellow-900 dark:hover:text-yellow-100 font-medium"
-                    title="Retry connection"
-                  >
-                    Retry
-                  </button>
-                  <button
-                    v-if="authStore.isAdmin"
-                    @click="navigateTo('/settings')"
-                    class="text-sm text-yellow-700 dark:text-yellow-300 hover:text-yellow-900 dark:hover:text-yellow-100 font-medium"
-                    title="Go to settings"
-                  >
-                    Settings
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-
           <!-- Main Header Content -->
           <div class="px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between h-16">
@@ -227,27 +193,6 @@
               </div>
               
               <div class="flex items-center space-x-4">
-                <!-- RAG Status Indicator (for admins) -->
-                <div 
-                  v-if="authStore.isAdmin" 
-                  class="hidden md:flex items-center"
-                  :title="ragStore.statusMessage"
-                >
-                  <div class="flex items-center space-x-2">
-                    <div 
-                      class="w-2 h-2 rounded-full"
-                      :class="{
-                        'bg-green-500': ragStore.statusColor === 'green',
-                        'bg-yellow-500': ragStore.statusColor === 'yellow',
-                        'bg-red-500': ragStore.statusColor === 'red'
-                      }"
-                    ></div>
-                    <span class="text-xs text-gray-500 dark:text-gray-400">
-                      RAG {{ ragStore.isConnected ? 'Online' : 'Offline' }}
-                    </span>
-                  </div>
-                </div>
-                
                 <!-- Logout button (desktop) -->
                 <button
                   @click="authStore.logout"
@@ -292,15 +237,13 @@ import {
   XMarkIcon,
   SunIcon,
   MoonIcon,
-  ChevronRightIcon,
-  ExclamationTriangleIcon
+  ChevronRightIcon
 } from '@heroicons/vue/24/outline'
 
 const authStore = useAuthStore()
 const agentsStore = useAgentsStore()
 const colorMode = useColorMode()
 const route = useRoute()
-const ragStore = useRagStore()
 
 const mobileMenuOpen = ref(false)
 
@@ -351,18 +294,6 @@ onMounted(async () => {
       // Silently fail - the user will see the count as 0 and can navigate to agents page
       console.error('Failed to fetch agents for sidebar count:', error)
     }
-  }
-
-  // Start RAG status monitoring only if user is authenticated
-  if (authStore.user) {
-    ragStore.startStatusChecking()
-  }
-})
-
-// Watch for auth changes to start RAG monitoring when user logs in
-watch(() => authStore.user, (newUser) => {
-  if (newUser && !ragStore.isChecking) {
-    ragStore.startStatusChecking()
   }
 })
 </script> 
