@@ -1,6 +1,7 @@
 import mongoose from 'mongoose'
 import bcrypt from 'bcryptjs'
 import dotenv from 'dotenv'
+import crypto from 'crypto'
 
 dotenv.config()
 
@@ -83,7 +84,6 @@ const createAdminUser = async () => {
     const name = process.argv[3] || 'Admin User';
     // Generate a secure random password if none provided
 const generateSecurePassword = () => {
-  const crypto = require('crypto');
   return crypto.randomBytes(16).toString('base64').replace(/[^a-zA-Z0-9]/g, '') + 'A1!';
 };
 
