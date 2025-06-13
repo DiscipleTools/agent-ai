@@ -560,7 +560,7 @@ setup_admin_user() {
             echo ""
             
             # Extract the generated password from the output
-            GENERATED_PASSWORD=$(echo "$ADMIN_OUTPUT" | grep "Generated Password:" | cut -d':' -f2 | tr -d ' ')
+            GENERATED_PASSWORD=$(echo "$ADMIN_OUTPUT" | grep "🔑 Generated Password:" | cut -d':' -f2 | tr -d ' ')
             ADMIN_EMAIL=$(echo "$ADMIN_OUTPUT" | grep "📧 Email:" | cut -d':' -f2 | tr -d ' ')
             
             echo "🔑 ADMIN LOGIN CREDENTIALS:"
