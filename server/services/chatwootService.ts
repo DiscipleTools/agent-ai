@@ -1,3 +1,5 @@
+import settingsService from './settingsService'
+
 class ChatwootService {
   private chatwootUrl: string
   private apiToken: string
@@ -7,14 +9,46 @@ class ChatwootService {
     this.apiToken = process.env.CHATWOOT_API_TOKEN || ''
   }
 
-  async sendMessage(accountId: number, conversationId: number, content: string): Promise<any> {
+  private async getChatwootConfig(): Promise<{ url: string; apiToken: string }> {
     try {
-      if (!this.chatwootUrl || !this.apiToken) {
+      const chatwootSettings = await settingsService.getChatwootSettings()
+      
+      // Check if chatwoot is configured in settings and enabled
+      if (chatwootSettings?.enabled && chatwootSettings.url) {
+        return {
+          url: chatwootSettings.url,
+          apiToken: chatwootSettings.apiToken || this.apiToken
+        }
+      }
+      
+      // Fall back to environment variables
+      return {
+        url: this.chatwootUrl,
+        apiToken: this.apiToken
+      }
+    } catch (error) {
+      console.error('Failed to get chatwoot config from settings, using env vars:', error)
+      return {
+        url: this.chatwootUrl,
+        apiToken: this.apiToken
+      }
+    }
+  }
+
+  async sendMessage(accountId: number, conversationId: number, content: string, customApiKey?: string): Promise<any> {
+    try {
+      // Get chatwoot configuration from settings or environment
+      const config = await this.getChatwootConfig()
+      
+      // Use custom API key if provided, otherwise use configured token
+      const apiKey = customApiKey || config.apiToken
+      
+      if (!config.url || !apiKey) {
         console.warn('Chatwoot URL or API token not configured. Message would be:', content)
         return { success: true, message: 'Message logged (Chatwoot not configured)' }
       }
 
-      const url = `${this.chatwootUrl}/api/v1/accounts/${accountId}/conversations/${conversationId}/messages`
+      const url = `${config.url}/api/v1/accounts/${accountId}/conversations/${conversationId}/messages`
       
       const requestBody = {
         content,
@@ -25,13 +59,14 @@ class ChatwootService {
         url,
         accountId,
         conversationId,
-        content: content.substring(0, 100) + (content.length > 100 ? '...' : '')
+        content: content.substring(0, 100) + (content.length > 100 ? '...' : ''),
+        usingCustomApiKey: !!customApiKey
       })
 
       const response = await fetch(url, {
         method: 'POST',
         headers: {
-          'api_access_token': this.apiToken,
+          'api_access_token': apiKey,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify(requestBody)
@@ -54,18 +89,24 @@ class ChatwootService {
     }
   }
 
-  async getConversation(accountId: number, conversationId: number): Promise<any> {
+  async getConversation(accountId: number, conversationId: number, customApiKey?: string): Promise<any> {
     try {
-      if (!this.chatwootUrl || !this.apiToken) {
+      // Get chatwoot configuration from settings or environment
+      const config = await this.getChatwootConfig()
+      
+      // Use custom API key if provided, otherwise use configured token
+      const apiKey = customApiKey || config.apiToken
+      
+      if (!config.url || !apiKey) {
         throw new Error('Chatwoot URL or API token not configured')
       }
 
-      const url = `${this.chatwootUrl}/api/v1/accounts/${accountId}/conversations/${conversationId}`
+      const url = `${config.url}/api/v1/accounts/${accountId}/conversations/${conversationId}`
       
       const response = await fetch(url, {
         method: 'GET',
         headers: {
-          'api_access_token': this.apiToken,
+          'api_access_token': apiKey,
           'Content-Type': 'application/json'
         }
       })

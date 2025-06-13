@@ -105,6 +105,13 @@ export default defineEventHandler(async (event) => {
         }
       }
       
+      if (body.chatwoot) {
+        settings.chatwoot = {
+          ...settings.chatwoot,
+          ...body.chatwoot
+        }
+      }
+      
       settings.updatedBy = user._id
     } else {
       // Create new settings
@@ -121,6 +128,9 @@ export default defineEventHandler(async (event) => {
         server: body.server || {
           maxFileSize: 10485760,
           allowedFileTypes: ['pdf', 'txt', 'doc', 'docx']
+        },
+        chatwoot: body.chatwoot || {
+          enabled: false
         },
         updatedBy: user._id
       })
@@ -148,6 +158,10 @@ export default defineEventHandler(async (event) => {
             pass: '***HIDDEN***'
           } : undefined
         } : undefined
+      } : undefined,
+      chatwoot: settings.chatwoot ? {
+        ...settings.chatwoot,
+        apiToken: settings.chatwoot.apiToken ? '***HIDDEN***' : null
       } : undefined
     }
 

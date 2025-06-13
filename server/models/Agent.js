@@ -73,6 +73,11 @@ const agentSchema = new mongoose.Schema({
     modelId: {
       type: String,
       required: false
+    },
+    chatwootApiKey: {
+      type: String,
+      required: false,
+      trim: true
     }
   },
   createdBy: {

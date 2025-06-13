@@ -98,6 +98,20 @@ const settingsSchema = new mongoose.Schema({
       default: false
     }
   },
+  chatwoot: {
+    url: {
+      type: String,
+      required: false
+    },
+    apiToken: {
+      type: String,
+      required: false
+    },
+    enabled: {
+      type: Boolean,
+      default: false
+    }
+  },
   server: {
     webhookSecret: {
       type: String,

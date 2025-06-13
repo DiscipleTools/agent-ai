@@ -9,6 +9,7 @@ interface AgentSettings {
   responseDelay?: number
   connectionId?: string
   modelId?: string
+  chatwootApiKey?: string
 }
 
 interface AgentDocument {
@@ -157,7 +158,8 @@ export default defineEventHandler(async (event) => {
       await chatwootService.sendMessage(
         accountId,
         conversationObj?.id || 0,
-        responseMessage
+        responseMessage,
+        agent.settings?.chatwootApiKey
       )
 
       console.log('Response sent successfully to Chatwoot')

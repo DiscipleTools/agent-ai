@@ -75,6 +75,25 @@ class SettingsService {
     }
   }
 
+  async getChatwootSettings(): Promise<{ url: string; apiToken: string; enabled: boolean } | null> {
+    try {
+      const settings = await this.getAllSettings()
+      
+      if (!settings?.chatwoot) {
+        return null
+      }
+      
+      return {
+        url: settings.chatwoot.url || '',
+        apiToken: settings.chatwoot.apiToken || '',
+        enabled: settings.chatwoot.enabled || false
+      }
+    } catch (error: any) {
+      console.error('Failed to get Chatwoot settings:', error)
+      return null
+    }
+  }
+
   // Clear cache when settings are updated
   clearCache(): void {
     this.cachedSettings = null

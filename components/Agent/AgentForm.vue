@@ -148,6 +148,28 @@
           <p class="text-xs text-gray-500 mt-1">Delay before sending response</p>
         </div>
       </div>
+      
+      <!-- Chatwoot Settings -->
+      <div class="mt-6">
+        <h3 class="text-md font-medium text-gray-900 dark:text-white mb-4">Chatwoot Integration</h3>
+        <div class="grid grid-cols-1 gap-6">
+          <div>
+            <label for="chatwootApiKey" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Chatwoot API Key
+            </label>
+            <input
+              id="chatwootApiKey"
+              v-model="form.settings.chatwootApiKey"
+              type="password"
+              class="input-field"
+              placeholder="Enter Chatwoot API key for this agent"
+            />
+            <p class="text-xs text-gray-500 mt-1">
+              Optional: Agent-specific API key. If not provided, the global CHATWOOT_API_TOKEN will be used.
+            </p>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Context Documents (if editing) -->
@@ -641,7 +663,8 @@ const form = reactive({
     maxTokens: props.agent?.settings?.maxTokens || 500,
     responseDelay: props.agent?.settings?.responseDelay || 0,
     connectionId: props.agent?.settings?.connectionId || '',
-    modelId: props.agent?.settings?.modelId || ''
+    modelId: props.agent?.settings?.modelId || '',
+    chatwootApiKey: props.agent?.settings?.chatwootApiKey || ''
   }
 })
 
@@ -769,7 +792,8 @@ watch(() => props.agent, (newAgent) => {
       maxTokens: newAgent.settings?.maxTokens || 500,
       responseDelay: newAgent.settings?.responseDelay || 0,
       connectionId: newAgent.settings?.connectionId || '',
-      modelId: newAgent.settings?.modelId || ''
+      modelId: newAgent.settings?.modelId || '',
+      chatwootApiKey: newAgent.settings?.chatwootApiKey || ''
     }
     
     // Update selected model option
@@ -833,7 +857,8 @@ const handleSubmit = async () => {
         maxTokens: Number(form.settings.maxTokens),
         responseDelay: Number(form.settings.responseDelay),
         connectionId: form.settings.connectionId || null,
-        modelId: form.settings.modelId || null
+        modelId: form.settings.modelId || null,
+        chatwootApiKey: form.settings.chatwootApiKey || null
       }
     }
 

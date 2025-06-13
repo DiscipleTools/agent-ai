@@ -42,6 +42,10 @@ export default defineEventHandler(async (event) => {
             pass: settings.email.smtp.auth.pass ? '***HIDDEN***' : null
           } : undefined
         } : undefined
+      } : undefined,
+      chatwoot: settings.chatwoot ? {
+        ...settings.chatwoot,
+        apiToken: settings.chatwoot.apiToken ? '***HIDDEN***' : null
       } : undefined
     }
 
