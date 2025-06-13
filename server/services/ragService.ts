@@ -109,34 +109,50 @@ class RAGService {
   }
 
   private chunkText(text: string, chunkSize: number = 500, overlap: number = 50): string[] {
+    const words = text.split(/\s+/)
     const chunks: string[] = []
-    const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 0)
     
-    let currentChunk = ''
-    let currentLength = 0
-    
-    for (const sentence of sentences) {
-      const sentenceLength = sentence.trim().length
-      
-      if (currentLength + sentenceLength > chunkSize && currentChunk.length > 0) {
-        chunks.push(currentChunk.trim())
-        
-        // Add overlap by keeping last few words
-        const words = currentChunk.split(' ')
-        const overlapWords = words.slice(-Math.floor(overlap / 10))
-        currentChunk = overlapWords.join(' ') + ' ' + sentence.trim()
-        currentLength = currentChunk.length
-      } else {
-        currentChunk += (currentChunk ? ' ' : '') + sentence.trim()
-        currentLength += sentenceLength
+    for (let i = 0; i < words.length; i += chunkSize - overlap) {
+      const chunk = words.slice(i, i + chunkSize).join(' ')
+      if (chunk.trim()) {
+        chunks.push(chunk.trim())
       }
     }
     
-    if (currentChunk.trim().length > 0) {
-      chunks.push(currentChunk.trim())
+    return chunks.length > 0 ? chunks : [text]
+  }
+
+  private chunkWebsiteContent(content: string): { chunks: string[]; pageUrls: string[] } {
+    const chunks: string[] = []
+    const pageUrls: string[] = []
+    
+    // Split content by page sections
+    const sections = content.split(/--- Page \d+:.*? ---\n/)
+    
+    for (let i = 1; i < sections.length; i++) { // Skip first section (summary)
+      const section = sections[i]
+      
+      // Extract URL from the section
+      const urlMatch = section.match(/^URL: (https?:\/\/[^\n]+)/m)
+      const pageUrl = urlMatch ? urlMatch[1] : ''
+      
+      // Get the content after the URL line
+      const contentStart = section.indexOf('\n') + 1
+      const pageContent = section.substring(contentStart).trim()
+      
+      if (pageContent) {
+        // Chunk this page's content
+        const pageChunks = this.chunkText(pageContent)
+        
+        // Add chunks and associate each with this page's URL
+        for (const chunk of pageChunks) {
+          chunks.push(chunk)
+          pageUrls.push(pageUrl)
+        }
+      }
     }
     
-    return chunks.filter(chunk => chunk.length > 20) // Filter very short chunks
+    return { chunks, pageUrls }
   }
 
   private async generateEmbedding(text: string): Promise<number[]> {
@@ -183,7 +199,19 @@ class RAGService {
       
       // Clean and chunk the content
       const cleanContent = content.replace(/\s+/g, ' ').trim()
-      const chunks = this.chunkText(cleanContent)
+      let chunks: string[] = []
+      let chunkPageUrls: string[] = []
+      
+      // For website documents, extract page-specific URLs for each chunk
+      if (metadata.type === 'website' && content.includes('=== WEBSITE CONTENT ===')) {
+        const { chunks: websiteChunks, pageUrls } = this.chunkWebsiteContent(content)
+        chunks = websiteChunks
+        chunkPageUrls = pageUrls
+      } else {
+        chunks = this.chunkText(cleanContent)
+        chunkPageUrls = new Array(chunks.length).fill(metadata.source || '')
+      }
+      
       const language = this.detectLanguage(cleanContent)
       
       console.log(`Created ${chunks.length} chunks from document`)
@@ -206,7 +234,7 @@ class RAGService {
             documentTitle: metadata.title,
             chunkIndex: i,
             language,
-            source: metadata.source,
+            source: chunkPageUrls[i] || metadata.source,
             originalId: `${documentId}_chunk_${i}`
           }
         }

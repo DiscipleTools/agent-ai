@@ -256,7 +256,7 @@ class AIService {
               console.log(`      🌐 Language: ${chunk.metadata.language}`)
             }
             if (chunk.metadata.source) {
-              console.log(`      🔗 Source: ${chunk.metadata.source}`)
+              console.log(`      🔗 Page URL: ${chunk.metadata.source}`)
             }
             console.log(`      📝 Content preview: [CONTENT HIDDEN]`)
             console.log(`      📏 Content length: ${chunk.text.length} characters`)
