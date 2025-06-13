@@ -22,6 +22,7 @@
     "test:coverage": "NODE_ENV=test vitest run --coverage"
   },
   "dependencies": {
+    "@extractus/article-extractor": "^8.0.19",
     "@headlessui/vue": "^1.7.23",
     "@heroicons/vue": "^2.2.0",
     "@nuxtjs/color-mode": "^3.5.2",
@@ -37,6 +38,7 @@
     "axios": "^1.9.0",
     "bcryptjs": "^2.4.3",
     "cheerio": "^1.0.0",
+    "dom-to-semantic-markdown": "^1.5.0",
     "dotenv": "^16.5.0",
     "formidable": "^3.5.4",
     "handlebars": "^4.7.8",

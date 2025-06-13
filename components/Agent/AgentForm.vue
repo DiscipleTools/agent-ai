@@ -293,6 +293,12 @@
         </div>
       </div>
       
+      <!-- RAG Search Utility -->
+      <RAGSearchUtility 
+        v-if="ragSummary && ragSummary.totalChunks > 0"
+        :agent-id="agent._id"
+      />
+      
       <!-- Add New Context -->
       <div class="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-6">
         <div class="text-center">
@@ -639,6 +645,7 @@
 <script setup>
 import { DocumentIcon, LinkIcon } from '@heroicons/vue/24/outline'
 import { useAgentsStore } from '~/stores/agents'
+import RAGSearchUtility from '~/components/Agent/RAGSearchUtility.vue'
 
 const props = defineProps({
   agent: {

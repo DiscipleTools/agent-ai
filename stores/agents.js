@@ -436,6 +436,22 @@ export const useAgentsStore = defineStore('agents', () => {
     }
   }
 
+  // RAG Search functionality
+  const searchRAG = async (agentId, query, limit = 5) => {
+    try {
+      const response = await $api(`/api/agents/${agentId}/rag/search`, {
+        method: 'POST',
+        body: { query, limit }
+      })
+      return response.data
+    } catch (err) {
+      console.error('RAG search error:', err)
+      const errorMessage = err.data?.message || err.message || 'Failed to search RAG'
+      error.value = errorMessage
+      throw new Error(errorMessage)
+    }
+  }
+
   // AI Connection management for agents
   const fetchAIConnections = async () => {
     try {
@@ -472,6 +488,8 @@ export const useAgentsStore = defineStore('agents', () => {
     addContextWebsite,
     addContextWebsiteWithProgress,
     addContextWebsiteWithFetch,
+    // RAG functionality
+    searchRAG,
     fetchAIConnections
   }
 }) 

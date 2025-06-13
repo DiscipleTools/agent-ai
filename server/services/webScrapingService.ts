@@ -2,6 +2,7 @@ import { JSDOM } from 'jsdom'
 import validator from 'validator'
 import sanitizeHtml from 'sanitize-html'
 import urlParse from 'url-parse'
+import { extract } from '@extractus/article-extractor'
 
 interface ScrapedContent {
   content: string
@@ -318,18 +319,35 @@ class WebScrapingService {
         .replace(/<script[^>]*>[\s\S]{0,50000}?<\/script>/gi, '')
         .replace(/<style[^>]*>[\s\S]{0,50000}?<\/style>/gi, '')
         .replace(/<noscript[^>]*>[\s\S]{0,10000}?<\/noscript>/gi, '')
-        .replace(/<nav[^>]*>[\s\S]{0,20000}?<\/nav>/gi, '')
-        .replace(/<header[^>]*>[\s\S]{0,20000}?<\/header>/gi, '')
-        .replace(/<footer[^>]*>[\s\S]{0,20000}?<\/footer>/gi, '')
-        // Be more selective with aside - only remove obvious sidebars
-        .replace(/<aside[^>]*class="[^"]*(?:sidebar|widget|ad|banner)[^"]*"[^>]*>[\s\S]{0,20000}?<\/aside>/gi, '')
-        // Enhanced navigation and menu filtering with length limits
-        .replace(/<div[^>]*class="[^"]*(?:sidebar|menu|navigation|breadcrumb|social|share|comment|navbar|topbar|header|footer)[^"]*"[^>]*>[\s\S]{0,30000}?<\/div>/gi, '')
-        .replace(/<ul[^>]*class="[^"]*(?:menu|nav|navigation|breadcrumb|social|share)[^"]*"[^>]*>[\s\S]{0,20000}?<\/ul>/gi, '')
-        .replace(/<ol[^>]*class="[^"]*(?:menu|nav|navigation|breadcrumb)[^"]*"[^>]*>[\s\S]{0,20000}?<\/ol>/gi, '')
-        // Remove common navigation patterns
-        .replace(/<div[^>]*id="[^"]*(?:menu|nav|navigation|sidebar|header|footer)[^"]*"[^>]*>[\s\S]{0,30000}?<\/div>/gi, '')
-        .replace(/<section[^>]*class="[^"]*(?:menu|nav|navigation|sidebar|header|footer)[^"]*"[^>]*>[\s\S]{0,30000}?<\/section>/gi, '')
+        .replace(/<nav[^>]*>[\s\S]{0,50000}?<\/nav>/gi, '')
+        .replace(/<header[^>]*>[\s\S]{0,50000}?<\/header>/gi, '')
+        .replace(/<footer[^>]*>[\s\S]{0,50000}?<\/footer>/gi, '')
+        // Remove aside elements
+        .replace(/<aside[^>]*>[\s\S]{0,50000}?<\/aside>/gi, '')
+        
+        // More aggressive footer/header removal patterns
+        // Remove any element with id containing "footer" or "header"
+        .replace(/<(\w+)[^>]*\bid="[^"]*footer[^"]*"[^>]*>[\s\S]{0,100000}?<\/\1>/gi, '')
+        .replace(/<(\w+)[^>]*\bid="[^"]*header[^"]*"[^>]*>[\s\S]{0,100000}?<\/\1>/gi, '')
+        
+        // Remove any element with class containing "footer" or "header"
+        .replace(/<(\w+)[^>]*\bclass="[^"]*footer[^"]*"[^>]*>[\s\S]{0,100000}?<\/\1>/gi, '')
+        .replace(/<(\w+)[^>]*\bclass="[^"]*header[^"]*"[^>]*>[\s\S]{0,100000}?<\/\1>/gi, '')
+        
+        // Remove elements with navigation-related classes
+        .replace(/<(\w+)[^>]*\bclass="[^"]*(?:nav|menu|sidebar|breadcrumb|social|share|navbar|topbar)[^"]*"[^>]*>[\s\S]{0,50000}?<\/\1>/gi, '')
+        
+        // Remove elements with navigation-related ids
+        .replace(/<(\w+)[^>]*\bid="[^"]*(?:nav|menu|sidebar|breadcrumb|social|share|navbar|topbar)[^"]*"[^>]*>[\s\S]{0,50000}?<\/\1>/gi, '')
+        
+        // Remove common wrapper elements that often contain navigation
+        .replace(/<div[^>]*\bclass="[^"]*(?:wrapper|container)[^"]*"[^>]*>\s*<div[^>]*\bclass="[^"]*(?:nav|menu|footer|header)[^"]*"[^>]*>[\s\S]{0,100000}?<\/div>\s*<\/div>/gi, '')
+        
+        // Remove elements with role attributes for navigation/banner/contentinfo
+        .replace(/<(\w+)[^>]*\brole="(?:navigation|banner|contentinfo)"[^>]*>[\s\S]{0,50000}?<\/\1>/gi, '')
+        
+        // Remove common footer/header patterns regardless of tag name
+        .replace(/<(\w+)[^>]*(?:id|class)="[^"]*(?:site-footer|site-header|page-footer|page-header|main-footer|main-header)[^"]*"[^>]*>[\s\S]{0,100000}?<\/\1>/gi, '')
       
       // Helper function to clean text content
       const cleanText = (text: string): string => {
@@ -498,6 +516,44 @@ class WebScrapingService {
               return false
             }
             
+            // Skip repetitive footer/copyright content
+            if (/©\s*\d{4}|copyright|all rights reserved/i.test(trimmedLine)) {
+              return false
+            }
+            
+            // Skip footer menu content patterns
+            if (/^(product|solutions|resources|developers)\s*$/i.test(trimmedLine)) {
+              return false
+            }
+            
+            // Skip lines that contain typical footer menu items
+            if (lowerLine.includes('features') && lowerLine.includes('security') && lowerLine.includes('pricing')) {
+              return false
+            }
+            
+            // Skip lines with multiple footer-like links
+            const footerKeywords = ['features', 'security', 'pricing', 'demo', 'solutions', 'resources', 'developers', 'contact', 'github', 'docs']
+            const footerMatches = footerKeywords.filter(keyword => lowerLine.includes(keyword)).length
+            if (footerMatches >= 3 && trimmedLine.length < 300) {
+              return false
+            }
+            
+            // Skip lines with excessive arrow/navigation symbols
+            if ((trimmedLine.match(/--&gt;|&gt;|»|›/g) || []).length >= 3) {
+              return false
+            }
+            
+            // Skip very short lines that are likely navigation (less than 15 chars)
+            if (trimmedLine.length < 15 && /^[a-z\s\-&;]+$/i.test(trimmedLine)) {
+              return false
+            }
+            
+            // Skip lines that are mostly navigation menu items (many short words)
+            const shortWords = words.filter(word => word.length <= 4)
+            if (words.length > 5 && shortWords.length / words.length > 0.7) {
+              return false
+            }
+            
             return true
           })
           .join('\n')
@@ -527,6 +583,23 @@ class WebScrapingService {
       
       // Apply final navigation filtering
       extractedContent = filterNavigationLines(extractedContent)
+      
+      // Remove common patterns that often appear in footers/headers
+      extractedContent = extractedContent
+        // Remove copyright patterns
+        .replace(/©\s*\d{4}.*?(?:\.|$)/gi, '')
+        .replace(/Copyright\s*©?\s*\d{4}.*?(?:\.|$)/gi, '')
+        .replace(/All rights reserved.*?(?:\.|$)/gi, '')
+        // Remove arrow patterns (often used in navigation)
+        .replace(/--&gt;/g, '')
+        .replace(/&gt;&gt;/g, '')
+        .replace(/»/g, '')
+        // Remove "Search" followed by special characters (common in search boxes)
+        .replace(/Search[×✕✖]/gi, '')
+        // Remove excessive whitespace
+        .replace(/\n{3,}/g, '\n\n')
+        .replace(/\s+/g, ' ')
+        .trim()
       
       if (!extractedContent || extractedContent.trim().length < 10) {
         throw new Error('Insufficient content extracted')
@@ -630,6 +703,137 @@ class WebScrapingService {
   }
 
   /**
+   * Try to extract content using article-extractor first
+   */
+  private async tryArticleExtractor(url: string, signal?: AbortSignal): Promise<{ content: string; title?: string } | null> {
+    try {
+      // Create a custom fetch function that respects our abort signal
+      const customFetch = async (url: string) => {
+        const controller = new AbortController()
+        
+        if (signal) {
+          if (signal.aborted) {
+            throw new Error('Operation aborted')
+          }
+          signal.addEventListener('abort', () => controller.abort())
+        }
+        
+        const response = await fetch(url, {
+          signal: controller.signal,
+          headers: {
+            'User-Agent': this.defaultOptions.userAgent!,
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.9'
+          }
+        })
+        
+        return response
+      }
+      
+      // Use article-extractor (it will use its own fetch internally)
+      const article = await extract(url)
+      
+      if (article && article.content) {
+        // Convert HTML to text
+        const textContent = this.htmlToText(article.content)
+        
+        if (textContent && textContent.length > 50) {
+          return {
+            content: textContent,
+            title: article.title
+          }
+        }
+      }
+      
+      return null
+    } catch (error) {
+      console.log(`Article-extractor failed for ${url}, falling back to custom extraction`)
+      return null
+    }
+  }
+
+  /**
+   * Convert HTML to plain text (helper method)
+   */
+  private htmlToText(html: string): string {
+    // Create a DOM from the HTML
+    const dom = new JSDOM(html)
+    const document = dom.window.document
+    
+    // Remove script and style elements
+    const scripts = document.querySelectorAll('script, style, noscript')
+    scripts.forEach(el => el.remove())
+    
+    // Get text content and preserve some structure
+    const walker = document.createTreeWalker(
+      document.body,
+      dom.window.NodeFilter.SHOW_TEXT | dom.window.NodeFilter.SHOW_ELEMENT,
+      null
+    )
+    
+    let text = ''
+    let lastNodeName = ''
+    
+    while (walker.nextNode()) {
+      const node = walker.currentNode
+      
+      if (node.nodeType === dom.window.Node.TEXT_NODE) {
+        const content = node.textContent?.trim() || ''
+        if (content) {
+          // Add appropriate spacing based on parent element
+          const parentName = node.parentElement?.tagName?.toLowerCase() || ''
+          
+          if (['h1', 'h2', 'h3', 'h4', 'h5', 'h6'].includes(parentName)) {
+            text += '\n\n' + content + '\n\n'
+          } else if (['p', 'div', 'section', 'article'].includes(parentName)) {
+            if (text && !text.endsWith('\n')) {
+              text += '\n'
+            }
+            text += content + ' '
+          } else if (parentName === 'li') {
+            text += '\n• ' + content
+          } else {
+            // Inline elements - just add space
+            if (text && !text.endsWith(' ') && !text.endsWith('\n')) {
+              text += ' '
+            }
+            text += content
+          }
+          
+          lastNodeName = parentName
+        }
+      } else if (node.nodeType === dom.window.Node.ELEMENT_NODE) {
+        const element = node as Element
+        const tagName = element.tagName.toLowerCase()
+        
+        // Add line breaks for br tags
+        if (tagName === 'br') {
+          text += '\n'
+        }
+      }
+    }
+    
+    // Clean up the text
+    return text
+      // Decode HTML entities
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/&nbsp;/g, ' ')
+      // Clean up whitespace
+      .replace(/\n{4,}/g, '\n\n')     // Replace 4+ newlines with 2
+      .replace(/[ \t]+/g, ' ')        // Replace multiple spaces/tabs with single space
+      .replace(/\n +/g, '\n')         // Remove spaces at start of lines
+      .replace(/ +\n/g, '\n')         // Remove spaces at end of lines
+      .replace(/ +$/gm, '')           // Remove trailing spaces on each line
+      .replace(/^\n+/, '')            // Remove leading newlines
+      .replace(/\n+$/, '')            // Remove trailing newlines
+      .trim()
+  }
+
+  /**
    * Main method to scrape content from URL
    */
   async scrapeUrl(url: string, options: Partial<ScrapingOptions> = {}, signal?: AbortSignal): Promise<ScrapedContent> {
@@ -649,6 +853,24 @@ class WebScrapingService {
         throw new Error('Operation aborted')
       }
 
+      // First, try article-extractor for better content extraction
+      const articleResult = await this.tryArticleExtractor(normalizedUrl, signal)
+      
+      if (articleResult && articleResult.content) {
+        console.log(`Successfully extracted content using article-extractor for ${normalizedUrl}`)
+        
+        return {
+          content: articleResult.content,
+          title: articleResult.title,
+          url: normalizedUrl,
+          contentType: 'text/plain',
+          scrapedAt: new Date()
+        }
+      }
+
+      // If article-extractor failed, fall back to custom extraction
+      console.log(`Falling back to custom extraction for ${normalizedUrl}`)
+      
       // Fetch content with abort signal
       const { content: rawContent, contentType } = await this.fetchContent(normalizedUrl, mergedOptions, signal)
 
@@ -946,6 +1168,15 @@ class WebScrapingService {
           console.log(`  ✓ Page scraped in ${Date.now() - startTime}ms - ${scrapedContent.content.length} characters`)
           console.log(`  📄 Title: ${scrapedContent.title || 'No title'}`)
           
+          // Print full content scraped from this page
+          console.log(`\n${'='.repeat(80)}`)
+          console.log(`FULL CONTENT SCRAPED FROM: ${url}`)
+          console.log(`TITLE: ${scrapedContent.title || 'No title'}`)
+          console.log(`LENGTH: ${scrapedContent.content.length} characters`)
+          console.log(`${'='.repeat(80)}`)
+          console.log(scrapedContent.content)
+          console.log(`${'='.repeat(80)}\n`)
+          
           scrapedPages.push(scrapedContent)
           totalContentLength += scrapedContent.content.length
         } catch (error: any) {
@@ -1101,6 +1332,15 @@ class WebScrapingService {
             `Page scrape for ${url}`
           )
           console.log(`  ✓ Page scraped in ${Date.now() - startTime}ms`)
+          
+          // Print full content scraped from this page
+          console.log(`\n${'='.repeat(80)}`)
+          console.log(`FULL CONTENT SCRAPED FROM: ${url}`)
+          console.log(`TITLE: ${scrapedContent.title || 'No title'}`)
+          console.log(`LENGTH: ${scrapedContent.content.length} characters`)
+          console.log(`${'='.repeat(80)}`)
+          console.log(scrapedContent.content)
+          console.log(`${'='.repeat(80)}\n`)
           
           scrapedPages.push(scrapedContent)
           totalContentLength += scrapedContent.content.length
