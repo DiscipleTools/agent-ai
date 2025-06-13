@@ -233,6 +233,7 @@
           </div>
           <div class="flex flex-col sm:flex-row items-start sm:items-center space-y-1 sm:space-y-0 sm:space-x-2 ml-3 flex-shrink-0">
             <button
+              v-if="doc._id"
               type="button"
               @click="viewContextDocument(doc._id)"
               class="text-blue-600 hover:text-blue-700 text-sm whitespace-nowrap"
@@ -241,7 +242,7 @@
               View
             </button>
             <button
-              v-if="doc.type === 'url' || doc.type === 'website'"
+              v-if="doc._id && (doc.type === 'url' || doc.type === 'website')"
               type="button"
               @click="refreshContextDocument(doc._id)"
               :disabled="refreshingDocs.has(doc._id)"
@@ -256,6 +257,7 @@
               </span>
             </button>
             <button
+              v-if="doc._id"
               type="button"
               @click="removeContextDocument(doc._id)"
               :disabled="deletingDocs.has(doc._id)"
@@ -901,7 +903,10 @@ const addContextUrl = async () => {
 }
 
 const removeContextDocument = async (docId) => {
-  if (!props.agent?._id) return
+  if (!props.agent?._id || !docId) {
+    console.warn('Cannot remove document: missing agent ID or document ID', { agentId: props.agent?._id, docId })
+    return
+  }
   
   deletingDocs.value.add(docId)
   
@@ -918,7 +923,10 @@ const removeContextDocument = async (docId) => {
 }
 
 const refreshContextDocument = async (docId) => {
-  if (!props.agent?._id) return
+  if (!props.agent?._id || !docId) {
+    console.warn('Cannot refresh document: missing agent ID or document ID', { agentId: props.agent?._id, docId })
+    return
+  }
   
   refreshingDocs.value.add(docId)
   
@@ -935,7 +943,10 @@ const refreshContextDocument = async (docId) => {
 }
 
 const viewContextDocument = async (docId) => {
-  if (!props.agent?._id) return
+  if (!props.agent?._id || !docId) {
+    console.warn('Cannot view document: missing agent ID or document ID', { agentId: props.agent?._id, docId })
+    return
+  }
   
   try {
     const response = await agentsStore.getContextDocument(props.agent._id, docId)
