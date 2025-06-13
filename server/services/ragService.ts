@@ -349,6 +349,13 @@ class RAGService {
     try {
       const collectionName = `agent_${agentId}`
       
+      // Check if collection exists first
+      const collectionInfo = await this.getCollectionInfo(agentId)
+      if (!collectionInfo.exists) {
+        console.log(`📝 Collection ${collectionName} doesn't exist yet - no chunks to delete`)
+        return
+      }
+      
       // Delete all points with this documentId
       const deleteResponse = await fetch(`${this.qdrantUrl}/collections/${collectionName}/points/delete`, {
         method: 'POST',

@@ -2,6 +2,7 @@ import { connectDB } from '~/server/utils/db'
 import { requireAuth } from '~/server/utils/auth'
 import Agent from '~/server/models/Agent'
 import webScrapingService from '~/server/services/webScrapingService'
+import { ragService } from '~/server/services/ragService'
 import mongoose from 'mongoose'
 
 export default defineEventHandler(async (event) => {
@@ -52,7 +53,7 @@ export default defineEventHandler(async (event) => {
     }
 
     // Find the context document
-    const docIndex = agent.contextDocuments.findIndex(doc => doc._id?.toString() === docId)
+    const docIndex = agent.contextDocuments.findIndex((doc: any) => doc._id?.toString() === docId)
     if (docIndex === -1) {
       throw createError({
         statusCode: 404,
@@ -73,6 +74,96 @@ export default defineEventHandler(async (event) => {
         updatedFilename = scrapedContent.title || contextDoc.filename
         
         console.log(`URL content refreshed: ${scrapedContent.content.length} characters`)
+        
+        // Update the document first
+        agent.contextDocuments[docIndex] = {
+          ...contextDoc.toObject(),
+          type: contextDoc.type,
+          content: updatedContent,
+          filename: updatedFilename,
+          uploadedAt: new Date()
+        }
+        await agent.save()
+        
+        const updatedDoc = agent.contextDocuments[docIndex]
+        const documentId = updatedDoc._id?.toString()
+        
+        // Reprocess document for RAG (vector embeddings)
+        let ragInfo = null
+        try {
+          if (documentId) {
+            console.log(`🔄 Reprocessing URL document for RAG: ${documentId}`)
+            
+            // First, delete existing chunks for this document
+            await ragService.deleteDocumentChunks(agentId, documentId)
+            console.log(`🗑️  Deleted old RAG chunks for URL document`)
+            
+            // Then process the new content
+            const ragResult = await ragService.processDocument(
+              agentId,
+              documentId,
+              updatedContent,
+              {
+                type: 'url',
+                title: updatedDoc.filename || 'URL Document',
+                source: updatedDoc.url || contextDoc.url
+              }
+            )
+            ragInfo = {
+              chunksCreated: ragResult.chunksCreated,
+              collectionName: ragResult.collectionName
+            }
+            
+            // Update document metadata with RAG status
+            agent.contextDocuments[docIndex].metadata = {
+              ...agent.contextDocuments[docIndex].metadata,
+              rag: {
+                processed: true,
+                chunksCreated: ragResult.chunksCreated,
+                processedAt: new Date()
+              }
+            }
+            await agent.save()
+            
+            console.log(`✅ RAG reprocessing completed: ${ragResult.chunksCreated} chunks created for URL`)
+          }
+        } catch (ragError: any) {
+          console.error('RAG reprocessing failed (non-critical):', ragError)
+          
+          // Update document metadata to indicate RAG processing failed
+          agent.contextDocuments[docIndex].metadata = {
+            ...agent.contextDocuments[docIndex].metadata,
+            rag: {
+              processed: false,
+              error: ragError.message || 'RAG reprocessing failed',
+              attemptedAt: new Date()
+            }
+          }
+          await agent.save()
+        }
+        
+        return {
+          success: true,
+          message: 'URL content refreshed successfully',
+          data: {
+            contextDocument: {
+              _id: updatedDoc._id,
+              type: updatedDoc.type,
+              filename: updatedDoc.filename,
+              url: updatedDoc.url,
+              uploadedAt: updatedDoc.uploadedAt,
+              contentLength: updatedDoc.content?.length || 0,
+              contentPreview: updatedDoc.content?.substring(0, 200) + (updatedDoc.content?.length > 200 ? '...' : '')
+            },
+            agent: {
+              _id: agent._id,
+              name: agent.name,
+              contextDocumentsCount: agent.contextDocuments.length
+            },
+            rag: ragInfo
+          }
+        }
+        
       } catch (error: any) {
         console.error('URL refresh failed:', error.message)
         throw createError({
@@ -120,7 +211,8 @@ export default defineEventHandler(async (event) => {
         
         // Update the document with new metadata
         agent.contextDocuments[docIndex] = {
-          ...contextDoc,
+          ...contextDoc.toObject(),
+          type: contextDoc.type, // Explicitly preserve the type field
           content: updatedContent,
           filename: updatedFilename,
           uploadedAt: new Date(),
@@ -132,6 +224,63 @@ export default defineEventHandler(async (event) => {
         console.log(`Website re-crawled: ${websiteContent.totalPages} pages, ${websiteContent.totalContentLength} characters`)
         
         const updatedDoc = agent.contextDocuments[docIndex]
+        const documentId = updatedDoc._id?.toString()
+        
+        // Reprocess document for RAG (vector embeddings)
+        let ragInfo = null
+        try {
+          if (documentId) {
+            console.log(`🔄 Reprocessing document for RAG: ${documentId}`)
+            
+            // First, delete existing chunks for this document
+            await ragService.deleteDocumentChunks(agentId, documentId)
+            console.log(`🗑️  Deleted old RAG chunks for document`)
+            
+            // Then process the new content
+            const ragResult = await ragService.processDocument(
+              agentId,
+              documentId,
+              updatedContent,
+              {
+                type: 'website',
+                title: updatedDoc.filename || 'Website',
+                source: updatedDoc.url || websiteContent.baseUrl
+              }
+            )
+            ragInfo = {
+              chunksCreated: ragResult.chunksCreated,
+              collectionName: ragResult.collectionName
+            }
+            
+            // Update document metadata with RAG status
+            agent.contextDocuments[docIndex].metadata = {
+              ...agent.contextDocuments[docIndex].metadata,
+              rag: {
+                processed: true,
+                chunksCreated: ragResult.chunksCreated,
+                processedAt: new Date()
+              }
+            }
+            await agent.save()
+            
+            console.log(`✅ RAG reprocessing completed: ${ragResult.chunksCreated} chunks created`)
+          }
+        } catch (ragError: any) {
+          console.error('RAG reprocessing failed (non-critical):', ragError)
+          
+          // Update document metadata to indicate RAG processing failed
+          agent.contextDocuments[docIndex].metadata = {
+            ...agent.contextDocuments[docIndex].metadata,
+            rag: {
+              processed: false,
+              error: ragError.message || 'RAG reprocessing failed',
+              attemptedAt: new Date()
+            }
+          }
+          await agent.save()
+          
+          // RAG failure is non-critical - document is still updated in MongoDB
+        }
         
         return {
           success: true,
@@ -151,7 +300,8 @@ export default defineEventHandler(async (event) => {
               _id: agent._id,
               name: agent.name,
               contextDocumentsCount: agent.contextDocuments.length
-            }
+            },
+            rag: ragInfo
           }
         }
         
@@ -203,7 +353,8 @@ export default defineEventHandler(async (event) => {
 
     // Update the document
     agent.contextDocuments[docIndex] = {
-      ...contextDoc,
+      ...contextDoc.toObject(),
+      type: contextDoc.type, // Explicitly preserve the type field
       content: updatedContent,
       filename: updatedFilename,
       uploadedAt: refreshUrl ? new Date() : contextDoc.uploadedAt // Update timestamp only if refreshed
@@ -212,8 +363,67 @@ export default defineEventHandler(async (event) => {
     await agent.save()
 
     const updatedDoc = agent.contextDocuments[docIndex]
+    const documentId = updatedDoc._id?.toString()
 
     console.log(`Updated context document for agent ${agent.name}: ${updatedDoc.type} - ${updatedDoc.filename || updatedDoc.url}`)
+
+    // Reprocess document for RAG if content was updated
+    let ragInfo = null
+    if (content !== undefined || filename !== undefined) {
+      try {
+        if (documentId) {
+          console.log(`🔄 Reprocessing document for RAG after manual update: ${documentId}`)
+          
+          // First, delete existing chunks for this document
+          await ragService.deleteDocumentChunks(agentId, documentId)
+          console.log(`🗑️  Deleted old RAG chunks for document`)
+          
+          // Then process the updated content
+          const ragResult = await ragService.processDocument(
+            agentId,
+            documentId,
+            updatedContent,
+            {
+              type: updatedDoc.type as 'file' | 'url' | 'website',
+              title: updatedDoc.filename || 'Document',
+              source: updatedDoc.url || updatedDoc.filename || 'Manual update'
+            }
+          )
+          ragInfo = {
+            chunksCreated: ragResult.chunksCreated,
+            collectionName: ragResult.collectionName
+          }
+          
+          // Update document metadata with RAG status
+          agent.contextDocuments[docIndex].metadata = {
+            ...agent.contextDocuments[docIndex].metadata,
+            rag: {
+              processed: true,
+              chunksCreated: ragResult.chunksCreated,
+              processedAt: new Date()
+            }
+          }
+          await agent.save()
+          
+          console.log(`✅ RAG reprocessing completed: ${ragResult.chunksCreated} chunks created`)
+        }
+      } catch (ragError: any) {
+        console.error('RAG reprocessing failed (non-critical):', ragError)
+        
+        // Update document metadata to indicate RAG processing failed
+        agent.contextDocuments[docIndex].metadata = {
+          ...agent.contextDocuments[docIndex].metadata,
+          rag: {
+            processed: false,
+            error: ragError.message || 'RAG reprocessing failed',
+            attemptedAt: new Date()
+          }
+        }
+        await agent.save()
+        
+        // RAG failure is non-critical - document is still updated in MongoDB
+      }
+    }
 
     return {
       success: true,
@@ -232,7 +442,8 @@ export default defineEventHandler(async (event) => {
           _id: agent._id,
           name: agent.name,
           contextDocumentsCount: agent.contextDocuments.length
-        }
+        },
+        rag: ragInfo
       }
     }
 

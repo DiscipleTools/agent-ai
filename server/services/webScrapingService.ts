@@ -40,7 +40,7 @@ interface ScrapingOptions {
 class WebScrapingService {
   private readonly defaultOptions: ScrapingOptions = {
     maxContentLength: 1000000, // 500KB max content (increased from 150KB)
-    timeout: 10000, // 10 seconds
+    timeout: 30000, // 30 seconds
     userAgent: 'Agent-AI-Server/1.0 (+https://github.com/agent-ai-server)',
     allowedDomains: [],
     blockedDomains: [
@@ -160,9 +160,21 @@ class WebScrapingService {
   /**
    * Fetch content from URL with security checks
    */
-  private async fetchContent(url: string, options: ScrapingOptions): Promise<{ content: string; contentType: string }> {
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), options.timeout)
+  private async fetchContent(url: string, options: ScrapingOptions, signal?: AbortSignal): Promise<{ content: string; contentType: string }> {
+    // Use external signal if provided, otherwise create our own
+    const controller = signal ? new AbortController() : new AbortController()
+    let timeoutId: NodeJS.Timeout
+    
+    if (signal) {
+      // If external signal is provided, listen to it
+      if (signal.aborted) {
+        throw new Error('Operation aborted')
+      }
+      signal.addEventListener('abort', () => controller.abort())
+    }
+    
+    // Set up internal timeout
+    timeoutId = setTimeout(() => controller.abort(), options.timeout)
 
     try {
       const response = await fetch(url, {
@@ -202,7 +214,15 @@ class WebScrapingService {
         throw new Error(`Content too large: ${contentLength} bytes (max: ${options.maxContentLength})`)
       }
 
-      const content = await response.text()
+      // Add timeout for reading response body
+      const textTimeout = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('Response body read timeout')), 15000)
+      })
+      
+      const content = await Promise.race([
+        response.text(),
+        textTimeout
+      ])
 
       // Double-check content length after download
       if (content.length > options.maxContentLength!) {
@@ -222,32 +242,94 @@ class WebScrapingService {
   }
 
   /**
+   * Simplified HTML text extraction that avoids complex regex
+   */
+  private extractTextFromHtmlSimple(html: string, url: string): { content: string; title?: string } {
+    try {
+      // Early termination for extremely large HTML
+      if (html.length > 2000000) { // 2MB limit for simple processing
+        html = html.substring(0, 2000000)
+      }
+      
+      // Extract title using simple regex
+      const titleMatch = html.match(/<title[^>]*>([^<]*)<\/title>/i)
+      const title = titleMatch ? titleMatch[1].trim() : undefined
+      
+      // Simple approach: remove scripts, styles, and convert to text
+      let cleanHtml = html
+        // Remove scripts and styles completely (simple approach)
+        .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+        .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
+        .replace(/<noscript\b[^<]*(?:(?!<\/noscript>)<[^<]*)*<\/noscript>/gi, '')
+        // Remove common navigation elements
+        .replace(/<nav\b[^>]*>.*?<\/nav>/gi, '')
+        .replace(/<header\b[^>]*>.*?<\/header>/gi, '')
+        .replace(/<footer\b[^>]*>.*?<\/footer>/gi, '')
+      
+      // Simple text extraction - just remove all HTML tags
+      let text = cleanHtml
+        .replace(/<[^>]*>/g, ' ') // Remove all HTML tags
+        .replace(/&nbsp;/g, ' ')
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'")
+        .replace(/\s+/g, ' ') // Collapse whitespace
+        .trim()
+      
+      // Simple content filtering - remove very short lines and obvious navigation
+      const lines = text.split('\n').filter(line => {
+        const trimmed = line.trim()
+        return trimmed.length > 20 && !trimmed.toLowerCase().match(/^(home|about|contact|menu|login|search)$/i)
+      })
+      
+      const finalContent = lines.join('\n').trim()
+      
+      return {
+        content: finalContent || text.substring(0, 10000), // Fallback to first 10k chars
+        title
+      }
+    } catch (error) {
+      console.error(`Simple HTML extraction failed for ${url}:`, error)
+      return {
+        content: 'Failed to extract content from HTML',
+        title: undefined
+      }
+    }
+  }
+
+  /**
    * Extract and clean text content from HTML, focusing on headings and main content
    */
   private extractTextFromHtml(html: string, url: string): { content: string; title?: string } {
     try {
+      // Early termination for extremely large HTML to prevent hanging
+      if (html.length > 5000000) { // 5MB limit
+        html = html.substring(0, 5000000)
+      }
       
       // Extract title using regex
       const titleMatch = html.match(/<title[^>]*>([^<]*)<\/title>/i)
       const title = titleMatch ? titleMatch[1].trim() : undefined
-      
-      // Remove script, style, and navigation elements
+      // Remove script, style, and navigation elements with more efficient regex
+      // Use non-greedy matching with length limits to prevent catastrophic backtracking
       let cleanHtml = html
-        .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
-        .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
-        .replace(/<noscript[^>]*>[\s\S]*?<\/noscript>/gi, '')
-        .replace(/<nav[^>]*>[\s\S]*?<\/nav>/gi, '')
-        .replace(/<header[^>]*>[\s\S]*?<\/header>/gi, '')
-        .replace(/<footer[^>]*>[\s\S]*?<\/footer>/gi, '')
+        .replace(/<script[^>]*>[\s\S]{0,50000}?<\/script>/gi, '')
+        .replace(/<style[^>]*>[\s\S]{0,50000}?<\/style>/gi, '')
+        .replace(/<noscript[^>]*>[\s\S]{0,10000}?<\/noscript>/gi, '')
+        .replace(/<nav[^>]*>[\s\S]{0,20000}?<\/nav>/gi, '')
+        .replace(/<header[^>]*>[\s\S]{0,20000}?<\/header>/gi, '')
+        .replace(/<footer[^>]*>[\s\S]{0,20000}?<\/footer>/gi, '')
         // Be more selective with aside - only remove obvious sidebars
-        .replace(/<aside[^>]*class="[^"]*(?:sidebar|widget|ad|banner)[^"]*"[^>]*>[\s\S]*?<\/aside>/gi, '')
-        // Enhanced navigation and menu filtering
-        .replace(/<div[^>]*class="[^"]*(?:sidebar|menu|navigation|breadcrumb|social|share|comment|navbar|topbar|header|footer)[^"]*"[^>]*>[\s\S]*?<\/div>/gi, '')
-        .replace(/<ul[^>]*class="[^"]*(?:menu|nav|navigation|breadcrumb|social|share)[^"]*"[^>]*>[\s\S]*?<\/ul>/gi, '')
-        .replace(/<ol[^>]*class="[^"]*(?:menu|nav|navigation|breadcrumb)[^"]*"[^>]*>[\s\S]*?<\/ol>/gi, '')
+        .replace(/<aside[^>]*class="[^"]*(?:sidebar|widget|ad|banner)[^"]*"[^>]*>[\s\S]{0,20000}?<\/aside>/gi, '')
+        // Enhanced navigation and menu filtering with length limits
+        .replace(/<div[^>]*class="[^"]*(?:sidebar|menu|navigation|breadcrumb|social|share|comment|navbar|topbar|header|footer)[^"]*"[^>]*>[\s\S]{0,30000}?<\/div>/gi, '')
+        .replace(/<ul[^>]*class="[^"]*(?:menu|nav|navigation|breadcrumb|social|share)[^"]*"[^>]*>[\s\S]{0,20000}?<\/ul>/gi, '')
+        .replace(/<ol[^>]*class="[^"]*(?:menu|nav|navigation|breadcrumb)[^"]*"[^>]*>[\s\S]{0,20000}?<\/ol>/gi, '')
         // Remove common navigation patterns
-        .replace(/<div[^>]*id="[^"]*(?:menu|nav|navigation|sidebar|header|footer)[^"]*"[^>]*>[\s\S]*?<\/div>/gi, '')
-        .replace(/<section[^>]*class="[^"]*(?:menu|nav|navigation|sidebar|header|footer)[^"]*"[^>]*>[\s\S]*?<\/section>/gi, '')
+        .replace(/<div[^>]*id="[^"]*(?:menu|nav|navigation|sidebar|header|footer)[^"]*"[^>]*>[\s\S]{0,30000}?<\/div>/gi, '')
+        .replace(/<section[^>]*class="[^"]*(?:menu|nav|navigation|sidebar|header|footer)[^"]*"[^>]*>[\s\S]{0,30000}?<\/section>/gi, '')
       
       // Helper function to clean text content
       const cleanText = (text: string): string => {
@@ -318,53 +400,61 @@ class WebScrapingService {
       
       // Extract headings with their content (improved regex to handle nested HTML)
       const headings: string[] = []
-      const headingRegex = /<(h[1-6])[^>]*>([\s\S]*?)<\/h[1-6]>/gi
+      const headingRegex = /<(h[1-6])[^>]*>([\s\S]{0,5000}?)<\/h[1-6]>/gi
       let headingMatch
-      while ((headingMatch = headingRegex.exec(cleanHtml)) !== null) {
+      let headingCount = 0
+      while ((headingMatch = headingRegex.exec(cleanHtml)) !== null && headingCount < 100) {
         const level = headingMatch[1].toUpperCase()
         const text = cleanText(headingMatch[2])
         if (text && text.length > 0 && !isNavigationContent(text)) {
           headings.push(`${level}: ${text}`)
         }
+        headingCount++
       }
       
       // Extract ALL main content paragraphs (improved regex to handle nested HTML)
       const paragraphs: string[] = []
-      const paragraphRegex = /<p[^>]*>([\s\S]*?)<\/p>/gi
+      const paragraphRegex = /<p[^>]*>([\s\S]{0,10000}?)<\/p>/gi
       let paragraphMatch
-      while ((paragraphMatch = paragraphRegex.exec(cleanHtml)) !== null) {
+      let paragraphCount = 0
+      while ((paragraphMatch = paragraphRegex.exec(cleanHtml)) !== null && paragraphCount < 500) {
         const text = cleanText(paragraphMatch[1])
         
         // Filter out navigation content and very short paragraphs
         if (text && text.length > 20 && !isNavigationContent(text)) {
           paragraphs.push(text)
         }
+        paragraphCount++
       }
       
       // Extract ALL list items for structured content (improved regex to handle nested HTML)
       const listItems: string[] = []
-      const listRegex = /<li[^>]*>([\s\S]*?)<\/li>/gi
+      const listRegex = /<li[^>]*>([\s\S]{0,5000}?)<\/li>/gi
       let listMatch
-      while ((listMatch = listRegex.exec(cleanHtml)) !== null) {
+      let listCount = 0
+      while ((listMatch = listRegex.exec(cleanHtml)) !== null && listCount < 200) {
         const text = cleanText(listMatch[1])
         
         // Filter out navigation content and very short items
         if (text && text.length > 10 && !isNavigationContent(text)) {
           listItems.push(`• ${text}`)
         }
+        listCount++
       }
       
       // Also try to extract content from div elements that might contain main content
       const contentDivs: string[] = []
-      const contentDivRegex = /<div[^>]*class="[^"]*(?:content|entry|post|article|main)[^"]*"[^>]*>([\s\S]*?)<\/div>/gi
+      const contentDivRegex = /<div[^>]*class="[^"]*(?:content|entry|post|article|main)[^"]*"[^>]*>([\s\S]{0,20000}?)<\/div>/gi
       let contentDivMatch
-      while ((contentDivMatch = contentDivRegex.exec(cleanHtml)) !== null) {
+      let contentDivCount = 0
+      while ((contentDivMatch = contentDivRegex.exec(cleanHtml)) !== null && contentDivCount < 50) {
         const text = cleanText(contentDivMatch[1])
         if (text && text.length > 50 && !isNavigationContent(text)) {
           // Extract paragraphs from content divs
           const divParagraphs = text.split(/\.\s+/).filter(p => p.trim().length > 20 && !isNavigationContent(p.trim()))
           contentDivs.push(...divParagraphs.map(p => p.trim() + (p.endsWith('.') ? '' : '.')))
         }
+        contentDivCount++
       }
       
       // Post-process to remove any remaining navigation content
@@ -482,16 +572,11 @@ class WebScrapingService {
    * Remove duplicate URLs from pages (URL-only deduplication for CPU efficiency)
    */
   private deduplicateContent(pages: ScrapedContent[]): ScrapedContent[] {
-    console.log(`Starting URL deduplication for ${pages.length} pages...`)
-    
     const seenUrls = new Set<string>()
     const uniquePages: ScrapedContent[] = []
-    let skippedCount = 0
     
     for (const page of pages) {
       if (seenUrls.has(page.url)) {
-        console.log(`Skipping duplicate URL: ${page.url}`)
-        skippedCount++
         continue
       }
       
@@ -499,7 +584,6 @@ class WebScrapingService {
       uniquePages.push(page)
     }
     
-    console.log(`URL deduplication complete: ${pages.length} pages → ${uniquePages.length} unique pages (${skippedCount} duplicate URLs removed)`)
     return uniquePages
   }
 
@@ -524,9 +608,31 @@ class WebScrapingService {
   }
 
   /**
+   * Wrapper function to add aggressive timeout to any async operation
+   */
+  private async withTimeout<T>(promise: Promise<T>, timeoutMs: number, operation: string): Promise<T> {
+    let timeoutHandle: NodeJS.Timeout
+    
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timeoutHandle = setTimeout(() => {
+        reject(new Error(`${operation} timeout after ${timeoutMs}ms`))
+      }, timeoutMs)
+    })
+    
+    try {
+      const result = await Promise.race([promise, timeoutPromise])
+      clearTimeout(timeoutHandle!)
+      return result
+    } catch (error) {
+      clearTimeout(timeoutHandle!)
+      throw error
+    }
+  }
+
+  /**
    * Main method to scrape content from URL
    */
-  async scrapeUrl(url: string, options: Partial<ScrapingOptions> = {}): Promise<ScrapedContent> {
+  async scrapeUrl(url: string, options: Partial<ScrapingOptions> = {}, signal?: AbortSignal): Promise<ScrapedContent> {
     const mergedOptions = { ...this.defaultOptions, ...options }
 
     // Validate URL
@@ -538,16 +644,31 @@ class WebScrapingService {
     const normalizedUrl = validation.normalizedUrl!
 
     try {
+      // Check if operation was aborted
+      if (signal?.aborted) {
+        throw new Error('Operation aborted')
+      }
 
-      // Fetch content
-      const { content: rawContent, contentType } = await this.fetchContent(normalizedUrl, mergedOptions)
+      // Fetch content with abort signal
+      const { content: rawContent, contentType } = await this.fetchContent(normalizedUrl, mergedOptions, signal)
+
+      // Check if operation was aborted after fetch
+      if (signal?.aborted) {
+        throw new Error('Operation aborted')
+      }
 
       let extractedContent: string
       let title: string | undefined
 
       // Process based on content type
       if (contentType.includes('text/html') || contentType.includes('application/xhtml')) {
-        const extracted = this.extractTextFromHtml(rawContent, normalizedUrl)
+        // Use simple HTML processing to avoid hanging on complex pages
+        const extracted = await this.withTimeout(
+          Promise.resolve(this.extractTextFromHtmlSimple(rawContent, normalizedUrl)),
+          10000, // Reduced to 10 seconds for simple processing
+          `Simple HTML processing for ${normalizedUrl}`
+        )
+        
         extractedContent = extracted.content
         title = extracted.title
       } else if (contentType.includes('text/plain')) {
@@ -799,14 +920,7 @@ class WebScrapingService {
     const scrapedPages: ScrapedContent[] = []
     let totalContentLength = 0
 
-    console.log(`Starting website crawl: ${normalizedBaseUrl}`)
-    console.log(`Options: maxPages=${mergedOptions.maxPages}, maxDepth=${mergedOptions.maxDepth}`)
-
-    // Log path filtering if active
     const basePath = new URL(normalizedBaseUrl).pathname
-    if (basePath && basePath !== '/' && basePath !== '') {
-      console.log(`Path filtering active: only crawling subpages of ${basePath}`)
-    }
 
     while (urlsToVisit.length > 0 && scrapedPages.length < mergedOptions.maxPages!) {
       const { url, depth } = urlsToVisit.shift()!
@@ -819,42 +933,91 @@ class WebScrapingService {
       
       try {
         console.log(`Crawling page ${scrapedPages.length + 1}/${mergedOptions.maxPages}: ${url} (depth: ${depth})`)
+        const startTime = Date.now()
         
-        // Scrape the current page
-        const scrapedContent = await this.scrapeUrl(url)
-        scrapedPages.push(scrapedContent)
-        totalContentLength += scrapedContent.content.length
+        // Scrape the current page with timeout
+        try {
+          const scrapedContent = await this.withTimeout(
+            this.scrapeUrl(url),
+            45000,
+            `Page scrape for ${url}`
+          )
+          
+          console.log(`  ✓ Page scraped in ${Date.now() - startTime}ms - ${scrapedContent.content.length} characters`)
+          console.log(`  📄 Title: ${scrapedContent.title || 'No title'}`)
+          
+          scrapedPages.push(scrapedContent)
+          totalContentLength += scrapedContent.content.length
+        } catch (error: any) {
+          if (error.message.includes('timeout')) {
+            console.warn(`⚠️  Page timeout: ${error.message}`)
+            throw new Error(`Page crawl timeout after 45 seconds for ${url}`)
+          }
+          throw error
+        }
 
         // Extract links for next level if we haven't reached max depth
         if (depth < mergedOptions.maxDepth!) {
-          const { content } = await this.fetchContent(url, this.defaultOptions)
-          const links = this.extractLinks(content, url)
-          const filteredLinks = this.filterUrls(links, normalizedBaseUrl, mergedOptions)
-          
-          // Add new URLs to visit
-          for (const link of filteredLinks) {
-            if (!visitedUrls.has(link) && !urlsToVisit.some(item => item.url === link)) {
-              urlsToVisit.push({ url: link, depth: depth + 1 })
+          try {
+            const linkStartTime = Date.now()
+            
+            try {
+              const { content } = await this.withTimeout(
+                this.fetchContent(url, this.defaultOptions),
+                30000,
+                `Link extraction for ${url}`
+              )
+              console.log(`  ✓ Links extracted in ${Date.now() - linkStartTime}ms`)
+              
+              const links = this.extractLinks(content, url)
+              const filteredLinks = this.filterUrls(links, normalizedBaseUrl, mergedOptions)
+              console.log(`  → Found ${filteredLinks.length} new links to crawl (${links.length} total found)`)
+              
+              // Add new URLs to visit
+              let newLinksAdded = 0
+              for (const link of filteredLinks) {
+                if (!visitedUrls.has(link) && !urlsToVisit.some(item => item.url === link)) {
+                  urlsToVisit.push({ url: link, depth: depth + 1 })
+                  newLinksAdded++
+                }
+              }
+              console.log(`  ➕ Added ${newLinksAdded} new URLs to crawl queue`)
+            } catch (linkError: any) {
+              if (linkError.message.includes('timeout')) {
+                console.warn(`⚠️  Link extraction timeout: ${linkError.message}`)
+              } else {
+                console.warn(`⚠️  Failed to extract links from ${url}:`, linkError.message)
+              }
             }
+          } catch (linkError) {
+            console.warn(`⚠️  Failed to extract links from ${url}:`, linkError)
+            // Continue without links if extraction fails
           }
         }
 
         // Add delay between requests to be respectful and reduce CPU load
         await new Promise(resolve => setTimeout(resolve, 1000))
         
-      } catch (error) {
-        console.warn(`Failed to scrape ${url}:`, error)
+      } catch (error: any) {
+        console.warn(`❌ Failed to scrape ${url}: ${error.message}`)
         // Continue with other pages even if one fails
       }
+      
+      // Progress summary
+      console.log(`📊 Progress: ${scrapedPages.length}/${mergedOptions.maxPages} pages scraped, ${urlsToVisit.length} URLs remaining in queue`)
     }
 
     if (scrapedPages.length === 0) {
       throw new Error('No pages could be scraped from the website')
     }
 
+    console.log(`\nStarting URL deduplication for ${scrapedPages.length} pages...`)
+    
     // Remove duplicate/similar content between pages
     const uniquePages = this.deduplicateContent(scrapedPages)
     const finalContentLength = uniquePages.reduce((sum, page) => sum + page.content.length, 0)
+    
+    console.log(`URL deduplication complete: ${scrapedPages.length} pages → ${uniquePages.length} unique pages (${scrapedPages.length - uniquePages.length} duplicate URLs removed)`)
 
     // Generate summary
     const summary = this.generateWebsiteSummary(uniquePages, normalizedBaseUrl)
@@ -905,14 +1068,7 @@ class WebScrapingService {
     const scrapedPages: ScrapedContent[] = []
     let totalContentLength = 0
 
-    console.log(`Starting website crawl with progress: ${normalizedBaseUrl}`)
-    console.log(`Options: maxPages=${mergedOptions.maxPages}, maxDepth=${mergedOptions.maxDepth}`)
-
-    // Log path filtering if active
     const basePath = new URL(normalizedBaseUrl).pathname
-    if (basePath && basePath !== '/' && basePath !== '') {
-      console.log(`Path filtering active: only crawling subpages of ${basePath}`)
-    }
 
     while (urlsToVisit.length > 0 && scrapedPages.length < mergedOptions.maxPages!) {
       const { url, depth } = urlsToVisit.shift()!
@@ -925,6 +1081,7 @@ class WebScrapingService {
       
       try {
         console.log(`Crawling page ${scrapedPages.length + 1}/${mergedOptions.maxPages}: ${url} (depth: ${depth})`)
+        const startTime = Date.now()
         
         // Send progress update
         if (onProgress) {
@@ -936,22 +1093,58 @@ class WebScrapingService {
           })
         }
         
-        // Scrape the current page
-        const scrapedContent = await this.scrapeUrl(url)
-        scrapedPages.push(scrapedContent)
-        totalContentLength += scrapedContent.content.length
+        // Scrape the current page with timeout
+        try {
+          const scrapedContent = await this.withTimeout(
+            this.scrapeUrl(url),
+            45000,
+            `Page scrape for ${url}`
+          )
+          console.log(`  ✓ Page scraped in ${Date.now() - startTime}ms`)
+          
+          scrapedPages.push(scrapedContent)
+          totalContentLength += scrapedContent.content.length
+        } catch (error: any) {
+          if (error.message.includes('timeout')) {
+            console.warn(`⚠️  Page timeout: ${error.message}`)
+            throw new Error(`Page crawl timeout after 45 seconds for ${url}`)
+          }
+          throw error
+        }
 
         // Extract links for next level if we haven't reached max depth
         if (depth < mergedOptions.maxDepth!) {
-          const { content } = await this.fetchContent(url, this.defaultOptions)
-          const links = this.extractLinks(content, url)
-          const filteredLinks = this.filterUrls(links, normalizedBaseUrl, mergedOptions)
-          
-          // Add new URLs to visit
-          for (const link of filteredLinks) {
-            if (!visitedUrls.has(link) && !urlsToVisit.some(item => item.url === link)) {
-              urlsToVisit.push({ url: link, depth: depth + 1 })
+          try {
+            const linkStartTime = Date.now()
+            
+            try {
+              const { content } = await this.withTimeout(
+                this.fetchContent(url, this.defaultOptions),
+                30000,
+                `Link extraction for ${url}`
+              )
+              console.log(`  ✓ Links extracted in ${Date.now() - linkStartTime}ms`)
+              
+              const links = this.extractLinks(content, url)
+              const filteredLinks = this.filterUrls(links, normalizedBaseUrl, mergedOptions)
+              console.log(`  → Found ${filteredLinks.length} new links to crawl`)
+              
+              // Add new URLs to visit
+              for (const link of filteredLinks) {
+                if (!visitedUrls.has(link) && !urlsToVisit.some(item => item.url === link)) {
+                  urlsToVisit.push({ url: link, depth: depth + 1 })
+                }
+              }
+            } catch (linkError: any) {
+              if (linkError.message.includes('timeout')) {
+                console.warn(`⚠️  Link extraction timeout: ${linkError.message}`)
+              } else {
+                console.warn(`Failed to extract links from ${url}:`, linkError)
+              }
             }
+          } catch (linkError) {
+            console.warn(`Failed to extract links from ${url}:`, linkError)
+            // Continue without links if extraction fails
           }
         }
 
