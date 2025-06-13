@@ -6,14 +6,6 @@ services:
       dockerfile: Dockerfile
     container_name: agent-ai-app
     restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          cpus: '0.8'
-          memory: 2G
-        reservations:
-          cpus: '0.2'
-          memory: 512M
     environment:
       - NODE_ENV=production
       - MONGODB_URI=${MONGODB_URI}
@@ -26,6 +18,7 @@ services:
       - LOG_LEVEL=${LOG_LEVEL:-info}
       - CHATWOOT_URL=${CHATWOOT_URL}
       - CHATWOOT_API_TOKEN=${CHATWOOT_API_TOKEN}
+      - NODE_OPTIONS=--max-old-space-size=3072
     depends_on:
       - mongodb
       - qdrant
@@ -42,14 +35,6 @@ services:
     image: mongo:7.0
     container_name: agent-ai-mongodb
     restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          cpus: '0.15'
-          memory: 1G
-        reservations:
-          cpus: '0.05'
-          memory: 256M
     user: "999:999"
     security_opt:
       - no-new-privileges:true
@@ -72,15 +57,6 @@ services:
   qdrant:
     image: qdrant/qdrant:latest
     container_name: agent-ai-qdrant
-    deploy:
-      resources:
-        limits:
-          cpus: '0.15'
-          memory: 1G
-        reservations:
-          cpus: '0.05'
-          memory: 256M
-    user: "1000:1000"
     security_opt:
       - no-new-privileges:true
     volumes:
@@ -103,14 +79,6 @@ services:
     image: nginx:alpine
     container_name: agent-ai-nginx
     restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          cpus: '0.05'
-          memory: 512M
-        reservations:
-          cpus: '0.02'
-          memory: 128M
     ports:
       - "80:80"
       - "443:443"
