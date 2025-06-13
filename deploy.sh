@@ -195,27 +195,23 @@ get_user_inputs() {
         echo "Using default: localhost"
     fi
     
-    # Get SSL method
-    echo ""
-    echo "🔐 SSL Certificate Setup:"
-    echo "1) Generate self-signed certificate (for testing/development)"
-    echo "2) Use Let's Encrypt (for production with valid domain)"
-    echo "3) Skip SSL setup (manual setup required later)"
-    read -p "Choose SSL method [1-3]: " SSL_METHOD
-    
-    if [ -z "$SSL_METHOD" ]; then
-        SSL_METHOD="1"
-        echo "Using default: Self-signed certificate"
+    # Validate domain name for Let's Encrypt
+    if [ "$DOMAIN_NAME" = "localhost" ]; then
+        echo "❌ Error: 'localhost' cannot be used for production deployment"
+        echo "   Let's Encrypt requires a valid domain name that points to this server"
+        echo "   Please enter a valid domain name (e.g., example.com)"
+        exit 1
     fi
+    
+    # Only Let's Encrypt is supported for production security
+    SSL_METHOD="2"
+    echo ""
+    echo "🔐 SSL Certificate Setup: Let's Encrypt (production-ready)"
     
     echo ""
     echo "📝 Configuration Summary:"
     echo "   Domain: $DOMAIN_NAME"
-    case $SSL_METHOD in
-        1) echo "   SSL: Self-signed certificate" ;;
-        2) echo "   SSL: Let's Encrypt" ;;
-        3) echo "   SSL: Manual setup" ;;
-    esac
+    echo "   SSL: Let's Encrypt (production-ready)"
     echo ""
 }
 
@@ -362,65 +358,69 @@ setup_environment() {
 
 # Function to setup SSL certificates
 setup_ssl() {
-    echo "🔐 Setting up SSL certificates..."
+    echo "🔐 Setting up Let's Encrypt SSL certificates..."
     
     if [ ! -f "$APP_DIR/docker/nginx/ssl/cert.pem" ]; then
-        case $SSL_METHOD in
-            1)
-                echo "🔨 Generating self-signed certificate for $DOMAIN_NAME..."
-                mkdir -p "$APP_DIR/docker/nginx/ssl"
-                openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
-                    -keyout "$APP_DIR/docker/nginx/ssl/key.pem" \
-                    -out "$APP_DIR/docker/nginx/ssl/cert.pem" \
-                    -subj "/C=US/ST=State/L=City/O=Organization/CN=$DOMAIN_NAME"
-                echo "✅ Self-signed certificate generated"
-                ;;
-            2)
-                echo "🌐 Setting up Let's Encrypt for $DOMAIN_NAME..."
-                
-                echo "Make sure your domain points to this server's IP address."
-                echo "You can verify this by running: nslookup $DOMAIN_NAME"
-                read -p "Press Enter to continue when your domain is pointing to this server..."
-                
-                # Stop any existing web servers that might use port 80
-                docker compose down nginx 2>/dev/null || true
-                sudo systemctl stop nginx 2>/dev/null || true
-                sudo systemctl stop apache2 2>/dev/null || true
-                
-                # Get certificate
-                echo "🔑 Requesting SSL certificate from Let's Encrypt..."
-                if sudo certbot certonly --standalone -d $DOMAIN_NAME --non-interactive --agree-tos --email admin@$DOMAIN_NAME; then
-                    # Create SSL directory
-                    mkdir -p "$APP_DIR/docker/nginx/ssl"
-                    
-                    # Copy certificates
-                    sudo cp /etc/letsencrypt/live/$DOMAIN_NAME/fullchain.pem "$APP_DIR/docker/nginx/ssl/cert.pem"
-                    sudo cp /etc/letsencrypt/live/$DOMAIN_NAME/privkey.pem "$APP_DIR/docker/nginx/ssl/key.pem"
-                    sudo chown $USER:$USER "$APP_DIR/docker/nginx/ssl/"*
-                    echo "✅ Let's Encrypt certificate installed"
-                else
-                    echo "❌ Let's Encrypt certificate request failed!"
-                    echo "This could be because:"
-                    echo "  - Domain doesn't point to this server"
-                    echo "  - Port 80 is blocked by firewall"
-                    echo "  - Another service is using port 80"
-                    echo ""
-                    echo "Falling back to self-signed certificate..."
-                    mkdir -p "$APP_DIR/docker/nginx/ssl"
-                    openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
-                        -keyout "$APP_DIR/docker/nginx/ssl/key.pem" \
-                        -out "$APP_DIR/docker/nginx/ssl/cert.pem" \
-                        -subj "/C=US/ST=State/L=City/O=Organization/CN=$DOMAIN_NAME"
-                    echo "✅ Self-signed certificate generated as fallback"
-                fi
-                ;;
-            3)
-                echo "⚠️  SSL setup skipped. Please manually place cert.pem and key.pem in docker/nginx/ssl/"
-                mkdir -p "$APP_DIR/docker/nginx/ssl"
-                ;;
-        esac
+        echo "🌐 Setting up Let's Encrypt for $DOMAIN_NAME..."
+        
+        # Verify domain points to this server
+        echo "⚠️  IMPORTANT: Make sure your domain points to this server's IP address."
+        echo "   You can verify this by running: nslookup $DOMAIN_NAME"
+        echo "   The domain must resolve to this server's public IP for Let's Encrypt to work."
+        echo ""
+        read -p "Press Enter to continue when your domain is pointing to this server..."
+        
+        # Stop any existing web servers that might use port 80
+        echo "🛑 Stopping any services using port 80..."
+        docker compose down nginx 2>/dev/null || true
+        sudo systemctl stop nginx 2>/dev/null || true
+        sudo systemctl stop apache2 2>/dev/null || true
+        
+        # Ensure port 80 is available
+        if netstat -tulpn | grep -q ":80 "; then
+            echo "❌ Error: Port 80 is still in use. Let's Encrypt requires port 80 to be available."
+            echo "   Please stop all services using port 80 and try again."
+            netstat -tulpn | grep ":80 "
+            exit 1
+        fi
+        
+        # Get certificate
+        echo "🔑 Requesting SSL certificate from Let's Encrypt..."
+        if sudo certbot certonly --standalone -d $DOMAIN_NAME --non-interactive --agree-tos --email admin@$DOMAIN_NAME; then
+            # Create SSL directory
+            mkdir -p "$APP_DIR/docker/nginx/ssl"
+            
+            # Copy certificates
+            sudo cp /etc/letsencrypt/live/$DOMAIN_NAME/fullchain.pem "$APP_DIR/docker/nginx/ssl/cert.pem"
+            sudo cp /etc/letsencrypt/live/$DOMAIN_NAME/privkey.pem "$APP_DIR/docker/nginx/ssl/key.pem"
+            sudo chown $USER:$USER "$APP_DIR/docker/nginx/ssl/"*
+            echo "✅ Let's Encrypt certificate installed successfully"
+            
+            # Set up automatic renewal
+            echo "🔄 Setting up automatic certificate renewal..."
+            (sudo crontab -l 2>/dev/null; echo "0 12 * * * /usr/bin/certbot renew --quiet --deploy-hook 'docker compose -f $APP_DIR/docker-compose.yml restart nginx'") | sudo crontab -
+            echo "✅ Automatic renewal configured"
+        else
+            echo "❌ Let's Encrypt certificate request failed!"
+            echo ""
+            echo "Common causes:"
+            echo "  - Domain doesn't point to this server's public IP"
+            echo "  - Port 80 is blocked by firewall (check: sudo ufw status)"
+            echo "  - Another service is using port 80"
+            echo "  - Domain DNS hasn't propagated yet (wait 5-10 minutes)"
+            echo ""
+            echo "Please fix the issue and run the deployment script again."
+            exit 1
+        fi
     else
         echo "✅ SSL certificates already exist"
+        
+        # Verify certificate is still valid
+        if openssl x509 -checkend 2592000 -noout -in "$APP_DIR/docker/nginx/ssl/cert.pem" 2>/dev/null; then
+            echo "✅ Certificate is valid for at least 30 more days"
+        else
+            echo "⚠️  Certificate expires soon or is invalid. Consider renewal."
+        fi
     fi
 }
 
