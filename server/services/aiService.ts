@@ -187,7 +187,12 @@ class AIService {
               model: 'default' // Temporary placeholder for model fetching
             }
           }
+        } else {
+          console.log(`❌ Connection "${connectionId}" not found or inactive`)
+          console.log(`🔄 Falling back to system default`)
         }
+      } else {
+        console.log(`📋 No specific connection requested, using system default`)
       }
 
       // Try to get default connection

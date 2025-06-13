@@ -121,7 +121,7 @@ export default defineEventHandler(async (event) => {
           temperature: agent.settings?.temperature,
           maxTokens: agent.settings?.maxTokens,
           responseDelay: agent.settings?.responseDelay,
-          connectionId: agent.settings?.connectionId,
+          connectionId: agent.settings?.connectionId?.toString(),
           modelId: agent.settings?.modelId
         }
       )
