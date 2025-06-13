@@ -335,6 +335,20 @@ setup_environment() {
         echo "🔐 Generated secure MongoDB password"
         echo "🌐 Set domain name to: $DOMAIN_NAME"
         echo ""
+        
+        # Set secure file permissions
+        echo "🔒 Setting secure file permissions..."
+        chmod 600 "$APP_DIR/.env"
+        echo "✅ .env file permissions set to 600 (owner read/write only)"
+        
+        # Set permissions for SSL directory if it exists
+        if [ -d "$APP_DIR/docker/nginx/ssl" ]; then
+            chmod 700 "$APP_DIR/docker/nginx/ssl"
+            chmod 600 "$APP_DIR/docker/nginx/ssl"/*
+            echo "✅ SSL certificate permissions secured"
+        fi
+        
+        echo ""
         echo "📝 AI provider configuration (API keys, endpoints, models) is done through"
         echo "   the Settings interface after deployment is complete."
         echo ""
@@ -418,6 +432,37 @@ setup_ssl() {
             echo "⚠️  Certificate expires soon or is invalid. Consider renewal."
         fi
     fi
+}
+
+# Function to setup secure logging
+setup_secure_logging() {
+    echo "📋 Setting up secure logging..."
+    
+    # Create logs directory with proper permissions
+    sudo mkdir -p /var/log/agent-ai
+    sudo chown $USER:$USER /var/log/agent-ai
+    sudo chmod 750 /var/log/agent-ai
+    
+    # Create logrotate configuration for nginx logs
+    sudo tee /etc/logrotate.d/agent-ai-nginx > /dev/null << 'EOF'
+/var/lib/docker/volumes/agent-ai_nginx_logs/_data/*.log {
+    daily
+    missingok
+    rotate 14
+    compress
+    delaycompress
+    notifempty
+    create 640 root root
+    postrotate
+        docker exec agent-ai-nginx nginx -s reload 2>/dev/null || true
+    endscript
+}
+EOF
+    
+    echo "✅ Secure logging configuration created"
+    echo "   - Log files will be rotated daily"
+    echo "   - Logs kept for 14 days"
+    echo "   - Log files have restricted permissions (640)"
 }
 
 # Function to deploy application
@@ -608,6 +653,9 @@ main() {
     
     # Setup SSL
     setup_ssl
+    
+    # Setup secure logging
+    setup_secure_logging
     
     # Deploy application
     deploy_app
