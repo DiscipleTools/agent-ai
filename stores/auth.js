@@ -55,7 +55,8 @@ export const useAuthStore = defineStore('auth', () => {
 
   const refreshTokens = async () => {
     try {
-      const { data } = await $api('/api/auth/refresh', {
+      // Use direct $fetch to avoid circular dependency with useApi
+      const { data } = await $fetch('/api/auth/refresh', {
         method: 'POST'
       })
       return data.accessToken
