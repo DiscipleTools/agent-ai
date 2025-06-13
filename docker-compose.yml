@@ -34,8 +34,6 @@ services:
     image: mongo:7.0
     container_name: agent-ai-mongodb
     restart: unless-stopped
-    ports:
-      - "27017:27017"
     environment:
       - MONGO_INITDB_ROOT_USERNAME=${MONGO_ROOT_USER:-admin}
       - MONGO_INITDB_ROOT_PASSWORD=${MONGO_ROOT_PASSWORD:-password}
@@ -55,9 +53,6 @@ services:
   qdrant:
     image: qdrant/qdrant:latest
     container_name: agent-ai-qdrant
-    ports:
-      - "6333:6333"
-      - "6334:6334"
     volumes:
       - qdrant_data:/qdrant/storage
     environment:
