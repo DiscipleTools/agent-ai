@@ -26,7 +26,7 @@ export default defineEventHandler(async (event) => {
       httpOnly: false,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
-      maxAge: 60 * 60 // 1 hour
+      maxAge: 60 * 60 * 24 // 24 hours
     })
 
     setCookie(event, 'refresh-token', result.tokens.refreshToken, {

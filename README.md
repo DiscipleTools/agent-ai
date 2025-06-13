@@ -63,7 +63,7 @@ MONGODB_URI=mongodb://localhost:27017/agent-ai-server
 # JWT Configuration
 JWT_SECRET=your-super-secret-jwt-key
 JWT_REFRESH_SECRET=your-super-secret-refresh-key
-JWT_EXPIRE=1h
+JWT_EXPIRE=24h
 JWT_REFRESH_EXPIRE=7d
 
 # Chatwoot Integration (optional)

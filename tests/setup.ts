@@ -80,7 +80,7 @@ export const createdAgentIds: mongoose.Types.ObjectId[] = []
 // Helper function to generate JWT tokens using the same secrets as the server
 export function generateTestToken(userId: string, type: 'access' | 'refresh' = 'access'): string {
   const secret = type === 'access' ? JWT_SECRET : JWT_REFRESH_SECRET
-  const expiresIn = type === 'access' ? '1h' : '7d'
+  const expiresIn = type === 'access' ? '24h' : '7d'
   
   return jwt.sign(
     { 
