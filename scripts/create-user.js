@@ -89,7 +89,7 @@ async function createUser() {
     const userData = {
       email: 'user@example.com',
       name: 'Regular User',
-      password: 'UserPassword123', // Default password
+              password: require('crypto').randomBytes(12).toString('base64').replace(/[^a-zA-Z0-9]/g, '') + 'U1!', // Secure random password
       role: 'user',
       isActive: true,
       agentAccess: [],

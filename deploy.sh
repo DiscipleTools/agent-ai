@@ -297,7 +297,7 @@ setup_environment() {
             exit 1
         fi
         
-        if ! sed -i "s|change-this-secure-password|$MONGO_PASSWORD|" "$APP_DIR/.env"; then
+        if ! sed -i "s|GENERATE_MONGO_PASSWORD_AUTOMATICALLY|$MONGO_PASSWORD|g" "$APP_DIR/.env"; then
             echo "❌ Error: Failed to update MONGO_PASSWORD"
             exit 1
         fi
@@ -307,11 +307,7 @@ setup_environment() {
             exit 1
         fi
         
-        # Update MongoDB URI with authentication credentials
-        if ! sed -i "s|mongodb://mongodb:27017/agent-ai-server|mongodb://admin:$MONGO_PASSWORD@mongodb:27017/agent-ai-server?authSource=admin|" "$APP_DIR/.env"; then
-            echo "❌ Error: Failed to update MONGODB_URI with authentication"
-            exit 1
-        fi
+        # MongoDB URI is already configured with placeholder in template, no need to update
         
         # Verify the replacements worked
         echo "🔍 Verifying replacements..."
@@ -325,7 +321,7 @@ setup_environment() {
             exit 1
         fi
         
-        if grep -q "change-this-secure-password" "$APP_DIR/.env"; then
+        if grep -q "GENERATE_MONGO_PASSWORD_AUTOMATICALLY" "$APP_DIR/.env"; then
             echo "❌ Error: MONGO_PASSWORD was not replaced properly"
             exit 1
         fi
@@ -349,7 +345,7 @@ setup_environment() {
         echo "🔍 Last modified: $(stat -c %y "$APP_DIR/.env" 2>/dev/null || stat -f %Sm "$APP_DIR/.env" 2>/dev/null || echo "unknown")"
         
         # Check if the file contains default values that need to be replaced
-        if grep -q "GENERATE_JWT_SECRET_AUTOMATICALLY\|GENERATE_JWT_REFRESH_SECRET_AUTOMATICALLY\|change-this-secure-password" "$APP_DIR/.env"; then
+        if grep -q "GENERATE_JWT_SECRET_AUTOMATICALLY\|GENERATE_JWT_REFRESH_SECRET_AUTOMATICALLY\|GENERATE_MONGO_PASSWORD_AUTOMATICALLY" "$APP_DIR/.env"; then
             echo "⚠️  Warning: .env file contains default values that should be replaced"
             echo "   Consider deleting .env file and re-running this script, or manually update the file"
         fi
@@ -513,16 +509,24 @@ setup_admin_user() {
             echo "ℹ️  Admin user already exists"
             EXISTING_EMAIL=$(echo "$ADMIN_OUTPUT" | grep "Admin user already exists:" | cut -d':' -f2 | tr -d ' ')
             echo "   📧 Email: $EXISTING_EMAIL"
-            echo "   🔐 Password: AdminPassword123 (if unchanged)"
+            echo "   🔐 Password: Use existing password or reset if forgotten"
         else
             echo "✅ Admin user created successfully!"
             echo ""
-            echo "🔑 Default Admin Credentials:"
-            echo "   📧 Email: admin@example.com"
-            echo "   🔐 Password: AdminPassword123"
+            
+            # Extract the generated password from the output
+            GENERATED_PASSWORD=$(echo "$ADMIN_OUTPUT" | grep "Generated Password:" | cut -d':' -f2 | tr -d ' ')
+            ADMIN_EMAIL=$(echo "$ADMIN_OUTPUT" | grep "📧 Email:" | cut -d':' -f2 | tr -d ' ')
+            
+            echo "🔑 ADMIN LOGIN CREDENTIALS:"
+            echo "   📧 Email: ${ADMIN_EMAIL:-admin@example.com}"
+            echo "   🔐 Password: $GENERATED_PASSWORD"
+            echo ""
+            echo "⚠️  CRITICAL SECURITY NOTICE:"
+            echo "   1. Save these credentials in a secure location NOW"
+            echo "   2. You MUST change the password after first login"
+            echo "   3. This password will not be shown again"
         fi
-        echo ""
-        echo "⚠️  IMPORTANT: Please change the password after first login!"
         echo ""
     else
         echo "⚠️  Admin user creation failed"
@@ -532,8 +536,12 @@ setup_admin_user() {
         echo "   You can create the admin user manually after deployment:"
         echo "   docker run --rm --network agent-ai_app-network --env-file .env -v \$(pwd):/app -w /app node:22-alpine sh -c \"npm install && npm run create-admin\""
         echo ""
+        echo "   Or reset the admin password:"
+        echo "   docker run --rm --network agent-ai_app-network --env-file .env -v \$(pwd):/app -w /app node:22-alpine sh -c \"npm install && npm run reset-admin-password\""
+        echo ""
         echo "   Or if you have Node.js installed locally:"
         echo "   npm run create-admin"
+        echo "   npm run reset-admin-password"
         echo ""
     fi
 }
@@ -560,6 +568,11 @@ show_info() {
     echo "   Restart app: docker compose restart app"
     echo "   Stop all: docker compose down"
     echo "   Update app: docker compose up -d --build app"
+    echo ""
+    echo "🔐 Security Reminders:"
+    echo "   - Change the admin password immediately after first login"
+    echo "   - Admin password was displayed during deployment (scroll up to find it)"
+    echo "   - If you missed the password, you can reset it using the admin interface"
     echo ""
     echo "📚 For more information, see:"
     echo "   - DEPLOYMENT.md for manual deployment instructions"

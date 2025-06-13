@@ -15,6 +15,7 @@ interface IUser extends mongoose.Document {
   passwordResetToken?: string
   passwordResetExpires?: Date
   lastLogin?: Date
+  mustChangePassword?: boolean
   refreshTokens: string[]
   comparePassword(candidatePassword: string): Promise<boolean>
   createInvitationToken(): string
@@ -87,6 +88,10 @@ const userSchema = new mongoose.Schema({
   },
   lastLogin: {
     type: Date
+  },
+  mustChangePassword: {
+    type: Boolean,
+    default: false
   },
   refreshTokens: {
     type: [String],

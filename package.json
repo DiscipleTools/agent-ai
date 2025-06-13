@@ -13,6 +13,7 @@
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare",
     "create-admin": "node scripts/createAdmin.js",
+    "reset-admin-password": "node scripts/reset-admin-password.js",
     "create-user": "node scripts/create-user.cjs",
     "setup": "node scripts/setup.js",
     "fix-agent-permissions": "node scripts/fix-agent-permissions.js",

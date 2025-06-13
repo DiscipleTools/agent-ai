@@ -41,6 +41,10 @@ const userSchema = new mongoose.Schema({
     ref: 'User'
   },
   lastLogin: Date,
+  mustChangePassword: {
+    type: Boolean,
+    default: false
+  },
   refreshTokens: [String]
 }, {
   timestamps: true
@@ -77,7 +81,13 @@ const createAdminUser = async () => {
     // Get admin details from command line arguments or use defaults
     const email = process.argv[2] || 'admin@example.com';
     const name = process.argv[3] || 'Admin User';
-    const password = process.argv[4] || 'AdminPassword123';
+    // Generate a secure random password if none provided
+const generateSecurePassword = () => {
+  const crypto = require('crypto');
+  return crypto.randomBytes(16).toString('base64').replace(/[^a-zA-Z0-9]/g, '') + 'A1!';
+};
+
+const password = process.argv[4] || generateSecurePassword();
 
     // Create admin user
     const adminUser = new User({
@@ -85,7 +95,8 @@ const createAdminUser = async () => {
       name,
       password,
       role: 'admin',
-      isActive: true
+      isActive: true,
+      mustChangePassword: true
     });
 
     await adminUser.save();
@@ -93,9 +104,9 @@ const createAdminUser = async () => {
     console.log('✅ Admin user created successfully!');
     console.log('📧 Email:', email);
     console.log('👤 Name:', name);
-    console.log('🔑 Password: [HIDDEN - Check deployment logs for initial password]');
+    console.log('🔑 Generated Password:', password);
     console.log('');
-    console.log('⚠️  Please change the password after first login!');
+    console.log('⚠️  IMPORTANT: Please change the password after first login!');
 
   } catch (error) {
     console.error('❌ Error creating admin user:', error.message);
