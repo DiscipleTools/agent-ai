@@ -107,16 +107,16 @@ async function createUser() {
     console.log(`  - Email: ${user.email}`)
     console.log(`  - Role: ${user.role}`)
     console.log(`  - Active: ${user.isActive}`)
-    console.log(`  - Password: UserPassword123`)
+            console.log(`  - Password: [HIDDEN]`)
     console.log(`  - Created: ${user.createdAt}`)
     
     if (adminUser) {
       console.log(`  - Invited by: ${adminUser.name} (${adminUser.email})`)
     }
 
-    console.log('\n🔑 Login credentials:')
-    console.log('  Email: user@example.com')
-    console.log('  Password: UserPassword123')
+            console.log('\n🔑 Login credentials:')
+        console.log('  Email: user@example.com')
+        console.log('  Password: [HIDDEN - Default password set]')
 
   } catch (error) {
     console.error('❌ Error creating user:', error.message)

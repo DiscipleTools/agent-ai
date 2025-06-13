@@ -18,20 +18,20 @@ const debugUser = async () => {
     const user = await User.findOne({ email: 'admin@example.com' }).select('+refreshTokens +password');
     
     if (user) {
-      console.log('User found:');
-      console.log('Email:', user.email);
-      console.log('Name:', user.name);
-      console.log('Role:', user.role);
-      console.log('Password hash:', user.password);
-      console.log('Is Active:', user.isActive);
+          console.log('User found:');
+    console.log('Email:', user.email);
+    console.log('Name:', user.name);
+    console.log('Role:', user.role);
+    console.log('Password hash: [HIDDEN]');
+    console.log('Is Active:', user.isActive);
       
       // Test multiple passwords
       const passwords = ['password123', 'AdminPassword123!', 'admin123', 'admin'];
       
-      for (const pwd of passwords) {
+          for (const pwd of passwords) {
         const isValid = await user.comparePassword(pwd);
-        console.log(`Password "${pwd}" is valid:`, isValid);
-      }
+        console.log(`Password "[HIDDEN]" is valid:`, isValid);
+    }
     } else {
       console.log('User not found');
     }

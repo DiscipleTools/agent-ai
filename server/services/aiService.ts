@@ -219,7 +219,7 @@ class AIService {
     
     console.log(`\n🤖 Building system prompt for agent ${agentId}`)
     console.log(`📝 Base prompt length: ${prompt.length} characters`)
-    console.log(`❓ User message: "${userMessage.substring(0, 100)}${userMessage.length > 100 ? '...' : ''}"`)
+    console.log(`❓ User message length: ${userMessage.length} characters`)
 
     try {
       // Check if RAG is available and agent has context documents
@@ -253,7 +253,7 @@ class AIService {
             if (chunk.metadata.source) {
               console.log(`      🔗 Source: ${chunk.metadata.source}`)
             }
-            console.log(`      📝 Content preview: "${chunk.text.substring(0, 100)}${chunk.text.length > 100 ? '...' : ''}"`)
+            console.log(`      📝 Content preview: [CONTENT HIDDEN]`)
             console.log(`      📏 Content length: ${chunk.text.length} characters`)
           })
           
@@ -337,17 +337,10 @@ class AIService {
       }
     }
 
-    // Log the complete system prompt (truncated for readability)
-    console.log(`\n📋 Complete System Prompt Preview:`)
-    console.log(`${'='.repeat(60)}`)
-    if (systemPrompt.length <= 500) {
-      console.log(systemPrompt)
-    } else {
-      console.log(systemPrompt.substring(0, 400))
-      console.log(`\n... [TRUNCATED - showing first 400 chars of ${systemPrompt.length} total] ...`)
-      console.log(systemPrompt.substring(systemPrompt.length - 100))
-    }
-    console.log(`${'='.repeat(60)}\n`)
+    // Log system prompt stats only (content hidden for security)
+    console.log(`\n📋 System Prompt Stats:`)
+    console.log(`📏 Total length: ${systemPrompt.length} characters`)
+    console.log(`📊 Context added: ${systemPrompt.length - prompt.length} characters`)
 
     return systemPrompt
   }

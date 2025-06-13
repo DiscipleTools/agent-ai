@@ -53,7 +53,7 @@ export default defineEventHandler(async (event) => {
 
     await user.save()
 
-    console.log(`Account setup completed for user: ${user.email}`)
+    console.log('Account setup completed for user')
 
     return {
       success: true,

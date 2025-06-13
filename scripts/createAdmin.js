@@ -93,7 +93,7 @@ const createAdminUser = async () => {
     console.log('✅ Admin user created successfully!');
     console.log('📧 Email:', email);
     console.log('👤 Name:', name);
-    console.log('🔑 Password:', password);
+    console.log('🔑 Password: [HIDDEN - Check deployment logs for initial password]');
     console.log('');
     console.log('⚠️  Please change the password after first login!');
 

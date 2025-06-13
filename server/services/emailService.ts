@@ -246,7 +246,7 @@ The {{appName}} Team
       const transporter = await this.createTransport(config)
       await transporter.sendMail(mailOptions)
 
-      console.log(`Invitation email sent successfully to ${userEmail}`)
+              console.log('Invitation email sent successfully')
       return true
 
     } catch (error) {
@@ -293,7 +293,7 @@ The {{appName}} Team
       }
 
       await transporter.sendMail(mailOptions)
-      console.log(`Password reset email sent successfully to ${userEmail}`)
+              console.log('Password reset email sent successfully')
       return true
 
     } catch (error) {
@@ -338,7 +338,7 @@ The {{appName}} Team
       }
 
       await transporter.sendMail(mailOptions)
-      console.log(`Welcome email sent successfully to ${userEmail}`)
+              console.log('Welcome email sent successfully')
       return true
 
     } catch (error) {

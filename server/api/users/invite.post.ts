@@ -48,7 +48,7 @@ export default defineEventHandler(async (event) => {
         })
       } else {
         // Inactive user exists - delete it so we can create a new one
-        console.log(`Removing inactive user ${existingUser.email} to allow new invitation`)
+        console.log('Removing inactive user to allow new invitation')
         await User.findByIdAndDelete(existingUser._id)
       }
     }

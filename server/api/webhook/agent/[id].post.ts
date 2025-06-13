@@ -103,7 +103,7 @@ export default defineEventHandler(async (event) => {
     }
 
     console.log('Webhook received for agent:', agent.name)
-    console.log('Message:', messageContent)
+    console.log('Message length:', messageContent.length, 'characters')
     console.log('Conversation ID:', conversationObj?.id || 'unknown')
     console.log('Account ID:', accountId)
 
@@ -128,7 +128,7 @@ export default defineEventHandler(async (event) => {
       console.log('AI response generated:', {
         agentName: agent.name,
         responseLength: responseMessage.length,
-        originalMessage: messageContent.substring(0, 100) + (messageContent.length > 100 ? '...' : '')
+        originalMessageLength: messageContent.length
       })
       
     } catch (aiError: any) {
@@ -142,7 +142,7 @@ export default defineEventHandler(async (event) => {
         agentId: agent._id,
         agentName: agent.name,
         error: aiError.message,
-        userMessage: messageContent
+        userMessageLength: messageContent.length
       })
     }
 
@@ -168,11 +168,10 @@ export default defineEventHandler(async (event) => {
         data: {
           agentId: agent._id,
           agentName: agent.name,
-          originalMessage: messageContent,
-          responseMessage,
+          originalMessageLength: messageContent.length,
+          responseLength: responseMessage.length,
           conversationId: conversationObj?.id || 0,
           accountId: accountId,
-          responseLength: responseMessage.length,
           hasContextDocuments: (agent.contextDocuments || []).length > 0
         }
       }
@@ -188,8 +187,8 @@ export default defineEventHandler(async (event) => {
         data: {
           agentId: agent._id,
           agentName: agent.name,
-          originalMessage: messageContent,
-          responseMessage
+          originalMessageLength: messageContent.length,
+          responseLength: responseMessage.length
         }
       }
     }
