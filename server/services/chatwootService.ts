@@ -124,6 +124,47 @@ class ChatwootService {
       throw new Error(`Failed to get conversation from Chatwoot: ${error.message}`)
     }
   }
+
+  async getConversationMessages(accountId: number, conversationId: number, customApiKey?: string): Promise<any> {
+    try {
+      // Get chatwoot configuration from settings or environment
+      const config = await this.getChatwootConfig()
+      
+      // Use custom API key if provided, otherwise use configured token
+      const apiKey = customApiKey || config.apiToken
+      
+      if (!config.url || !apiKey) {
+        throw new Error('Chatwoot URL or API token not configured')
+      }
+
+      const url = `${config.url}/api/v1/accounts/${accountId}/conversations/${conversationId}/messages`
+      
+      console.log('Fetching conversation messages from:', url)
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'api_access_token': apiKey,
+          'Content-Type': 'application/json'
+        }
+      })
+
+      if (!response.ok) {
+        const errorData = await response.text()
+        console.error('Chatwoot API error:', response.status, errorData)
+        throw new Error(`Chatwoot API error: ${response.status} ${response.statusText}`)
+      }
+
+      const data = await response.json()
+      console.log(`Retrieved ${data?.length || 0} messages from conversation ${conversationId}`)
+      
+      return data
+
+    } catch (error: any) {
+      console.error('Chatwoot Service Error:', error)
+      throw new Error(`Failed to get conversation messages from Chatwoot: ${error.message}`)
+    }
+  }
 }
 
 export default new ChatwootService() 

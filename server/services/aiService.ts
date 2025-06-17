@@ -47,7 +47,8 @@ class AIService {
     prompt: string, 
     contextDocuments: ContextDocument[], 
     userMessage: string, 
-    settings: AISettings = {}
+    settings: AISettings = {},
+    conversationHistory: OpenAIMessage[] = []
   ): Promise<string> {
     try {
       // Get AI connection and model to use
@@ -62,6 +63,7 @@ class AIService {
       
       const messages: OpenAIMessage[] = [
         { role: 'system', content: systemPrompt },
+        ...conversationHistory,
         { role: 'user', content: userMessage }
       ]
 

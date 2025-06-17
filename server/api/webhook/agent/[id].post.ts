@@ -56,6 +56,11 @@ export default defineEventHandler(async (event) => {
     // Get webhook payload
     const payload = await readBody(event)
 
+    // Print the entire payload for debugging
+    console.log('=== WEBHOOK PAYLOAD START ===')
+    console.log(JSON.stringify(payload, null, 2))
+    console.log('=== WEBHOOK PAYLOAD END ===')
+
     // Validate ChatWoot webhook payload
     if (!payload || typeof payload !== 'object') {
       throw createError({
@@ -108,6 +113,38 @@ export default defineEventHandler(async (event) => {
     console.log('Conversation ID:', conversationObj?.id || 'unknown')
     console.log('Account ID:', accountId)
 
+    // Fetch conversation history to provide context
+    let conversationHistory: Array<{ role: 'user' | 'assistant', content: string }> = []
+    
+    try {
+      const messages = await chatwootService.getConversationMessages(
+        accountId,
+        conversationObj?.id || 0,
+        agent.settings?.chatwootApiKey
+      )
+      
+      if (messages && Array.isArray(messages)) {
+        // Transform Chatwoot messages to OpenAI format
+        // Filter out the current message and only include recent messages (last 10)
+        conversationHistory = messages
+          .filter(msg => 
+            msg.content && 
+            msg.content.trim() && 
+            msg.content !== messageContent.trim() // Exclude current message
+          )
+          .slice(-10) // Get last 10 messages for context
+          .map(msg => ({
+            role: msg.message_type === 'incoming' ? 'user' : 'assistant',
+            content: msg.content.trim()
+          }))
+          
+        console.log(`Retrieved ${conversationHistory.length} previous messages for context`)
+      }
+    } catch (historyError: any) {
+      console.warn('Could not retrieve conversation history:', historyError.message)
+      // Continue without history - this is not critical
+    }
+
     // Generate AI response using the agent's prompt and context
     let responseMessage: string
     
@@ -123,7 +160,8 @@ export default defineEventHandler(async (event) => {
           responseDelay: agent.settings?.responseDelay,
           connectionId: agent.settings?.connectionId?.toString(),
           modelId: agent.settings?.modelId
-        }
+        },
+        conversationHistory
       )
       
       console.log('AI response generated:', {
