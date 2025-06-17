@@ -428,8 +428,37 @@ class RAGService {
       const collectionName = `agent_${agentId}`
       const batchSize = 10 // Insert 10 chunks at a time to avoid large payloads
       
+      console.log(`📊 Starting batch insertion: ${points.length} points, ${Math.ceil(points.length/batchSize)} batches`)
+      console.log(`🔗 Qdrant URL: ${this.qdrantUrl}`)
+      console.log(`📝 Collection: ${collectionName}`)
+      
+      // Quick health check before starting batch processing
+      try {
+        const healthCheck = await this.healthCheck()
+        console.log('Pre-insertion health check:', healthCheck)
+        if (!healthCheck.qdrantConnected) {
+          throw new Error(`Qdrant health check failed before insertion. Please verify Qdrant is running at ${this.qdrantUrl}`)
+        }
+      } catch (healthError) {
+        console.error('Pre-insertion health check failed:', healthError)
+        throw new Error(`Cannot proceed with insertion - Qdrant health check failed: ${healthError instanceof Error ? healthError.message : 'Unknown error'}`)
+      }
+      
       for (let i = 0; i < points.length; i += batchSize) {
         const batch = points.slice(i, i + batchSize)
+        
+        // Validate batch before sending
+        console.log(`📤 Preparing batch ${Math.floor(i/batchSize) + 1}: ${batch.length} points`)
+        for (const point of batch) {
+          if (!point.id || !point.vector || !Array.isArray(point.vector) || point.vector.length !== 384) {
+            console.error('Invalid point structure:', { 
+              id: !!point.id, 
+              hasVector: !!point.vector, 
+              vectorLength: point.vector?.length 
+            })
+            throw new Error(`Invalid point structure in batch ${Math.floor(i/batchSize) + 1}`)
+          }
+        }
         
         try {
           // Add timeout for Qdrant connection
@@ -463,9 +492,32 @@ class RAGService {
           }
           
         } catch (error: any) {
+          console.error(`❌ Batch ${Math.floor(i/batchSize) + 1} failed:`, {
+            error: error.message,
+            cause: error.cause?.message || 'No cause',
+            code: error.cause?.code || 'No code',
+            qdrantUrl: this.qdrantUrl,
+            batchSize: batch.length
+          })
+          
           if (error.name === 'AbortError') {
             throw new Error(`Qdrant connection timeout on batch ${Math.floor(i/batchSize) + 1} - please check Qdrant performance`)
           }
+          
+          // If it's a connection error, try to check Qdrant health first
+          if (error.message.includes('fetch failed') || error.cause?.code === 'ECONNREFUSED' || error.cause?.code === 'EPIPE') {
+            console.log('🔍 Testing Qdrant connection due to fetch failure...')
+            try {
+              const healthCheck = await this.healthCheck()
+              console.log('Qdrant health check result:', healthCheck)
+              if (!healthCheck.qdrantConnected) {
+                throw new Error(`Qdrant is not accessible at ${this.qdrantUrl}. Please check if Qdrant container is running and accessible.`)
+              }
+            } catch (healthError) {
+              throw new Error(`Qdrant connection failed. Health check error: ${healthError instanceof Error ? healthError.message : 'Unknown error'}`)
+            }
+          }
+          
           throw new Error(`Failed to insert batch ${Math.floor(i/batchSize) + 1}: ${error.message}`)
         }
       }
