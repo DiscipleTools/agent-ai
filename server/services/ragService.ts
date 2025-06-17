@@ -379,6 +379,9 @@ class RAGService {
       
       await this.ensureCollectionExists(agentId)
       
+      // Small delay to ensure Qdrant is fully ready (especially after deletions)
+      await new Promise(resolve => setTimeout(resolve, 500))
+      
       // Clean and chunk the content
       const cleanContent = content.replace(/\s+/g, ' ').trim()
       let chunks: string[] = []
@@ -732,6 +735,37 @@ class RAGService {
       }
       
       console.log(`✅ Deleted all chunks for document ${documentId}`)
+      
+      // Wait for Qdrant to process the deletion and stabilize
+      // This prevents EPIPE/connection issues when immediately inserting after deletion
+      console.log('⏳ Waiting for Qdrant to process deletion...')
+      await new Promise(resolve => setTimeout(resolve, 2000)) // 2 second wait
+      
+      // Verify Qdrant is responsive before returning
+      let isResponsive = false
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          const testResponse = await fetch(`${this.qdrantUrl}/collections/${collectionName}`, {
+            method: 'GET',
+            signal: AbortSignal.timeout(5000)
+          })
+          if (testResponse.ok) {
+            isResponsive = true
+            console.log('✅ Qdrant is responsive after deletion')
+            break
+          }
+        } catch (error) {
+          console.log(`❌ Qdrant responsiveness check ${attempt}/3 failed`)
+          if (attempt < 3) {
+            await new Promise(resolve => setTimeout(resolve, 1000))
+          }
+        }
+      }
+      
+      if (!isResponsive) {
+        console.warn('⚠️ Qdrant may not be fully responsive after deletion - proceeding anyway')
+      }
+      
     } catch (error) {
       console.error('Error deleting document chunks:', error)
       throw error
