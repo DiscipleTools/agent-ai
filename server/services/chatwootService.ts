@@ -186,6 +186,61 @@ class ChatwootService {
       throw new Error(`Failed to get conversation messages from Chatwoot: ${error.message}`)
     }
   }
+
+  async updateConversationStatus(accountId: number, conversationId: number, status: string, customApiKey?: string): Promise<any> {
+    try {
+      // Get chatwoot configuration from settings or environment
+      const config = await this.getChatwootConfig()
+      
+      // Use custom API key if provided, otherwise use configured token
+      const apiKey = customApiKey || config.apiToken
+      
+      if (!config.url || !apiKey) {
+        console.warn('Chatwoot URL or API token not configured. Cannot update conversation status.')
+        return { success: false, message: 'Chatwoot not configured' }
+      }
+
+      // Use configured URL or fall back to environment URL if we have a custom API key
+      const baseUrl = config.url || this.chatwootUrl
+      const url = `${baseUrl}/api/v1/accounts/${accountId}/conversations/${conversationId}`
+      
+      const requestBody = {
+        status
+      }
+
+      console.log('Updating conversation status in Chatwoot:', {
+        url,
+        accountId,
+        conversationId,
+        status,
+        usingCustomApiKey: !!customApiKey
+      })
+
+      const response = await fetch(url, {
+        method: 'PATCH',
+        headers: {
+          'api_access_token': apiKey,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(requestBody)
+      })
+
+      if (!response.ok) {
+        const errorData = await response.text()
+        console.error('Chatwoot API error updating status:', response.status, errorData)
+        throw new Error(`Chatwoot API error: ${response.status} ${response.statusText}`)
+      }
+
+      const data = await response.json()
+      console.log(`Conversation status updated successfully to "${status}"`)
+      
+      return data
+
+    } catch (error: any) {
+      console.error('Chatwoot Service Error updating status:', error)
+      throw new Error(`Failed to update conversation status in Chatwoot: ${error.message}`)
+    }
+  }
 }
 
 export default new ChatwootService() 

@@ -112,6 +112,23 @@ export default defineEventHandler(async (event) => {
     console.log('Message length:', messageContent.length, 'characters')
     console.log('Conversation ID:', conversationObj?.id || 'unknown')
     console.log('Account ID:', accountId)
+    console.log('Conversation status:', conversationObj?.status || 'unknown')
+
+    // Check if conversation status is "pending" and update it to "open" (async, non-blocking)
+    if (conversationObj?.status === 'pending') {
+      console.log('Conversation is pending, updating status to "open" asynchronously...')
+      // Run status update in background without waiting
+      chatwootService.updateConversationStatus(
+        accountId,
+        conversationObj.id,
+        'open',
+        agent.settings?.chatwootApiKey
+      ).then(() => {
+        console.log('Successfully updated conversation status from "pending" to "open"')
+      }).catch((statusError: any) => {
+        console.warn('Failed to update conversation status:', statusError.message)
+      })
+    }
 
     // Fetch conversation history via Chatwoot API to get full context
     let conversationHistory: Array<{ role: 'user' | 'assistant', content: string }> = []
