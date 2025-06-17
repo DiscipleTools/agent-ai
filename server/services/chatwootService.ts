@@ -202,7 +202,7 @@ class ChatwootService {
 
       // Use configured URL or fall back to environment URL if we have a custom API key
       const baseUrl = config.url || this.chatwootUrl
-      const url = `${baseUrl}/api/v1/accounts/${accountId}/conversations/${conversationId}`
+      const url = `${baseUrl}/api/v1/accounts/${accountId}/conversations/${conversationId}/toggle_status`
       
       const requestBody = {
         status
@@ -217,7 +217,7 @@ class ChatwootService {
       })
 
       const response = await fetch(url, {
-        method: 'PATCH',
+        method: 'POST',
         headers: {
           'api_access_token': apiKey,
           'Content-Type': 'application/json'
