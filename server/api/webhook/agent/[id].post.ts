@@ -113,10 +113,11 @@ export default defineEventHandler(async (event) => {
     console.log('Conversation ID:', conversationObj?.id || 'unknown')
     console.log('Account ID:', accountId)
 
-    // Fetch conversation history to provide context
+    // Fetch conversation history via Chatwoot API to get full context
     let conversationHistory: Array<{ role: 'user' | 'assistant', content: string }> = []
     
     try {
+      // Try to fetch conversation messages via API
       const messages = await chatwootService.getConversationMessages(
         accountId,
         conversationObj?.id || 0,
@@ -130,19 +131,40 @@ export default defineEventHandler(async (event) => {
           .filter(msg => 
             msg.content && 
             msg.content.trim() && 
-            msg.content !== messageContent.trim() // Exclude current message
+            msg.content !== messageContent.trim() && // Exclude current message
+            msg.id !== payload.id // Exclude current message by ID too
           )
           .slice(-10) // Get last 10 messages for context
-          .map(msg => ({
-            role: msg.message_type === 'incoming' ? 'user' : 'assistant',
-            content: msg.content.trim()
-          }))
+          .map((msg): { role: 'user' | 'assistant', content: string } => {
+            // In Chatwoot: message_type 0 = incoming (user), 1 = outgoing (agent)  
+            // Also handle string values: 'incoming' vs 'outgoing'
+            const isIncoming = msg.message_type === 0 || 
+                              msg.message_type === 'incoming' || 
+                              msg.sender_type === 'Contact'
+            const role: 'user' | 'assistant' = isIncoming ? 'user' : 'assistant'
+            return {
+              role,
+              content: msg.content.trim()
+            }
+          })
+          .filter(msg => msg.content.length > 0) // Remove empty messages
           
-        console.log(`Retrieved ${conversationHistory.length} previous messages for context`)
+        console.log(`Retrieved ${conversationHistory.length} previous messages via API for context`)
+        
+        // Log conversation history for debugging
+        if (conversationHistory.length > 0) {
+          console.log('Conversation history:')
+          conversationHistory.forEach((msg, index) => {
+            console.log(`  ${index + 1}. ${msg.role}: ${msg.content.substring(0, 50)}${msg.content.length > 50 ? '...' : ''}`)
+          })
+        }
+      } else {
+        console.log('No previous messages found in conversation')
       }
     } catch (historyError: any) {
       console.warn('Could not retrieve conversation history:', historyError.message)
-      // Continue without history - this is not critical
+      console.log('Continuing without conversation context...')
+      conversationHistory = []
     }
 
     // Generate AI response using the agent's prompt and context

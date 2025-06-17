@@ -43,12 +43,17 @@ class ChatwootService {
       // Use custom API key if provided, otherwise use configured token
       const apiKey = customApiKey || config.apiToken
       
-      if (!config.url || !apiKey) {
+      // If we have a custom API key but no URL, try environment URL
+      if (customApiKey && !config.url && this.chatwootUrl) {
+        console.log('Using environment Chatwoot URL with agent-specific API key')
+      } else if (!config.url || !apiKey) {
         console.warn('Chatwoot URL or API token not configured. Message would be:', content)
         return { success: true, message: 'Message logged (Chatwoot not configured)' }
       }
 
-      const url = `${config.url}/api/v1/accounts/${accountId}/conversations/${conversationId}/messages`
+      // Use configured URL or fall back to environment URL if we have a custom API key
+      const baseUrl = config.url || this.chatwootUrl
+      const url = `${baseUrl}/api/v1/accounts/${accountId}/conversations/${conversationId}/messages`
       
       const requestBody = {
         content,
@@ -133,11 +138,23 @@ class ChatwootService {
       // Use custom API key if provided, otherwise use configured token
       const apiKey = customApiKey || config.apiToken
       
-      if (!config.url || !apiKey) {
-        throw new Error('Chatwoot URL or API token not configured')
+      // If we have a custom API key but no URL, we need a URL from somewhere
+      if (customApiKey && !config.url) {
+        // Try to construct URL from environment or throw informative error
+        if (!this.chatwootUrl) {
+          console.warn('Custom API key provided but no Chatwoot URL configured in settings or environment')
+          return [] // Return empty array instead of throwing
+        }
+        // Use environment URL with custom API key
+        console.log('Using environment Chatwoot URL with agent-specific API key')
+      } else if (!config.url || !apiKey) {
+        console.warn('Chatwoot URL or API token not configured - skipping conversation history')
+        return [] // Return empty array instead of throwing
       }
 
-      const url = `${config.url}/api/v1/accounts/${accountId}/conversations/${conversationId}/messages`
+      // Use configured URL or fall back to environment URL if we have a custom API key
+      const baseUrl = config.url || this.chatwootUrl
+      const url = `${baseUrl}/api/v1/accounts/${accountId}/conversations/${conversationId}/messages`
       
       console.log('Fetching conversation messages from:', url)
 
