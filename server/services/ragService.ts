@@ -424,27 +424,50 @@ class RAGService {
         points.push(point)
       }
       
-      // Batch insert to Qdrant
+      // Batch insert to Qdrant with chunking to avoid EPIPE errors
       const collectionName = `agent_${agentId}`
+      const batchSize = 10 // Insert 10 chunks at a time to avoid large payloads
       
-      // Add timeout for Qdrant connection
-      const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout
-      
-      const insertResponse = await fetch(`${this.qdrantUrl}/collections/${collectionName}/points`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          points: points
-        }),
-        signal: controller.signal
-      })
-      
-      clearTimeout(timeoutId)
-      
-      if (!insertResponse.ok) {
-        const error = await insertResponse.text()
-        throw new Error(`Failed to insert points to Qdrant: ${error}`)
+      for (let i = 0; i < points.length; i += batchSize) {
+        const batch = points.slice(i, i + batchSize)
+        
+        try {
+          // Add timeout for Qdrant connection
+          const controller = new AbortController()
+          const timeoutId = setTimeout(() => controller.abort(), 60000) // 60 second timeout for larger batches
+          
+          const insertResponse = await fetch(`${this.qdrantUrl}/collections/${collectionName}/points`, {
+            method: 'PUT',
+            headers: { 
+              'Content-Type': 'application/json',
+              'Connection': 'keep-alive' // Try to maintain connection
+            },
+            body: JSON.stringify({
+              points: batch
+            }),
+            signal: controller.signal
+          })
+          
+          clearTimeout(timeoutId)
+          
+          if (!insertResponse.ok) {
+            const error = await insertResponse.text()
+            throw new Error(`Failed to insert batch ${Math.floor(i/batchSize) + 1}: ${error}`)
+          }
+          
+          console.log(`✅ Inserted batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(points.length/batchSize)} (${batch.length} chunks)`)
+          
+          // Small delay between batches to avoid overwhelming Qdrant
+          if (i + batchSize < points.length) {
+            await new Promise(resolve => setTimeout(resolve, 100))
+          }
+          
+        } catch (error: any) {
+          if (error.name === 'AbortError') {
+            throw new Error(`Qdrant connection timeout on batch ${Math.floor(i/batchSize) + 1} - please check Qdrant performance`)
+          }
+          throw new Error(`Failed to insert batch ${Math.floor(i/batchSize) + 1}: ${error.message}`)
+        }
       }
       
       console.log(`✅ Successfully processed document ${documentId}: ${chunks.length} chunks`)
