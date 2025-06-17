@@ -81,21 +81,7 @@
           <span>{{ formatDate(agent.createdAt) }}</span>
         </div>
         
-        <div class="bg-gray-50 dark:bg-gray-700 rounded p-3 mb-4">
-          <p class="text-xs text-gray-600 dark:text-gray-400 mb-1">Webhook URL:</p>
-          <div class="flex items-center space-x-2">
-            <code class="text-xs bg-gray-100 dark:bg-gray-600 px-2 py-1 rounded flex-1 truncate">
-              {{ agent.webhookUrl }}
-            </code>
-            <button
-              @click="copyWebhookUrl(agent.webhookUrl)"
-              class="text-primary-600 hover:text-primary-700 text-xs"
-              title="Copy URL"
-            >
-              <ClipboardIcon class="h-4 w-4" />
-            </button>
-          </div>
-        </div>
+
         
         <div class="flex space-x-2">
           <button
@@ -117,7 +103,7 @@
 </template>
 
 <script setup>
-import { PlusIcon, CpuChipIcon, ClipboardIcon } from '@heroicons/vue/24/outline'
+import { PlusIcon, CpuChipIcon } from '@heroicons/vue/24/outline'
 import { useAgentsStore } from '~/stores/agents'
 import { useNuxtApp } from 'nuxt/app'
 
@@ -159,22 +145,6 @@ const deleteAgent = async (agentId) => {
     const toast = useNuxtApp().$toast
     if (toast) {
       toast.error('Failed to delete agent')
-    }
-  }
-}
-
-const copyWebhookUrl = async (url) => {
-  try {
-    await navigator.clipboard.writeText(url)
-    const toast = useNuxtApp().$toast
-    if (toast) {
-      toast.success('Webhook URL copied to clipboard')
-    }
-  } catch (error) {
-    console.error('Failed to copy URL:', error)
-    const toast = useNuxtApp().$toast
-    if (toast) {
-      toast.error('Failed to copy URL')
     }
   }
 }

@@ -25,21 +25,7 @@
       <span>{{ formatDate(agent.createdAt) }}</span>
     </div>
     
-    <div class="bg-gray-50 dark:bg-gray-700 rounded p-3 mb-4">
-      <p class="text-xs text-gray-600 dark:text-gray-400 mb-1">Webhook URL:</p>
-      <div class="flex items-center space-x-2">
-        <code class="text-xs bg-gray-100 dark:bg-gray-600 px-2 py-1 rounded flex-1 truncate">
-          {{ agent.webhookUrl || 'Not generated' }}
-        </code>
-        <button
-          @click="copyWebhookUrl"
-          class="text-primary-600 hover:text-primary-700 text-xs"
-          title="Copy URL"
-        >
-          <ClipboardIcon class="h-4 w-4" />
-        </button>
-      </div>
-    </div>
+
     
     <div class="flex space-x-2">
       <NuxtLink
@@ -60,8 +46,6 @@
 </template>
 
 <script setup>
-import { ClipboardIcon } from '@heroicons/vue/24/outline'
-
 const props = defineProps({
   agent: {
     type: Object,
@@ -75,16 +59,6 @@ const isDeleting = ref(false)
 
 const formatDate = (date) => {
   return new Date(date).toLocaleDateString()
-}
-
-const copyWebhookUrl = async () => {
-  try {
-    await navigator.clipboard.writeText(props.agent.webhookUrl || '')
-    // TODO: Add toast notification
-    console.log('Webhook URL copied to clipboard')
-  } catch (error) {
-    console.error('Failed to copy URL:', error)
-  }
 }
 
 const handleDelete = async () => {
