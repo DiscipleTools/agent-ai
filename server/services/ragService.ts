@@ -435,16 +435,35 @@ class RAGService {
       console.log(`🔗 Qdrant URL: ${this.qdrantUrl}`)
       console.log(`📝 Collection: ${collectionName}`)
       
-      // Quick health check before starting batch processing
-      try {
-        const healthCheck = await this.healthCheck()
-        console.log('Pre-insertion health check:', healthCheck)
-        if (!healthCheck.qdrantConnected) {
-          throw new Error(`Qdrant health check failed before insertion. Please verify Qdrant is running at ${this.qdrantUrl}`)
+      // Robust health check before starting batch processing (with retries for post-deletion scenarios)
+      let healthCheckPassed = false
+      for (let attempt = 1; attempt <= 5; attempt++) {
+        try {
+          console.log(`🔍 Pre-insertion health check attempt ${attempt}/5`)
+          const healthCheck = await this.healthCheck()
+          console.log(`Health check result ${attempt}:`, healthCheck)
+          
+          if (healthCheck.qdrantConnected) {
+            console.log(`✅ Pre-insertion health check passed on attempt ${attempt}`)
+            healthCheckPassed = true
+            break
+          } else {
+            console.log(`❌ Health check failed on attempt ${attempt}: ${healthCheck.error}`)
+          }
+        } catch (healthError) {
+          console.log(`❌ Health check error on attempt ${attempt}:`, healthError)
         }
-      } catch (healthError) {
-        console.error('Pre-insertion health check failed:', healthError)
-        throw new Error(`Cannot proceed with insertion - Qdrant health check failed: ${healthError instanceof Error ? healthError.message : 'Unknown error'}`)
+        
+        // Wait between attempts (longer waits for later attempts)
+        if (attempt < 5) {
+          const waitTime = attempt * 1000 // 1s, 2s, 3s, 4s
+          console.log(`⏳ Waiting ${waitTime}ms before retry...`)
+          await new Promise(resolve => setTimeout(resolve, waitTime))
+        }
+      }
+      
+      if (!healthCheckPassed) {
+        throw new Error(`Cannot proceed with insertion - Qdrant health check failed after 5 attempts. Please verify Qdrant is running at ${this.qdrantUrl}`)
       }
       
       for (let i = 0; i < points.length; i += batchSize) {
@@ -865,10 +884,7 @@ class RAGService {
       
       const qdrantConnected = qdrantResponse.ok
       
-      // Check embedding model
-      if (!this.embeddingModel) {
-        await this.initializeEmbeddingModel()
-      }
+      // Check embedding model (but don't initialize during health check to avoid connection issues)
       const embeddingModelLoaded = !!this.embeddingModel
       
       return {

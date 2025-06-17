@@ -234,7 +234,6 @@ export default defineEventHandler(async (event) => {
             
             // First, delete existing chunks for this document
             await ragService.deleteDocumentChunks(agentId, documentId)
-            console.log(`🗑️  Deleted old RAG chunks for document`)
             
             // Then process the new content
             const ragResult = await ragService.processDocument(
@@ -376,7 +375,6 @@ export default defineEventHandler(async (event) => {
           
           // First, delete existing chunks for this document
           await ragService.deleteDocumentChunks(agentId, documentId)
-          console.log(`🗑️  Deleted old RAG chunks for document`)
           
           // Then process the updated content
           const ragResult = await ragService.processDocument(
