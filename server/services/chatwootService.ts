@@ -173,9 +173,13 @@ class ChatwootService {
       }
 
       const data = await response.json()
-      console.log(`Retrieved ${data?.length || 0} messages from conversation ${conversationId}`)
       
-      return data
+      // Chatwoot returns messages in a 'payload' array, not directly
+      console.log('Chatwoot API response:', data)
+      const messages = data.payload || data
+      console.log(`Retrieved ${messages?.length || 0} messages from conversation ${conversationId}`)
+      
+      return messages
 
     } catch (error: any) {
       console.error('Chatwoot Service Error:', error)
