@@ -1,4 +1,5 @@
 import Settings from '~/server/models/Settings'
+import User from '~/server/models/User' // Ensure User model is registered for populate
 import { Types } from 'mongoose'
 
 interface AIConnection {
