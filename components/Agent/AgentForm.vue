@@ -248,94 +248,120 @@
         <div
           v-for="doc in contextDocuments"
           :key="doc._id"
-          class="flex items-start justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg overflow-hidden"
+          class="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg"
         >
-          <div class="flex items-start space-x-3 flex-1 min-w-0">
-            <div class="flex-shrink-0 mt-0.5">
-              <DocumentIcon v-if="doc.type === 'file'" class="h-5 w-5 text-gray-400" />
-              <LinkIcon v-else-if="doc.type === 'url'" class="h-5 w-5 text-gray-400" />
-              <svg v-else-if="doc.type === 'website'" class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9v-3a5 5 0 00-5-5 5 5 0 00-5 5v3m0 0h10" />
-              </svg>
-            </div>
-            <div class="flex-1 min-w-0">
-              <p class="text-sm font-medium text-gray-900 dark:text-white truncate">
-                {{ doc.filename || doc.url }}
-                <span v-if="doc.type === 'website' && doc.metadata?.totalPages" class="font-normal text-gray-500">
-                  ({{ doc.metadata.totalPages }} pages)
-                </span>
-              </p>
-              <div class="flex items-center space-x-2 text-xs text-gray-500 break-words">
-                <span>{{ doc.type === 'file' ? 'File' : doc.type === 'url' ? 'URL' : 'Website' }}</span>
-                <span>•</span>
-                <span>{{ formatDate(doc.uploadedAt) }}</span>
-                <span>•</span>
-                <span>{{ formatContentLength(doc.contentLength) }}</span>
-                <span>•</span>
-                <div class="flex items-center space-x-1">
-                  <div 
-                    v-if="doc.rag?.inRAG" 
-                    class="flex items-center space-x-1 text-green-600 dark:text-green-400"
-                    :title="`Vector Database: ${doc.rag.chunksCount} chunks stored`"
-                  >
-                    <svg class="h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
-                      <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
-                    </svg>
-                    <span class="text-xs font-medium">RAG</span>
-                  </div>
-                  <div 
-                    v-else 
-                    class="flex items-center space-x-1 text-gray-400 dark:text-gray-500"
-                    title="Not indexed in vector database"
-                  >
-                    <svg class="h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
-                      <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
-                    </svg>
-                    <span class="text-xs">No RAG</span>
+          <div class="flex items-start justify-between">
+            <div class="flex items-start space-x-3 flex-1 min-w-0">
+              <div class="flex-shrink-0 mt-0.5">
+                <DocumentIcon v-if="doc.type === 'file'" class="h-5 w-5 text-gray-400" />
+                <LinkIcon v-else-if="doc.type === 'url'" class="h-5 w-5 text-gray-400" />
+                <svg v-else-if="doc.type === 'website'" class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9v-3a5 5 0 00-5-5 5 5 0 00-5 5v3m0 0h10" />
+                </svg>
+              </div>
+              <div class="flex-1 min-w-0">
+                <p class="text-sm font-medium text-gray-900 dark:text-white flex items-baseline">
+                  <span class="truncate">{{ doc.type === 'website' ? doc.url : (doc.filename || doc.url) }}</span>
+                  <span v-if="doc.type === 'website' && doc.metadata?.totalPages" class="ml-2 flex-shrink-0 font-normal text-gray-500">
+                    ({{ doc.metadata.totalPages }} pages)
+                  </span>
+                </p>
+                <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500 mt-1">
+                  <span class="font-medium capitalize">{{ doc.type }}</span>
+                  <span class="text-gray-400 dark:text-gray-500">&bull;</span>
+                  <span>{{ formatDate(doc.uploadedAt) }}</span>
+                  <span class="text-gray-400 dark:text-gray-500">&bull;</span>
+                  <span>{{ formatContentLength(doc.contentLength) }}</span>
+                  
+                  <div class="flex items-center">
+                    <span class="text-gray-400 dark:text-gray-500 mr-3">&bull;</span>
+                    <div 
+                      v-if="doc.rag?.inRAG" 
+                      class="flex items-center space-x-1 text-green-600 dark:text-green-400"
+                      :title="`Vector Database: ${doc.rag.chunksCount} chunks stored`"
+                    >
+                      <svg class="h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                      </svg>
+                      <span class="text-xs font-medium">RAG</span>
+                    </div>
+                    <div 
+                      v-else 
+                      class="flex items-center space-x-1 text-gray-400 dark:text-gray-500"
+                      title="Not indexed in vector database"
+                    >
+                      <svg class="h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+                      </svg>
+                      <span class="text-xs">No RAG</span>
+                    </div>
                   </div>
                 </div>
+                
               </div>
-              <p v-if="doc.contentPreview" class="text-xs text-gray-600 dark:text-gray-400 mt-1 line-clamp-2">
-                {{ doc.contentPreview }}
-              </p>
+            </div>
+            <div class="flex flex-col sm:flex-row items-start sm:items-center space-y-1 sm:space-y-0 sm:space-x-2 ml-3 flex-shrink-0">
+              <button
+                v-if="doc._id"
+                type="button"
+                @click="viewContextDocument(doc)"
+                class="text-blue-600 hover:text-blue-700 text-sm whitespace-nowrap"
+                title="View content"
+              >
+                {{ expandedDocs[doc._id] ? 'Hide' : 'View' }}
+              </button>
+              <button
+                v-if="doc._id && (doc.type === 'url' || doc.type === 'website')"
+                type="button"
+                @click="refreshContextDocument(doc._id)"
+                :disabled="refreshingDocs.has(doc._id)"
+                class="text-green-600 hover:text-green-700 text-sm disabled:opacity-50 whitespace-nowrap"
+                :title="doc.type === 'website' ? 'Re-crawl website' : 'Refresh URL content'"
+              >
+                <span v-if="refreshingDocs.has(doc._id)">
+                  {{ doc.type === 'website' ? 'Re-crawling...' : 'Refreshing...' }}
+                </span>
+                <span v-else>
+                  {{ doc.type === 'website' ? 'Re-crawl' : 'Refresh' }}
+                </span>
+              </button>
+              <button
+                v-if="doc._id"
+                type="button"
+                @click="removeContextDocument(doc._id)"
+                :disabled="deletingDocs.has(doc._id)"
+                class="text-red-600 hover:text-red-700 text-sm disabled:opacity-50 whitespace-nowrap"
+                title="Remove document"
+              >
+                <span v-if="deletingDocs.has(doc._id)">Removing...</span>
+                <span v-else>Remove</span>
+              </button>
             </div>
           </div>
-          <div class="flex flex-col sm:flex-row items-start sm:items-center space-y-1 sm:space-y-0 sm:space-x-2 ml-3 flex-shrink-0">
-            <button
-              v-if="doc._id"
-              type="button"
-              @click="viewContextDocument(doc._id)"
-              class="text-blue-600 hover:text-blue-700 text-sm whitespace-nowrap"
-              title="View content"
-            >
-              View
-            </button>
-            <button
-              v-if="doc._id && (doc.type === 'url' || doc.type === 'website')"
-              type="button"
-              @click="refreshContextDocument(doc._id)"
-              :disabled="refreshingDocs.has(doc._id)"
-              class="text-green-600 hover:text-green-700 text-sm disabled:opacity-50 whitespace-nowrap"
-              :title="doc.type === 'website' ? 'Re-crawl website' : 'Refresh URL content'"
-            >
-              <span v-if="refreshingDocs.has(doc._id)">
-                {{ doc.type === 'website' ? 'Re-crawling...' : 'Refreshing...' }}
-              </span>
-              <span v-else>
-                {{ doc.type === 'website' ? 'Re-crawl' : 'Refresh' }}
-              </span>
-            </button>
-            <button
-              v-if="doc._id"
-              type="button"
-              @click="removeContextDocument(doc._id)"
-              :disabled="deletingDocs.has(doc._id)"
-              class="text-red-600 hover:text-red-700 text-sm disabled:opacity-50 whitespace-nowrap"
-              title="Remove document"
-            >
-              <span v-if="deletingDocs.has(doc._id)">Removing...</span>
-              <span v-else>Remove</span>
-            </button>
+          
+          <!-- Expanded View -->
+          <div v-if="expandedDocs[doc._id]" class="mt-4 pt-4 border-t border-gray-200 dark:border-gray-600">
+            <div v-if="expandedDocs[doc._id].loading" class="text-sm text-gray-500">Loading...</div>
+            <div v-else-if="expandedDocs[doc._id].error" class="text-sm text-red-500">
+              Error: {{ expandedDocs[doc._id].error }}
+            </div>
+            <div v-else-if="expandedDocs[doc._id].data" class="space-y-3">
+              <template v-if="doc.type === 'website'">
+                <h4 class="text-sm font-medium text-gray-900 dark:text-white">
+                  Scraped URLs ({{ expandedDocs[doc._id].data.metadata?.pageUrls?.length || 0 }})
+                </h4>
+                <ul v-if="expandedDocs[doc._id].data.metadata?.pageUrls?.length" class="max-h-60 overflow-y-auto space-y-1 text-xs text-gray-600 dark:text-gray-400 list-disc list-inside bg-gray-100 dark:bg-gray-800 p-3 rounded-md">
+                  <li v-for="url in expandedDocs[doc._id].data.metadata.pageUrls" :key="url" class="break-all">
+                    {{ url }}
+                  </li>
+                </ul>
+                <p v-else class="text-sm text-gray-500">No scraped URLs found.</p>
+              </template>
+              <template v-else>
+                <h4 class="text-sm font-medium text-gray-900 dark:text-white">Content</h4>
+                <pre class="text-xs text-gray-700 dark:text-gray-300 whitespace-pre-wrap font-sans bg-gray-100 dark:bg-gray-800 p-3 rounded-md max-h-60 overflow-y-auto">{{ expandedDocs[doc._id].data.content || 'No content available' }}</pre>
+              </template>
+            </div>
           </div>
         </div>
       </div>
@@ -701,7 +727,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['submit', 'cancel'])
+const emit = defineEmits(['submit', 'cancel', 'agentUpdated'])
 
 // Stores
 const agentsStore = useAgentsStore()
@@ -745,6 +771,7 @@ const contextDocuments = ref([])
 const refreshingDocs = ref(new Set())
 const deletingDocs = ref(new Set())
 const ragSummary = ref(null)
+const expandedDocs = reactive({})
 
 // Crawl options
 const crawlOptions = reactive({
@@ -822,17 +849,21 @@ onMounted(() => {
   loadAIConnections()
 })
 
-// Load context documents function (defined before watcher)
-const loadContextDocuments = async () => {
+// Helper function to reload agent data (including context documents)
+const reloadAgentData = async () => {
   if (!props.agent?._id) return
   
   try {
-    const response = await agentsStore.fetchContextDocuments(props.agent._id)
-    contextDocuments.value = response.contextDocuments || []
-    ragSummary.value = response.ragSummary || null
+    const updatedAgent = await agentsStore.fetchAgent(props.agent._id)
+    // Update the reactive references with new data
+    contextDocuments.value = updatedAgent.contextDocuments || []
+    ragSummary.value = updatedAgent.ragSummary || null
+    
+    // Emit to parent to update the agent prop
+    emit('agentUpdated', updatedAgent)
   } catch (error) {
-    console.error('Failed to load context documents:', error)
-    toast.error('Failed to load context documents')
+    console.error('Failed to reload agent data:', error)
+    toast.error('Failed to reload agent data')
   }
 }
 
@@ -854,9 +885,10 @@ watch(() => props.agent, (newAgent) => {
     // Update selected model option
     updateSelectedModelOption()
     
-    // Load context documents if editing
-    if (newAgent._id) {
-      loadContextDocuments()
+    // Load context documents from agent prop if editing
+    if (newAgent._id && newAgent.contextDocuments) {
+      contextDocuments.value = newAgent.contextDocuments || []
+      ragSummary.value = newAgent.ragSummary || null
     }
   }
 }, { immediate: true })
@@ -973,7 +1005,7 @@ const addContextUrl = async () => {
     urlInput.value = ''
     showUrlInput.value = false
     urlTestResult.value = null
-    await loadContextDocuments()
+    await reloadAgentData()
   } catch (error) {
     console.error('Failed to add URL:', error)
     toast.error(error.message || 'Failed to add URL content')
@@ -993,7 +1025,7 @@ const removeContextDocument = async (docId) => {
   try {
     await agentsStore.deleteContextDocument(props.agent._id, docId)
     toast.success('Context document removed successfully')
-    await loadContextDocuments()
+    await reloadAgentData()
   } catch (error) {
     console.error('Failed to remove document:', error)
     toast.error(error.message || 'Failed to remove context document')
@@ -1013,7 +1045,7 @@ const refreshContextDocument = async (docId) => {
   try {
     await agentsStore.refreshContextDocument(props.agent._id, docId)
     toast.success('Context document refreshed successfully')
-    await loadContextDocuments()
+    await reloadAgentData()
   } catch (error) {
     console.error('Failed to refresh document:', error)
     toast.error(error.message || 'Failed to refresh context document')
@@ -1022,20 +1054,22 @@ const refreshContextDocument = async (docId) => {
   }
 }
 
-const viewContextDocument = async (docId) => {
-  if (!props.agent?._id || !docId) {
-    console.warn('Cannot view document: missing agent ID or document ID', { agentId: props.agent?._id, docId })
+const viewContextDocument = (doc) => {
+  const docId = doc._id;
+  if (!docId) {
+    console.warn('Cannot view document: missing document ID', { doc })
     return
   }
-  
-  try {
-    const response = await agentsStore.getContextDocument(props.agent._id, docId)
-    // TODO: Open modal or navigate to view page
-    toast.info('Document viewing not yet implemented')
-  } catch (error) {
-    console.error('Failed to get document:', error)
-    toast.error(error.message || 'Failed to get context document')
+
+  // Toggle expansion
+  if (expandedDocs[docId]) {
+    delete expandedDocs[docId]
+    return
   }
+
+  // The content is now loaded with the document list.
+  // We just need to set it in the expandedDocs reactive object.
+  expandedDocs[docId] = { loading: false, error: null, data: doc }
 }
 
 const handleFileUpload = async (event) => {
@@ -1080,7 +1114,7 @@ const handleFileUpload = async (event) => {
     event.target.value = ''
     
     // Reload context documents
-    await loadContextDocuments()
+    await reloadAgentData()
     
   } catch (error) {
     console.error('File upload failed:', error)
@@ -1198,7 +1232,7 @@ const addContextWebsite = async () => {
     websiteInput.value = ''
     showWebsiteInput.value = false
     websiteTestResult.value = null
-    await loadContextDocuments()
+    await reloadAgentData()
   } catch (error) {
     console.error('Failed to add website:', error)
     toast.error(error.message || 'Failed to add website content')
