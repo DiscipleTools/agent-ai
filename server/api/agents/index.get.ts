@@ -17,9 +17,10 @@ export default defineEventHandler(async (event) => {
       query._id = { $in: user.agentAccess || [] }
     }
 
-    // Fetch agents
+    // Fetch agents with only necessary fields for listing
     const agents = await Agent.find(query)
-      .populate('createdBy', 'name email')
+      .select('name description isActive createdAt createdBy')
+      .populate('createdBy', 'name')
       .sort({ createdAt: -1 })
 
     return {
