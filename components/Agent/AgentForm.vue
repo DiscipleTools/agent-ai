@@ -339,6 +339,51 @@
             </div>
           </div>
           
+          <!-- Re-crawl Progress Display (for websites only) -->
+          <div v-if="reCrawlingProgress.isActive && reCrawlingProgress.docId === doc._id" class="mt-4 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-md">
+            <h4 class="text-sm font-medium text-green-900 dark:text-green-200 mb-3">
+              Re-crawling Progress
+            </h4>
+            
+            <!-- Progress Bar -->
+            <div class="mb-3">
+              <div class="flex justify-between items-center mb-1">
+                <span class="text-xs text-green-700 dark:text-green-300">
+                  {{ reCrawlingProgress.message }}
+                </span>
+                <span class="text-xs font-medium text-green-700 dark:text-green-300">
+                  {{ reCrawlingProgress.percentage }}%
+                </span>
+              </div>
+              <div class="w-full bg-green-200 dark:bg-green-800 rounded-full h-2">
+                <div 
+                  class="bg-green-600 h-2 rounded-full transition-all duration-300 ease-out"
+                  :style="{ width: `${reCrawlingProgress.percentage}%` }"
+                ></div>
+              </div>
+            </div>
+            
+            <!-- Status Details -->
+            <div class="grid grid-cols-2 gap-4 text-xs">
+              <div>
+                <span class="font-medium text-green-900 dark:text-green-200">Phase:</span>
+                <span class="text-green-700 dark:text-green-300 ml-1 capitalize">{{ reCrawlingProgress.phase }}</span>
+              </div>
+              <div>
+                <span class="font-medium text-green-900 dark:text-green-200">Pages:</span>
+                <span class="text-green-700 dark:text-green-300 ml-1">
+                  {{ reCrawlingProgress.currentPage }}/{{ reCrawlingProgress.totalPages }}
+                </span>
+              </div>
+            </div>
+            
+            <!-- Current URL being crawled -->
+            <div v-if="reCrawlingProgress.currentUrl && reCrawlingProgress.phase === 'crawling'" class="mt-2 text-xs">
+              <span class="font-medium text-green-900 dark:text-green-200">Current URL:</span>
+              <span class="text-green-700 dark:text-green-300 ml-1 break-all">{{ reCrawlingProgress.currentUrl }}</span>
+            </div>
+          </div>
+          
           <!-- Expanded View -->
           <div v-if="expandedDocs[doc._id]" class="mt-4 pt-4 border-t border-gray-200 dark:border-gray-600">
             <div v-if="expandedDocs[doc._id].loading" class="text-sm text-gray-500">Loading...</div>
@@ -1040,17 +1085,79 @@ const refreshContextDocument = async (docId) => {
     return
   }
   
+  // Find the document to check if it's a website
+  const doc = contextDocuments.value.find(d => d._id === docId)
+  const isWebsite = doc?.type === 'website'
+  
   refreshingDocs.value.add(docId)
   
+  // Reset re-crawl progress for websites
+  if (isWebsite) {
+    Object.assign(reCrawlingProgress, {
+      isActive: true,
+      phase: 'starting',
+      message: 'Initializing website re-crawl...',
+      currentPage: 0,
+      totalPages: doc.metadata?.crawlOptions?.maxPages || 10,
+      percentage: 0,
+      currentUrl: '',
+      docId: docId
+    })
+  }
+  
   try {
-    await agentsStore.refreshContextDocument(props.agent._id, docId)
-    toast.success('Context document refreshed successfully')
+    if (isWebsite) {
+      // Try progress version first for websites
+      try {
+        await agentsStore.refreshContextDocumentWithProgress(
+          props.agent._id, 
+          docId,
+          (progress) => {
+            // Update re-crawl progress state
+            Object.assign(reCrawlingProgress, {
+              phase: progress.phase,
+              message: progress.message,
+              currentPage: progress.currentPage || 0,
+              totalPages: progress.totalPages || doc.metadata?.crawlOptions?.maxPages || 10,
+              percentage: progress.percentage || 0,
+              currentUrl: progress.currentUrl || '',
+              docId: docId
+            })
+          }
+        )
+      } catch (progressError) {
+        console.warn('Progress version failed for website re-crawl, falling back to standard method:', progressError)
+        
+        // Update progress to show fallback
+        Object.assign(reCrawlingProgress, {
+          phase: 'crawling',
+          message: 'Re-crawling website (progress not available)...',
+          currentPage: 0,
+          totalPages: doc.metadata?.crawlOptions?.maxPages || 10,
+          percentage: 50, // Show indeterminate progress
+          currentUrl: '',
+          docId: docId
+        })
+        
+        // Fallback to original method
+        await agentsStore.refreshContextDocument(props.agent._id, docId)
+      }
+    } else {
+      // Use standard refresh for non-website documents
+      await agentsStore.refreshContextDocument(props.agent._id, docId)
+    }
+    
+    toast.success(isWebsite ? 'Website re-crawled successfully' : 'Context document refreshed successfully')
     await reloadAgentData()
   } catch (error) {
     console.error('Failed to refresh document:', error)
     toast.error(error.message || 'Failed to refresh context document')
   } finally {
     refreshingDocs.value.delete(docId)
+    if (isWebsite) {
+      reCrawlingProgress.isActive = false
+      reCrawlingProgress.docId = null
+    }
   }
 }
 
@@ -1174,6 +1281,18 @@ const crawlingProgress = reactive({
   totalPages: 0,
   percentage: 0,
   currentUrl: ''
+})
+
+// Add reactive variables for re-crawl progress tracking
+const reCrawlingProgress = reactive({
+  isActive: false,
+  phase: '',
+  message: '',
+  currentPage: 0,
+  totalPages: 0,
+  percentage: 0,
+  currentUrl: '',
+  docId: null
 })
 
 const addContextWebsite = async () => {

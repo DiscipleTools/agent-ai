@@ -5,6 +5,48 @@ import webScrapingService from '~/server/services/webScrapingService'
 import { ragService } from '~/server/services/ragService'
 import mongoose from 'mongoose'
 
+// Helper function to create event stream for SSE
+function createEventStream(event: any) {
+  setHeaders(event, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    'Connection': 'keep-alive',
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'Cache-Control'
+  })
+
+  const encoder = new TextEncoder()
+  let closed = false
+
+  return {
+    push: async (data: string) => {
+      if (closed) return
+      try {
+        const formattedData = `data: ${data}\n\n`
+        const chunk = encoder.encode(formattedData)
+        // Send the chunk - this is handled by Nuxt's event system
+        await event.node.res.write(chunk)
+      } catch (error) {
+        console.error('Error writing to stream:', error)
+        closed = true
+      }
+    },
+    close: () => {
+      if (closed) return
+      closed = true
+      try {
+        event.node.res.end()
+      } catch (error) {
+        console.error('Error closing stream:', error)
+      }
+    },
+    send: () => {
+      // Return a promise that never resolves to keep the connection open
+      return new Promise(() => {})
+    }
+  }
+}
+
 export default defineEventHandler(async (event) => {
   try {
     // Connect to database
@@ -17,23 +59,24 @@ export default defineEventHandler(async (event) => {
     const agentId = getRouterParam(event, 'id')
     const docId = getRouterParam(event, 'docId')
     
-    if (!agentId) {
+    if (!agentId || !docId) {
       throw createError({
         statusCode: 400,
-        statusMessage: 'Agent ID is required'
-      })
-    }
-
-    if (!docId) {
-      throw createError({
-        statusCode: 400,
-        statusMessage: 'Document ID is required'
+        statusMessage: 'Agent ID and Document ID are required'
       })
     }
 
     // Get request body
     const body = await readBody(event)
     const { content, filename, refreshUrl } = body
+
+    // Validate input
+    if (!content && !filename && !refreshUrl) {
+      throw createError({
+        statusCode: 400,
+        statusMessage: 'At least one field (content, filename, or refreshUrl) is required'
+      })
+    }
 
     // Find the agent
     const agent = await Agent.findById(agentId)
@@ -53,7 +96,7 @@ export default defineEventHandler(async (event) => {
     }
 
     // Find the context document
-    const docIndex = agent.contextDocuments.findIndex((doc: any) => doc._id?.toString() === docId)
+    const docIndex = agent.contextDocuments.findIndex((doc: any) => doc._id.toString() === docId)
     if (docIndex === -1) {
       throw createError({
         statusCode: 404,
@@ -64,6 +107,10 @@ export default defineEventHandler(async (event) => {
     const contextDoc = agent.contextDocuments[docIndex]
     let updatedContent = contextDoc.content
     let updatedFilename = contextDoc.filename
+
+    // Check if this is a streaming request for website re-crawl
+    const isStreaming = refreshUrl && contextDoc.type === 'website' && contextDoc.url && 
+                       getQuery(event).stream === 'true'
 
     // Handle URL refresh
     if (refreshUrl && contextDoc.type === 'url' && contextDoc.url) {
@@ -184,7 +231,204 @@ export default defineEventHandler(async (event) => {
           maxDepth: 2,
           sameDomainOnly: true
         }
-        
+
+        // Handle streaming re-crawl
+        if (isStreaming) {
+          const eventStream = createEventStream(event)
+
+          // Handle the re-crawling in the background
+          const handleReCrawling = async () => {
+            try {
+              // Send initial progress
+              await eventStream.push(JSON.stringify({
+                type: 'progress',
+                phase: 'starting',
+                message: 'Starting website re-crawl...',
+                currentPage: 0,
+                totalPages: originalOptions.maxPages || 10,
+                percentage: 0
+              }))
+
+              // Re-crawl the website with progress callbacks
+              console.log(`Starting website re-crawl for agent ${agent.name}: ${contextDoc.url}`)
+              
+              const websiteContent = await webScrapingService.crawlWebsiteWithProgress(contextDoc.url, originalOptions, async (progress: any) => {
+                await eventStream.push(JSON.stringify({
+                  type: 'progress',
+                  phase: 'crawling',
+                  message: progress.message,
+                  currentPage: progress.currentPage,
+                  totalPages: progress.estimatedTotal || originalOptions.maxPages || 10,
+                  percentage: Math.round((progress.currentPage / (progress.estimatedTotal || originalOptions.maxPages || 10)) * 100),
+                  currentUrl: progress.currentUrl
+                }))
+              })
+
+              // Send processing phase
+              await eventStream.push(JSON.stringify({
+                type: 'progress',
+                phase: 'processing',
+                message: 'Processing re-crawled content...',
+                currentPage: websiteContent.totalPages,
+                totalPages: websiteContent.totalPages,
+                percentage: 95
+              }))
+
+              // Combine all page content into a single document (same format as original)
+              let combinedContent = `${websiteContent.summary}\n\n`
+              combinedContent += `=== WEBSITE CONTENT ===\n\n`
+              
+              websiteContent.pages.forEach((page: any, index: number) => {
+                combinedContent += `--- Page ${index + 1}: ${page.title || 'Untitled'} ---\n`
+                combinedContent += `URL: ${page.url}\n`
+                combinedContent += `${page.content}\n\n`
+              })
+              
+              updatedContent = combinedContent
+              updatedFilename = `${new URL(websiteContent.baseUrl).hostname} (${websiteContent.totalPages} pages)`
+              
+              // Update metadata with new crawl information
+              const updatedMetadata = {
+                ...contextDoc.metadata,
+                totalPages: websiteContent.totalPages,
+                totalContentLength: websiteContent.totalContentLength,
+                pageUrls: websiteContent.pages.map((page: any) => page.url),
+                lastCrawled: new Date()
+              }
+              
+              // Update the document with new metadata
+              agent.contextDocuments[docIndex] = {
+                ...contextDoc.toObject(),
+                type: contextDoc.type, // Explicitly preserve the type field
+                content: updatedContent,
+                filename: updatedFilename,
+                uploadedAt: new Date(),
+                metadata: updatedMetadata
+              }
+              
+              await agent.save()
+              
+              console.log(`Website re-crawled: ${websiteContent.totalPages} pages, ${websiteContent.totalContentLength} characters`)
+              
+              const updatedDoc = agent.contextDocuments[docIndex]
+              const documentId = updatedDoc._id?.toString()
+
+              // Send RAG processing phase
+              await eventStream.push(JSON.stringify({
+                type: 'progress',
+                phase: 'rag',
+                message: 'Creating vector embeddings...',
+                currentPage: websiteContent.totalPages,
+                totalPages: websiteContent.totalPages,
+                percentage: 98
+              }))
+              
+              // Reprocess document for RAG (vector embeddings)
+              let ragInfo = null
+              try {
+                if (documentId) {
+                  console.log(`🔄 Reprocessing document for RAG: ${documentId}`)
+                  
+                  // First, delete existing chunks for this document
+                  await ragService.deleteDocumentChunks(agentId, documentId)
+                  
+                  // Then process the new content
+                  const ragResult = await ragService.processDocument(
+                    agentId,
+                    documentId,
+                    updatedContent,
+                    {
+                      type: 'website',
+                      title: updatedDoc.filename || 'Website',
+                      source: updatedDoc.url || websiteContent.baseUrl
+                    }
+                  )
+                  ragInfo = {
+                    chunksCreated: ragResult.chunksCreated,
+                    collectionName: ragResult.collectionName
+                  }
+                  
+                  // Update document metadata with RAG status
+                  agent.contextDocuments[docIndex].metadata = {
+                    ...agent.contextDocuments[docIndex].metadata,
+                    rag: {
+                      processed: true,
+                      chunksCreated: ragResult.chunksCreated,
+                      processedAt: new Date()
+                    }
+                  }
+                  await agent.save()
+                  
+                  console.log(`✅ RAG reprocessing completed: ${ragResult.chunksCreated} chunks created`)
+                }
+              } catch (ragError: any) {
+                console.error('RAG reprocessing failed (non-critical):', ragError)
+                
+                // Update document metadata to indicate RAG processing failed
+                agent.contextDocuments[docIndex].metadata = {
+                  ...agent.contextDocuments[docIndex].metadata,
+                  rag: {
+                    processed: false,
+                    error: ragError.message || 'RAG reprocessing failed',
+                    attemptedAt: new Date()
+                  }
+                }
+                await agent.save()
+                
+                // RAG failure is non-critical - document is still updated in MongoDB
+              }
+
+              // Send completion
+              await eventStream.push(JSON.stringify({
+                type: 'complete',
+                phase: 'complete',
+                message: `Website re-crawled successfully (${websiteContent.totalPages} pages)`,
+                percentage: 100,
+                data: {
+                  contextDocument: {
+                    _id: updatedDoc._id,
+                    type: updatedDoc.type,
+                    filename: updatedDoc.filename,
+                    url: updatedDoc.url,
+                    uploadedAt: updatedDoc.uploadedAt,
+                    contentLength: updatedDoc.content?.length || 0,
+                    contentPreview: updatedDoc.content?.substring(0, 200) + (updatedDoc.content?.length > 200 ? '...' : ''),
+                    metadata: updatedDoc.metadata
+                  },
+                  agent: {
+                    _id: agent._id,
+                    name: agent.name,
+                    contextDocumentsCount: agent.contextDocuments.length
+                  },
+                  rag: ragInfo
+                }
+              }))
+
+              eventStream.close()
+
+            } catch (error: any) {
+              console.error('Website re-crawl error during streaming:', error)
+              
+              // Send error via SSE
+              await eventStream.push(JSON.stringify({
+                type: 'error',
+                phase: 'error',
+                message: error.message || 'Failed to re-crawl website',
+                error: error.statusMessage || error.message
+              }))
+              
+              eventStream.close()
+            }
+          }
+
+          // Start the re-crawling process in the background
+          handleReCrawling()
+
+          // Return the event stream
+          return eventStream.send()
+        }
+
+        // Non-streaming mode (original behavior for backward compatibility)
         const websiteContent = await webScrapingService.crawlWebsite(contextDoc.url, originalOptions)
         
         // Combine all page content into a single document (same format as original)
