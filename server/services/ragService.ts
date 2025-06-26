@@ -141,9 +141,6 @@ class RAGService {
       let pageContent = section.substring(contentStart).trim()
       
       if (pageContent) {
-        // Classify page type based on content
-        const pageType = this.classifyPageContent(pageContent, pageUrl)
-        
         // Preprocess content to reduce brand name pollution
         pageContent = this.preprocessTextForEmbedding(pageContent)
         
@@ -152,8 +149,7 @@ class RAGService {
         
         // Add page context to each chunk for better search relevance
         for (const chunk of pageChunks) {
-          const enhancedChunk = `${pageType}: ${chunk}`
-          chunks.push(enhancedChunk)
+          chunks.push(chunk)
           pageUrls.push(pageUrl)
         }
       }
@@ -195,171 +191,11 @@ class RAGService {
   }
 
   /**
-   * Classify page content to determine page type based on semantic content
-   */
-  private classifyPageContent(content: string, url: string): string {
-    const lowerContent = content.toLowerCase()
-    
-    // Content-based classification patterns
-    const classifications = [
-      {
-        keywords: ['download', 'install', 'get started', 'setup', 'installation', 'zip file', 'executable', 'installer', 'current version', 'release notes'],
-        phrases: ['download now', 'get the app', 'install guide', 'system requirements', 'download the', 'current version'],
-        weight: 4, // Increased weight for download pages
-        type: 'Download Page'
-      },
-      {
-        keywords: ['about us', 'our story', 'our mission', 'who we are', 'company', 'founded', 'team', 'history'],
-        phrases: ['about our company', 'our team', 'company history', 'who we are'],
-        weight: 2,
-        type: 'About Page'
-      },
-      {
-        keywords: ['contact', 'get in touch', 'reach us', 'email us', 'phone', 'address', 'location'],
-        phrases: ['contact us', 'get in touch', 'reach out', 'send us'],
-        weight: 2,
-        type: 'Contact Page'
-      },
-      {
-        keywords: ['features', 'capabilities', 'functionality', 'what we offer', 'benefits', 'advantages'],
-        phrases: ['key features', 'main features', 'core capabilities'],
-        weight: 2,
-        type: 'Features Page'
-      },
-      {
-        keywords: ['pricing', 'plans', 'cost', 'price', 'subscription', 'packages', 'billing'],
-        phrases: ['pricing plans', 'subscription plans', 'cost breakdown', 'free trial'],
-        weight: 3,
-        type: 'Pricing Page'
-      },
-      {
-        keywords: ['blog', 'article', 'post', 'news', 'announcement', 'update', 'release'],
-        phrases: ['latest news', 'blog post', 'recent updates'],
-        weight: 1,
-        type: 'Blog Page'
-      },
-      {
-        keywords: ['documentation', 'docs', 'guide', 'tutorial', 'how to', 'manual', 'instructions'],
-        phrases: ['user guide', 'documentation', 'step by step', 'getting started'],
-        weight: 2,
-        type: 'Documentation Page'
-      },
-      {
-        keywords: ['privacy policy', 'terms of service', 'legal', 'terms and conditions', 'disclaimer'],
-        phrases: ['privacy policy', 'terms of service', 'legal notice'],
-        weight: 3,
-        type: 'Legal Page'
-      },
-      {
-        keywords: ['api', 'developer', 'integration', 'webhook', 'endpoint', 'sdk'],
-        phrases: ['api documentation', 'developer guide', 'integration guide'],
-        weight: 2,
-        type: 'Developer Page'
-      },
-      {
-        keywords: ['support', 'help', 'faq', 'questions', 'troubleshooting', 'knowledge base'],
-        phrases: ['frequently asked', 'help center', 'customer support'],
-        weight: 2,
-        type: 'Support Page'
-      }
-    ]
-    
-    let bestMatch = { type: 'Content Page', score: 0 }
-    
-    for (const classification of classifications) {
-      let score = 0
-      
-      // Score based on individual keywords
-      for (const keyword of classification.keywords) {
-        const keywordRegex = new RegExp(`\\b${this.escapeRegex(keyword)}\\b`, 'g')
-        const matches = (lowerContent.match(keywordRegex) || []).length
-        score += matches * classification.weight
-      }
-      
-      // Score based on common phrases (higher weight)
-      for (const phrase of classification.phrases) {
-        const phraseRegex = new RegExp(`\\b${this.escapeRegex(phrase)}\\b`, 'g')
-        const matches = (lowerContent.match(phraseRegex) || []).length
-        score += matches * classification.weight * 2 // Phrases get double weight
-      }
-      
-      if (score > bestMatch.score) {
-        bestMatch = { type: classification.type, score }
-      }
-    }
-    
-    // If no strong content match, use a simple URL fallback
-    if (bestMatch.score === 0) {
-      return this.getPageTypeFromUrl(url)
-    }
-    
-    return bestMatch.type
-  }
-
-  /**
-   * Simple URL-based page type detection as fallback
-   */
-  private getPageTypeFromUrl(url: string): string {
-    try {
-      const path = new URL(url).pathname.toLowerCase()
-      
-      if (path.includes('download') || path.includes('install')) return 'Download Page'
-      if (path.includes('about')) return 'About Page'
-      if (path.includes('contact')) return 'Contact Page'
-      if (path.includes('features')) return 'Features Page'
-      if (path.includes('pricing') || path.includes('plans')) return 'Pricing Page'
-      if (path.includes('blog') || path.includes('news')) return 'Blog Page'
-      if (path.includes('docs') || path.includes('documentation')) return 'Documentation Page'
-      if (path.includes('support') || path.includes('help')) return 'Support Page'
-      if (path === '/' || path === '' || path.includes('home')) return 'Home Page'
-      
-      return 'Content Page'
-    } catch {
-      return 'Content Page'
-    }
-  }
-
-  /**
    * Preprocess text to reduce brand name pollution and improve semantic relevance
    */
   private preprocessTextForEmbedding(text: string): string {
-    // Normalize high-frequency terms that might pollute embeddings
-    const processed = this.normalizeHighFrequencyTerms(text, 3)
-    
     // Clean up excessive whitespace
-    return processed.replace(/\s+/g, ' ').trim()
-  }
-
-  /**
-   * Reduce frequency of terms that appear too often in a single chunk
-   */
-  private normalizeHighFrequencyTerms(text: string, maxTermFrequency: number = 3): string {
-    const words = text.split(/\s+/)
-    const termCount = new Map<string, number>()
-    
-    // Count word frequencies (case-insensitive, ignore short words)
-    words.forEach(word => {
-      const cleanWord = word.toLowerCase().replace(/[^\w]/g, '')
-      if (cleanWord.length > 3) {
-        termCount.set(cleanWord, (termCount.get(cleanWord) || 0) + 1)
-      }
-    })
-    
-    // Replace excessive occurrences of high-frequency terms
-    let result = text
-    termCount.forEach((count, term) => {
-      if (count > maxTermFrequency) {
-        const regex = new RegExp(`\\b${this.escapeRegex(term)}\\b`, 'gi')
-        let replacements = 0
-        result = result.replace(regex, (match) => {
-          replacements++
-          // Keep first few occurrences, replace others with generic placeholder
-          return replacements <= maxTermFrequency ? match : '[TERM]'
-        })
-      }
-    })
-    
-    return result
+    return text.replace(/\s+/g, ' ').trim()
   }
 
   /**
@@ -606,31 +442,9 @@ class RAGService {
       
       // Transform results and apply page type boost
       const results: SearchResult[] = searchResults.result.map((hit: any) => {
-        let boostedScore = hit.score
-        
-        // Apply page type boost if query matches page type intent
-        const chunkText = hit.payload.text.toLowerCase()
-        const originalQueryLower = query.toLowerCase()
-        
-        if (originalQueryLower.includes('download') && chunkText.startsWith('download page:')) {
-          boostedScore *= 1.3 // 30% boost for download queries matching download pages
-        } else if (originalQueryLower.includes('pricing') && chunkText.startsWith('pricing page:')) {
-          boostedScore *= 1.3
-        } else if (originalQueryLower.includes('about') && chunkText.startsWith('about page:')) {
-          boostedScore *= 1.3
-        } else if (originalQueryLower.includes('contact') && chunkText.startsWith('contact page:')) {
-          boostedScore *= 1.3
-        } else if (originalQueryLower.includes('features') && chunkText.startsWith('features page:')) {
-          boostedScore *= 1.3
-        } else if (originalQueryLower.includes('documentation') || (originalQueryLower.includes('how') && originalQueryLower.includes('use'))) {
-          if (chunkText.startsWith('documentation page:')) {
-            boostedScore *= 1.3
-          }
-        }
-        
         return {
           text: hit.payload.text,
-          score: Math.min(boostedScore, 1.0), // Cap at 1.0
+          score: hit.score,
           metadata: {
             agentId: hit.payload.agentId,
             documentId: hit.payload.documentId,
@@ -679,48 +493,7 @@ class RAGService {
       return query
     }
     
-    // For very short meaningful queries, enhance with intent keywords
-    if (meaningfulWords.length <= 2) {
-      const enhancedQuery = this.enhanceShortQuery(meaningfulWords.join(' '), query)
-      return enhancedQuery
-    }
-    
     return meaningfulWords.join(' ')
-  }
-
-  /**
-   * Enhance short queries with contextual intent keywords
-   */
-  private enhanceShortQuery(meaningfulQuery: string, originalQuery: string): string {
-    const lower = originalQuery.toLowerCase()
-    
-    // Add intent context based on query patterns
-    if (lower.includes('download') || lower.includes('install') || lower.includes('get')) {
-      return `Download Page ${meaningfulQuery} installation setup guide download now`
-    }
-    
-    if (lower.includes('how') && (lower.includes('use') || lower.includes('work'))) {
-      return `Documentation Page ${meaningfulQuery} tutorial guide instructions`
-    }
-    
-    if (lower.includes('price') || lower.includes('cost') || lower.includes('plan')) {
-      return `Pricing Page ${meaningfulQuery} pricing subscription plan`
-    }
-    
-    if (lower.includes('contact') || lower.includes('support') || lower.includes('help')) {
-      return `Contact Page ${meaningfulQuery} contact support help`
-    }
-    
-    if (lower.includes('feature') || lower.includes('capability') || lower.includes('function')) {
-      return `Features Page ${meaningfulQuery} features capabilities functionality`
-    }
-    
-    if (lower.includes('about') || lower.includes('company') || lower.includes('who')) {
-      return `About Page ${meaningfulQuery} company information`
-    }
-    
-    // Return enhanced query with some context
-    return meaningfulQuery
   }
 
   async deleteDocumentChunks(agentId: string, documentId: string): Promise<void> {
