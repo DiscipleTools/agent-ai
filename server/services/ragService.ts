@@ -884,8 +884,23 @@ class RAGService {
       
       const qdrantConnected = qdrantResponse.ok
       
-      // Check embedding model (but don't initialize during health check to avoid connection issues)
-      const embeddingModelLoaded = !!this.embeddingModel
+      // Check embedding model and try to initialize if not loaded
+      let embeddingModelLoaded = !!this.embeddingModel
+      
+      if (!embeddingModelLoaded) {
+        try {
+          console.log('Embedding model not loaded, attempting initialization...')
+          await this.initializeEmbeddingModel()
+          embeddingModelLoaded = !!this.embeddingModel
+        } catch (modelError) {
+          console.error('Failed to initialize embedding model during health check:', modelError)
+          return {
+            qdrantConnected,
+            embeddingModelLoaded: false,
+            error: `Embedding model initialization failed: ${modelError instanceof Error ? modelError.message : 'Unknown error'}`
+          }
+        }
+      }
       
       return {
         qdrantConnected,
