@@ -265,22 +265,22 @@ class AIService {
           })
           
           systemPrompt += '\n\n=== RELEVANT CONTEXT ===\n'
-          systemPrompt += 'Use the following relevant information to help answer the user\'s question:\n\n'
           
           relevantChunks.forEach((chunk, index) => {
-            systemPrompt += `--- Context ${index + 1} (Score: ${chunk.score.toFixed(3)}) ---\n`
-            systemPrompt += `Source: ${chunk.metadata.documentTitle}\n`
+            const source = chunk.metadata.source || chunk.metadata.documentTitle;
+            systemPrompt += `--- Context ${index + 1} (Score: ${chunk.score.toFixed(3)}) ---\n`;
+            systemPrompt += `Source: ${source}\n`;
             if (chunk.metadata.language && chunk.metadata.language !== 'english') {
-              systemPrompt += `Language: ${chunk.metadata.language}\n`
+              systemPrompt += `Language: ${chunk.metadata.language}\n`;
             }
-            systemPrompt += `${chunk.text}\n\n`
-          })
+            systemPrompt += `${chunk.text}\n\n`;
+          });
           
           systemPrompt += '=== END CONTEXT ===\n\n'
-          systemPrompt += 'Use this context information to provide accurate, helpful responses. If the context doesn\'t contain relevant information for the user\'s question, use your general knowledge but mention that you don\'t have specific information about their query.'
           
           console.log(`\n📤 Final system prompt length: ${systemPrompt.length} characters`)
           console.log(`📈 Context added: ${systemPrompt.length - prompt.length} additional characters`)
+          console.log(`📤 Final system prompt: ${systemPrompt}`)
         } else {
           console.log(`\n⚠️  RAG: No relevant chunks found (no articles matched the query)`)
           console.log(`🎯 Query did not match any stored context with sufficient relevance`)
@@ -313,6 +313,7 @@ class AIService {
           
           console.log(`📤 Final system prompt length: ${systemPrompt.length} characters`)
           console.log(`📈 Context added: ${systemPrompt.length - prompt.length} additional characters`)
+          console.log(`📤 Final system prompt: ${systemPrompt}`)
         } else {
           console.log(`📭 No traditional context documents available either`)
         }
@@ -339,6 +340,7 @@ class AIService {
         
         console.log(`📤 Final system prompt length: ${systemPrompt.length} characters`)
         console.log(`📈 Context added: ${systemPrompt.length - prompt.length} additional characters`)
+        console.log(`📤 Final system prompt: ${systemPrompt}`)
       } else {
         console.log(`📭 No fallback context documents available`)
       }
