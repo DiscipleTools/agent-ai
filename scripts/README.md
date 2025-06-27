@@ -17,16 +17,7 @@ Creates an admin user with full system access.
 
 **Note**: This script is automatically executed during deployment via `deploy.sh`. Manual execution is only needed if automatic creation fails or for additional admin users.
 
-### 2. Create Regular User
-```bash
-npm run create-user
-```
-Creates a regular user with limited access.
 
-**Default credentials:**
-- Email: `user@example.com`
-- Password: `UserPassword123`
-- Role: `user`
 
 ### 3. Setup Database
 ```bash
@@ -34,27 +25,6 @@ npm run setup
 ```
 Runs the initial database setup (if available).
 
-### 4. Fix Agent Permissions (Migration)
-```bash
-npm run fix-agent-permissions
-```
-**Purpose**: Fixes agent permissions for existing agents created before the permission system was implemented.
-
-**What it does:**
-- Finds all agents in the database
-- Grants creators access to their own agents (if they don't already have it)
-- Skips admin users (they have access to all agents)
-- Safe to run multiple times
-
-**When to use:**
-- After upgrading to a version with the agent permission fix
-- If users report that agents they created are not showing in their list
-- As a one-time migration after implementing the permission system
-
-**Output:**
-- Shows progress for each agent processed
-- Reports how many permissions were updated
-- Safe to run - won't duplicate permissions
 
 ## User Roles
 
