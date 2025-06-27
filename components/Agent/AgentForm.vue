@@ -763,6 +763,7 @@
 <script setup>
 import { DocumentIcon, LinkIcon, ClipboardIcon } from '@heroicons/vue/24/outline'
 import { useAgentsStore } from '~/stores/agents'
+import { useToast } from 'vue-toastification'
 import RAGSearchUtility from '~/components/Agent/RAGSearchUtility.vue'
 
 // Input sanitization utilities
@@ -961,7 +962,7 @@ const loadAIConnections = async () => {
     updateSelectedModelOption()
   } catch (error) {
     console.error('Failed to load AI connections:', error.message)
-    toast.error('Failed to load AI connections')
+          toast('Failed to load AI connections', { type: 'error' })
   } finally {
     loadingConnections.value = false
   }
@@ -1007,7 +1008,7 @@ const reloadAgentData = async () => {
     emit('agentUpdated', updatedAgent)
   } catch (error) {
     console.error('Failed to reload agent data:', error.message)
-    toast.error('Failed to reload agent data')
+          toast('Failed to reload agent data', { type: 'error' })
   }
 }
 
@@ -1192,14 +1193,14 @@ const addContextUrl = async () => {
   
   try {
     await agentsStore.addContextUrl(props.agent._id, sanitizedUrl)
-    toast.success('URL content added successfully')
+          toast('URL content added successfully', { type: 'success' })
     urlInput.value = ''
     showUrlInput.value = false
     urlTestResult.value = null
     await reloadAgentData()
   } catch (error) {
     console.error('Failed to add URL:', error.message)
-    toast.error(error.message || 'Failed to add URL content')
+          toast(error.message || 'Failed to add URL content', { type: 'error' })
   } finally {
     urlAdding.value = false
   }
@@ -1214,11 +1215,11 @@ const removeContextDocument = async (docId) => {
   
   try {
     await agentsStore.deleteContextDocument(props.agent._id, docId)
-    toast.success('Context document removed successfully')
+          toast('Context document removed successfully', { type: 'success' })
     await reloadAgentData()
   } catch (error) {
     console.error('Failed to remove document:', error.message)
-    toast.error(error.message || 'Failed to remove context document')
+          toast(error.message || 'Failed to remove context document', { type: 'error' })
   } finally {
     deletingDocs.value.delete(docId)
   }
@@ -1291,11 +1292,11 @@ const refreshContextDocument = async (docId) => {
       await agentsStore.refreshContextDocument(props.agent._id, docId)
     }
     
-    toast.success(isWebsite ? 'Website re-crawled successfully' : 'Context document refreshed successfully')
+          toast(isWebsite ? 'Website re-crawled successfully' : 'Context document refreshed successfully', { type: 'success' })
     await reloadAgentData()
   } catch (error) {
     console.error('Failed to refresh document:', error.message)
-    toast.error(error.message || 'Failed to refresh context document')
+          toast(error.message || 'Failed to refresh context document', { type: 'error' })
   } finally {
     refreshingDocs.value.delete(docId)
     if (isWebsite) {
@@ -1329,7 +1330,7 @@ const handleFileUpload = async (event) => {
   // Sanitize filename
   const sanitizedFilename = sanitizeFilename(file.name)
   if (!sanitizedFilename) {
-    toast.error('Invalid filename. Please rename the file and try again.')
+          toast('Invalid filename. Please rename the file and try again.', { type: 'error' })
     event.target.value = ''
     return
   }
@@ -1340,7 +1341,7 @@ const handleFileUpload = async (event) => {
   const fileExtension = sanitizedFilename.toLowerCase().substring(sanitizedFilename.lastIndexOf('.'))
   
   if (!allowedTypes.includes(file.type) && !allowedExtensions.includes(fileExtension)) {
-    toast.error('File type not supported. Please upload PDF, TXT, DOC, or DOCX files.')
+          toast('File type not supported. Please upload PDF, TXT, DOC, or DOCX files.', { type: 'error' })
     event.target.value = '' // Clear the input
     return
   }
@@ -1348,7 +1349,7 @@ const handleFileUpload = async (event) => {
   // Validate file size (10MB limit)
   const maxSize = 10 * 1024 * 1024 // 10MB
   if (file.size > maxSize) {
-    toast.error('File size too large. Maximum allowed size is 10MB.')
+          toast('File size too large. Maximum allowed size is 10MB.', { type: 'error' })
     event.target.value = '' // Clear the input
     return
   }
@@ -1364,7 +1365,7 @@ const handleFileUpload = async (event) => {
     // Upload file with progress tracking
     const response = await agentsStore.uploadContext(props.agent._id, file)
     
-    toast.success(`File "${file.name}" uploaded and processed successfully`)
+          toast(`File "${file.name}" uploaded and processed successfully`, { type: 'success' })
     
     // Clear the file input
     event.target.value = ''
@@ -1374,7 +1375,7 @@ const handleFileUpload = async (event) => {
     
   } catch (error) {
     console.error('File upload failed:', error.message)
-    toast.error(error.message || 'Failed to upload file')
+          toast(error.message || 'Failed to upload file', { type: 'error' })
     event.target.value = '' // Clear the input on error
   } finally {
     fileUploading.value = false
@@ -1505,14 +1506,14 @@ const addContextWebsite = async () => {
         await agentsStore.addContextWebsite(props.agent._id, sanitizedUrl, sanitizedCrawlOptions)
     }
     
-    toast.success('Website content added successfully')
+          toast('Website content added successfully', { type: 'success' })
     websiteInput.value = ''
     showWebsiteInput.value = false
     websiteTestResult.value = null
     await reloadAgentData()
   } catch (error) {
     console.error('Failed to add website:', error.message)
-    toast.error(error.message || 'Failed to add website content')
+          toast(error.message || 'Failed to add website content', { type: 'error' })
   } finally {
     websiteAdding.value = false
     crawlingProgress.isActive = false
@@ -1552,17 +1553,17 @@ const getFullWebhookUrl = (webhookPath) => {
 
 const copyWebhookUrl = async () => {
   if (!props.agent?.webhookUrl) {
-    toast.error('No webhook URL available')
+          toast('No webhook URL available', { type: 'error' })
     return
   }
   
   try {
     const fullUrl = getFullWebhookUrl(props.agent.webhookUrl)
     await navigator.clipboard.writeText(fullUrl)
-    toast.success('Webhook URL copied to clipboard')
+          toast('Webhook URL copied to clipboard', { type: 'success' })
   } catch (error) {
     console.error('Failed to copy webhook URL:', error.message)
-    toast.error('Failed to copy webhook URL')
+          toast('Failed to copy webhook URL', { type: 'error' })
   }
 }
 </script>

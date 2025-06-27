@@ -105,7 +105,7 @@
 <script setup>
 import { PlusIcon, CpuChipIcon } from '@heroicons/vue/24/outline'
 import { useAgentsStore } from '~/stores/agents'
-import { useNuxtApp } from 'nuxt/app'
+import { useToast } from 'vue-toastification'
 
 definePageMeta({
   layout: 'dashboard',
@@ -113,7 +113,7 @@ definePageMeta({
 })
 
 const agentsStore = useAgentsStore()
-const { $toast } = useNuxtApp()
+const toast = useToast()
 
 const fetchAgents = async () => {
   try {
@@ -136,16 +136,10 @@ const deleteAgent = async (agentId) => {
   
   try {
     await agentsStore.deleteAgent(agentId)
-    const toast = useNuxtApp().$toast
-    if (toast) {
-      toast.success('Agent deleted successfully')
-    }
+    toast('Agent deleted successfully', { type: 'success' })
   } catch (error) {
     console.error('Failed to delete agent:', error)
-    const toast = useNuxtApp().$toast
-    if (toast) {
-      toast.error('Failed to delete agent')
-    }
+    toast('Failed to delete agent', { type: 'error' })
   }
 }
 

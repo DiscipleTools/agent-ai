@@ -153,6 +153,8 @@
 </template>
 
 <script setup>
+import { useToast } from 'vue-toastification'
+
 definePageMeta({
   layout: false,
   middleware: 'guest'
@@ -161,6 +163,7 @@ definePageMeta({
 const route = useRoute()
 const { $api } = useApi()
 const router = useRouter()
+const toast = useToast()
 
 // Reactive data
 const loading = ref(true)
@@ -237,9 +240,7 @@ const handleSubmit = async () => {
     }
 
     if (result.success) {
-      // Show success message
-      const { $toast } = useNuxtApp()
-      $toast.success(result.message || 'Account setup completed successfully! Please sign in.')
+      toast(result.message || 'Account setup completed successfully! Please sign in.', { type: 'success' })
 
       // Redirect to login
       await router.push('/login')
@@ -250,9 +251,8 @@ const handleSubmit = async () => {
   } catch (err) {
     console.error('Account setup error:', err)
     
-    const { $toast } = useNuxtApp()
     const errorMessage = err.data?.message || err.message || 'Failed to complete account setup'
-    $toast.error(errorMessage)
+    toast(errorMessage, { type: 'error' })
     
   } finally {
     submitting.value = false

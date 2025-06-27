@@ -26,6 +26,7 @@
 import { ArrowLeftIcon } from '@heroicons/vue/24/outline'
 import { useAgentsStore } from '~/stores/agents'
 import AgentForm from '~/components/Agent/AgentForm.vue'
+import { useToast } from 'vue-toastification'
 
 definePageMeta({
   layout: 'dashboard',
@@ -34,25 +35,19 @@ definePageMeta({
 
 const router = useRouter()
 const agentsStore = useAgentsStore()
+const toast = useToast()
 
 const handleSubmit = async (agentData) => {
   try {
     await agentsStore.createAgent(agentData)
     
-    // Show success message
-    const toast = useNuxtApp().$toast
-    if (toast) {
-      toast.success('Agent created successfully!')
-    }
+    toast('Agent created successfully!', { type: 'success' })
     
     // Navigate back to agents list
     await router.push('/agents')
   } catch (error) {
     console.error('Failed to create agent:', error)
-    const toast = useNuxtApp().$toast
-    if (toast) {
-      toast.error(error.message || 'Failed to create agent')
-    }
+    toast(error.message || 'Failed to create agent', { type: 'error' })
   }
 }
 

@@ -42,6 +42,7 @@
 import { ArrowLeftIcon } from '@heroicons/vue/24/outline'
 import { useAgentsStore } from '~/stores/agents'
 import AgentForm from '~/components/Agent/AgentForm.vue'
+import { useToast } from 'vue-toastification'
 
 definePageMeta({
   layout: 'dashboard',
@@ -51,6 +52,7 @@ definePageMeta({
 const route = useRoute()
 const router = useRouter()
 const agentsStore = useAgentsStore()
+const toast = useToast()
 
 const agent = computed(() => agentsStore.currentAgent)
 
@@ -59,10 +61,7 @@ const fetchAgent = async () => {
     await agentsStore.fetchAgent(route.params.id)
   } catch (error) {
     console.error('Failed to load agent:', error)
-    const toast = useNuxtApp().$toast
-    if (toast) {
-      toast.error('Failed to load agent')
-    }
+    toast('Failed to load agent', { type: 'error' })
   }
 }
 
@@ -70,20 +69,13 @@ const handleSubmit = async (agentData) => {
   try {
     await agentsStore.updateAgent(route.params.id, agentData)
     
-    // Show success message
-    const toast = useNuxtApp().$toast
-    if (toast) {
-      toast.success('Agent updated successfully!')
-    }
+    toast('Agent updated successfully!', { type: 'success' })
     
     // Navigate back to agents list
     await router.push('/agents')
   } catch (error) {
     console.error('Failed to update agent:', error)
-    const toast = useNuxtApp().$toast
-    if (toast) {
-      toast.error(error.message || 'Failed to update agent')
-    }
+    toast(error.message || 'Failed to update agent', { type: 'error' })
   }
 }
 

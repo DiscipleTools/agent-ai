@@ -85,6 +85,7 @@ import UserTable from '~/components/User/UserTable.vue'
 import InviteModal from '~/components/User/InviteModal.vue'
 import UserForm from '~/components/User/UserForm.vue'
 import { useAgentsStore } from '~/stores/agents'
+import { useToast } from 'vue-toastification'
 
 definePageMeta({
   layout: 'dashboard',
@@ -94,6 +95,7 @@ definePageMeta({
 const usersStore = useUsersStore()
 const authStore = useAuthStore()
 const agentsStore = useAgentsStore()
+const toast = useToast()
 
 const showInviteModal = ref(false)
 const showEditModal = ref(false)
@@ -123,16 +125,9 @@ const handleInviteUser = async (userData) => {
     await usersStore.inviteUser(userData)
     showInviteModal.value = false
     
-    // Show success message
-    const toast = useNuxtApp().$toast
-    if (toast) {
-      toast.success('User invited successfully')
-    }
+    toast('User invited successfully', { type: 'success' })
   } catch (error) {
-    const toast = useNuxtApp().$toast
-    if (toast) {
-      toast.error(error.message || 'Failed to invite user')
-    }
+    toast(error.message || 'Failed to invite user', { type: 'error' })
   }
 }
 
@@ -147,15 +142,9 @@ const handleUpdateUser = async (userId, userData) => {
     showEditModal.value = false
     selectedUser.value = null
     
-    const toast = useNuxtApp().$toast
-    if (toast) {
-      toast.success('User updated successfully')
-    }
+    toast('User updated successfully', { type: 'success' })
   } catch (error) {
-    const toast = useNuxtApp().$toast
-    if (toast) {
-      toast.error(error.message || 'Failed to update user')
-    }
+    toast(error.message || 'Failed to update user', { type: 'error' })
   }
 }
 
@@ -167,15 +156,9 @@ const handleDeleteUser = async (userId) => {
   try {
     await usersStore.deleteUser(userId)
     
-    const toast = useNuxtApp().$toast
-    if (toast) {
-      toast.success('User deleted successfully')
-    }
+    toast('User deleted successfully', { type: 'success' })
   } catch (error) {
-    const toast = useNuxtApp().$toast
-    if (toast) {
-      toast.error(error.message || 'Failed to delete user')
-    }
+    toast(error.message || 'Failed to delete user', { type: 'error' })
   }
 }
 
@@ -191,15 +174,9 @@ const handleToggleUserStatus = async (userId) => {
   try {
     await usersStore.toggleUserStatus(userId)
     
-    const toast = useNuxtApp().$toast
-    if (toast) {
-      toast.success(`User ${action}d successfully`)
-    }
+    toast(`User ${action}d successfully`, { type: 'success' })
   } catch (error) {
-    const toast = useNuxtApp().$toast
-    if (toast) {
-      toast.error(error.message || `Failed to ${action} user`)
-    }
+    toast(error.message || `Failed to ${action} user`, { type: 'error' })
   }
 }
 

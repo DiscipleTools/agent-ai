@@ -205,6 +205,7 @@
 
 <script setup>
 import { CheckCircleIcon, ExclamationCircleIcon } from '@heroicons/vue/24/solid'
+import { useToast } from 'vue-toastification'
 
 definePageMeta({
   layout: 'dashboard',
@@ -278,10 +279,10 @@ const updateBasicInfo = async () => {
     })
     
     successMessage.value = 'Profile information updated successfully!'
-    toast.success('Profile updated successfully!')
+    toast('Profile updated successfully!', { type: 'success' })
   } catch (err) {
     error.value = err.message
-    toast.error(err.message)
+    toast(err.message, { type: 'error' })
   }
 }
 
@@ -305,10 +306,10 @@ const updatePassword = async () => {
     passwordForm.confirmPassword = ''
     
     successMessage.value = 'Password changed successfully!'
-    toast.success('Password changed successfully!')
+    toast('Password changed successfully!', { type: 'success' })
   } catch (err) {
     error.value = err.message
-    toast.error(err.message)
+    toast(err.message, { type: 'error' })
   }
 }
 

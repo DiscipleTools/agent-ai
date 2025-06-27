@@ -893,6 +893,8 @@
 </template>
 
 <script setup>
+import { useToast } from 'vue-toastification'
+
 definePageMeta({
   layout: 'dashboard',
   middleware: ['auth', 'admin']
@@ -900,6 +902,7 @@ definePageMeta({
 
 const settingsStore = useSettingsStore()
 const { $api } = useApi()
+const toast = useToast()
 const showApiKey = ref(false)
 
 // AI Connection state
@@ -1047,13 +1050,6 @@ const saveConnection = async () => {
 
   submittingConnection.value = true
 
-  let toast
-  try {
-    toast = useNuxtApp().$toast
-  } catch (e) {
-    console.error('Could not get toast:', e)
-  }
-
   try {
     const connectionData = {
       name: connectionForm.name,
@@ -1069,16 +1065,16 @@ const saveConnection = async () => {
 
     if (editingConnection.value) {
       await settingsStore.updateAIConnection(editingConnection.value._id, connectionData)
-      if (toast) toast.success('AI connection updated successfully!')
+      toast('AI connection updated successfully!', { type: 'success' })
     } else {
       await settingsStore.createAIConnection(connectionData)
-      if (toast) toast.success('AI connection created successfully!')
+      toast('AI connection created successfully!', { type: 'success' })
     }
     
     closeConnectionModal()
   } catch (error) {
     console.error('AI connection save error:', error)
-    if (toast) toast.error(error.message)
+    toast(error.message, { type: 'error' })
   } finally {
     submittingConnection.value = false
   }
@@ -1089,19 +1085,12 @@ const deleteConnection = async (connection) => {
     return
   }
 
-  let toast
-  try {
-    toast = useNuxtApp().$toast
-  } catch (e) {
-    console.error('Could not get toast:', e)
-  }
-
   try {
     await settingsStore.deleteAIConnection(connection._id)
-    if (toast) toast.success('AI connection deleted successfully!')
+    toast('AI connection deleted successfully!', { type: 'success' })
   } catch (error) {
     console.error('AI connection delete error:', error)
-    if (toast) toast.error(error.message)
+    toast(error.message, { type: 'error' })
   }
 }
 
@@ -1111,19 +1100,12 @@ const isDefaultModel = (connectionId, modelId) => {
 }
 
 const setAsDefault = async (connectionId, modelId) => {
-  let toast
-  try {
-    toast = useNuxtApp().$toast
-  } catch (e) {
-    console.error('Could not get toast:', e)
-  }
-
   try {
     await settingsStore.setDefaultAI(connectionId, modelId)
-    if (toast) toast.success('Default AI connection updated!')
+    toast('Default AI connection updated!', { type: 'success' })
   } catch (error) {
     console.error('Set default AI error:', error)
-    if (toast) toast.error(error.message)
+    toast(error.message, { type: 'error' })
   }
 }
 
@@ -1136,12 +1118,6 @@ const toggleConnectionModels = (connectionId) => {
 }
 
 const toggleModelEnabledInMain = async (connection, modelIndex) => {
-  let toast
-  try {
-    toast = useNuxtApp().$toast
-  } catch (e) {
-    console.error('Could not get toast:', e)
-  }
 
   try {
     // Mark this connection as updating
@@ -1166,7 +1142,7 @@ const toggleModelEnabledInMain = async (connection, modelIndex) => {
     
   } catch (error) {
     console.error('Toggle model error:', error)
-    if (toast) toast.error(error.message)
+    toast(error.message, { type: 'error' })
   } finally {
     // Remove loading state
     updatingConnections.value.delete(connection._id)
@@ -1174,12 +1150,6 @@ const toggleModelEnabledInMain = async (connection, modelIndex) => {
 }
 
 const refreshConnectionModels = async (connection) => {
-  let toast
-  try {
-    toast = useNuxtApp().$toast
-  } catch (e) {
-    console.error('Could not get toast:', e)
-  }
 
   try {
     // Mark this connection as updating
@@ -1196,11 +1166,11 @@ const refreshConnectionModels = async (connection) => {
       expandedConnections.value.add(connection._id)
     }
     
-    if (toast) toast.success('Models refreshed successfully!')
+    toast('Models refreshed successfully!', { type: 'success' })
     
   } catch (error) {
     console.error('Refresh models error:', error)
-    if (toast) toast.error(error.message || 'Failed to refresh models')
+    toast(error.message || 'Failed to refresh models', { type: 'error' })
   } finally {
     // Remove loading state
     updatingConnections.value.delete(connection._id)
@@ -1208,12 +1178,6 @@ const refreshConnectionModels = async (connection) => {
 }
 
 const disableAllModels = async (connection) => {
-  let toast
-  try {
-    toast = useNuxtApp().$toast
-  } catch (e) {
-    console.error('Could not get toast:', e)
-  }
 
   try {
     // Mark this connection as updating
@@ -1238,11 +1202,11 @@ const disableAllModels = async (connection) => {
       expandedConnections.value.add(connection._id)
     }
     
-    if (toast) toast.success('All models disabled')
+    toast('All models disabled', { type: 'success' })
     
   } catch (error) {
     console.error('Disable all models error:', error)
-    if (toast) toast.error(error.message || 'Failed to disable all models')
+    toast(error.message || 'Failed to disable all models', { type: 'error' })
   } finally {
     // Remove loading state
     updatingConnections.value.delete(connection._id)
@@ -1250,12 +1214,6 @@ const disableAllModels = async (connection) => {
 }
 
 const enableAllModels = async (connection) => {
-  let toast
-  try {
-    toast = useNuxtApp().$toast
-  } catch (e) {
-    console.error('Could not get toast:', e)
-  }
 
   try {
     // Mark this connection as updating
@@ -1280,11 +1238,11 @@ const enableAllModels = async (connection) => {
       expandedConnections.value.add(connection._id)
     }
     
-    if (toast) toast.success('All models enabled')
+    toast('All models enabled', { type: 'success' })
     
   } catch (error) {
     console.error('Enable all models error:', error)
-    if (toast) toast.error(error.message || 'Failed to enable all models')
+    toast(error.message || 'Failed to enable all models', { type: 'error' })
   } finally {
     // Remove loading state
     updatingConnections.value.delete(connection._id)
@@ -1293,13 +1251,6 @@ const enableAllModels = async (connection) => {
 
 // Email methods
 const handleEmailSubmit = async () => {
-  let toast
-  try {
-    toast = useNuxtApp().$toast
-  } catch (e) {
-    console.error('Could not get toast:', e)
-  }
-
   try {
     const updateData = {
       email: {
@@ -1329,9 +1280,7 @@ const handleEmailSubmit = async () => {
     
     await settingsStore.updateSettings(updateData)
     
-    if (toast) {
-      toast.success('Email settings saved successfully!')
-    }
+    toast('Email settings saved successfully!', { type: 'success' })
     
     // Only clear the password field, don't clear if we're preserving the existing one
     if (emailForm.smtp.pass.trim()) {
@@ -1361,25 +1310,12 @@ const handleEmailSubmit = async () => {
       errorMessage = 'Failed to save email settings'
     }
     
-    if (toast) {
-      try {
-        toast.error(errorMessage)
-      } catch (toastError) {
-        console.error('Could not show toast error:', toastError)
-      }
-    }
+    toast(errorMessage, { type: 'error' })
   }
 }
 
 const testEmailConfiguration = async () => {
   testingEmail.value = true
-  let toast
-  
-  try {
-    toast = useNuxtApp().$toast
-  } catch (e) {
-    console.error('Could not get toast:', e)
-  }
 
   try {
     const { $api } = useApi()
@@ -1387,9 +1323,7 @@ const testEmailConfiguration = async () => {
       method: 'POST'
     })
     
-    if (toast) {
-      toast.success(response.message || 'Email configuration test successful!')
-    }
+    toast(response.message || 'Email configuration test successful!', { type: 'success' })
   } catch (error) {
     console.error('Email test error:', error)
     
@@ -1412,13 +1346,7 @@ const testEmailConfiguration = async () => {
       errorMessage = 'Email configuration test failed'
     }
     
-    if (toast) {
-      try {
-        toast.error(errorMessage)
-      } catch (toastError) {
-        console.error('Could not show toast error:', toastError)
-      }
-    }
+    toast(errorMessage, { type: 'error' })
   } finally {
     testingEmail.value = false
   }
@@ -1438,12 +1366,6 @@ const resetEmailForm = () => {
 
 // Chatwoot methods
 const handleChatwootSubmit = async () => {
-  let toast
-  try {
-    toast = useNuxtApp().$toast
-  } catch (e) {
-    console.error('Could not get toast:', e)
-  }
 
   try {
     const updateData = {
@@ -1460,9 +1382,7 @@ const handleChatwootSubmit = async () => {
     
     await settingsStore.updateSettings(updateData)
     
-    if (toast) {
-      toast.success('Chatwoot settings saved successfully!')
-    }
+    toast('Chatwoot settings saved successfully!', { type: 'success' })
     
     // Clear the API token field after successful save
     if (chatwootForm.apiToken.trim()) {
@@ -1492,13 +1412,7 @@ const handleChatwootSubmit = async () => {
       errorMessage = 'Failed to save Chatwoot settings'
     }
     
-    if (toast) {
-      try {
-        toast.error(errorMessage)
-      } catch (toastError) {
-        console.error('Could not show toast error:', toastError)
-      }
-    }
+    toast(errorMessage, { type: 'error' })
   }
 }
 
@@ -1545,8 +1459,6 @@ const fetchSettings = async () => {
   } catch (error) {
     console.error('Failed to fetch settings:', error)
     if (error && error.message && !error.message.includes('Access token required')) {
-      const { $toast } = useNuxtApp()
-      
       let errorMessage = 'Failed to load settings'
       if (error && typeof error === 'object') {
         if (error.message) {
@@ -1560,7 +1472,7 @@ const fetchSettings = async () => {
         errorMessage = error
       }
       
-      $toast.error(errorMessage)
+      toast(errorMessage, { type: 'error' })
     }
   }
 }
@@ -1573,13 +1485,6 @@ const formatDate = (date) => {
 const checkRAGHealth = async () => {
   checkingRAGHealth.value = true
   ragHealthError.value = null
-  
-  let toast
-  try {
-    toast = useNuxtApp().$toast
-  } catch (e) {
-    console.error('Could not get toast:', e)
-  }
 
   try {
     const { $api } = useApi()
@@ -1614,13 +1519,7 @@ const checkRAGHealth = async () => {
     
     ragHealthError.value = errorMessage
     
-    if (toast) {
-      try {
-        toast.error(errorMessage)
-      } catch (toastError) {
-        console.error('Could not show toast error:', toastError)
-      }
-    }
+    toast(errorMessage, { type: 'error' })
   } finally {
     checkingRAGHealth.value = false
   }

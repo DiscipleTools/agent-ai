@@ -144,12 +144,12 @@ const handleSubmit = async () => {
     const result = await store.submitForm(form)
     console.log('Form submission result:', result)
     
-    toast.success('Form submitted successfully')
+    toast('Form submitted successfully', { type: 'success' })
     // Handle success (redirect, reset form, etc.)
   } catch (err) {
     console.error('Form submission error:', err)
     error.value = err.message || 'Failed to submit form'
-    toast.error(error.value)
+    toast(error.value, { type: 'error' })
   } finally {
     isSubmitting.value = false
   }

@@ -268,6 +268,7 @@
 
 <script setup>
 import { useAgentsStore } from '~/stores/agents'
+import { useToast } from 'vue-toastification'
 
 const props = defineProps({
   agentId: {
@@ -306,14 +307,14 @@ const performSearch = async () => {
     searchResults.value = result
     
     if (result.results.length === 0) {
-      toast.info(`No results found for "${searchQuery.value.trim()}"`)
+              toast(`No results found for "${searchQuery.value.trim()}"`, { type: 'info' })
     } else {
-      toast.success(`Found ${result.results.length} relevant chunks`)
+              toast(`Found ${result.results.length} relevant chunks`, { type: 'success' })
     }
   } catch (error) {
     console.error('RAG search failed:', error)
     searchError.value = error.message || 'Search failed'
-    toast.error(error.message || 'Search failed')
+          toast(error.message || 'Search failed', { type: 'error' })
   } finally {
     searching.value = false
   }
