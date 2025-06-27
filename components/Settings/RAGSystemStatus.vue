@@ -226,7 +226,6 @@ const checkRAGHealth = async () => {
     })
     
     ragHealthStatus.value = response
-    console.log('RAG health check result:', response)
     
   } catch (error) {
     logSafeData(error, 'RAG health check error')

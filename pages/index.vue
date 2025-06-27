@@ -11,49 +11,30 @@
 import { sanitizeErrorMessage } from '~/utils/sanitize.js'
 
 definePageMeta({
-  layout: 'default'
+  layout: 'default',
+  middleware: 'auth'
 })
 
 const authStore = useAuthStore()
-const checking = ref(false)
-
-const isValidToken = (token) => {
-  if (!token || typeof token !== 'string') return false
-  try {
-    const parts = token.split('.')
-    if (parts.length !== 3) return false
-    const payload = JSON.parse(atob(parts[1]))
-    return payload.exp * 1000 > Date.now()
-  } catch {
-    return false
-  }
-}
 
 onMounted(async () => {
-  if (checking.value) return
-  checking.value = true
-
-  const accessToken = useCookie('access-token')
-  
-  // Invalid token - clear and redirect
-  if (!isValidToken(accessToken.value)) {
-    accessToken.value = null
-    await navigateTo('/login')
+  // If user is authenticated, redirect to agents
+  if (authStore.isAuthenticated) {
+    await navigateTo('/agents')
     return
   }
 
-  // No user data - fetch it
+  // If no user data but we made it here (token exists and is valid), fetch user
   if (!authStore.user) {
     try {
       await authStore.fetchUser()
       await navigateTo('/agents')
     } catch (error) {
       console.warn('Auth failed:', sanitizeErrorMessage(error))
+      const accessToken = useCookie('access-token')
       accessToken.value = null
       await navigateTo('/login')
     }
-  } else if (authStore.isAuthenticated) {
-    await navigateTo('/agents')
   } else {
     await navigateTo('/login')
   }
