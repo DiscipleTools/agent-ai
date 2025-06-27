@@ -39,8 +39,8 @@ services:
     security_opt:
       - no-new-privileges:true
     environment:
-      - MONGO_INITDB_ROOT_USERNAME=${MONGO_ROOT_USER:-admin}
-      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_ROOT_PASSWORD:-password}
+      - MONGO_INITDB_ROOT_USERNAME=${MONGO_ROOT_USER}
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_ROOT_PASSWORD}
       - MONGO_INITDB_DATABASE=agent-ai-server
     volumes:
       - mongodb_data:/data/db
@@ -59,9 +59,6 @@ services:
     container_name: agent-ai-qdrant
     security_opt:
       - no-new-privileges:true
-    ports:
-      - "6333:6333"
-      - "6334:6334"
     volumes:
       - qdrant_data:/qdrant/storage
     environment:
