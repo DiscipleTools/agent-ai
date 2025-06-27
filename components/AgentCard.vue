@@ -2,7 +2,7 @@
   <div class="card hover:shadow-lg transition-shadow">
     <div class="flex justify-between items-start mb-4">
       <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
-        {{ agent.name }}
+        {{ sanitizeText(agent.name) }}
       </h3>
       <span 
         :class="[
@@ -17,11 +17,11 @@
     </div>
     
     <p class="text-gray-600 dark:text-gray-300 mb-4 line-clamp-2">
-      {{ agent.description || 'No description provided' }}
+      {{ sanitizeText(agent.description) || 'No description provided' }}
     </p>
     
     <div class="flex items-center justify-between text-sm text-gray-500 dark:text-gray-400 mb-4">
-      <span>Created by {{ agent.createdBy?.name || 'Unknown' }}</span>
+      <span>Created by {{ sanitizeText(agent.createdBy?.name) || 'Unknown' }}</span>
       <span>{{ formatDate(agent.createdAt) }}</span>
     </div>
     
@@ -46,10 +46,19 @@
 </template>
 
 <script setup>
+import { sanitizeText } from '~/utils/sanitize.js'
+
 const props = defineProps({
   agent: {
     type: Object,
-    required: true
+    required: true,
+    validator: (agent) => {
+      return agent && 
+             typeof agent._id === 'string' && 
+             typeof agent.name === 'string' &&
+             agent._id.length > 0 &&
+             agent.name.length > 0
+    }
   }
 })
 
