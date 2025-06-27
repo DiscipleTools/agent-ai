@@ -51,9 +51,13 @@
               v-model="basicForm.name"
               type="text"
               required
+              maxlength="100"
               class="input-field mt-1"
               placeholder="Enter your name"
             />
+            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              Maximum 100 characters
+            </p>
           </div>
 
           <div>
@@ -65,9 +69,13 @@
               v-model="basicForm.email"
               type="email"
               required
+              maxlength="254"
               class="input-field mt-1"
               placeholder="Enter your email"
             />
+            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              Maximum 254 characters
+            </p>
           </div>
 
           <div class="flex justify-end">
@@ -105,8 +113,10 @@
               v-model="passwordForm.currentPassword"
               type="password"
               required
+              maxlength="128"
               class="input-field mt-1"
               placeholder="Enter your current password"
+              autocomplete="current-password"
             />
           </div>
 
@@ -120,11 +130,13 @@
               type="password"
               required
               minlength="8"
+              maxlength="128"
               class="input-field mt-1"
               placeholder="Enter your new password"
+              autocomplete="new-password"
             />
             <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-              Password must be at least 8 characters long
+              Password must be at least 8 characters long (max 128)
             </p>
           </div>
 
@@ -137,9 +149,11 @@
               v-model="passwordForm.confirmPassword"
               type="password"
               required
+              maxlength="128"
               class="input-field mt-1"
               :class="{ 'border-red-500': passwordForm.newPassword && passwordForm.confirmPassword && passwordForm.newPassword !== passwordForm.confirmPassword }"
               placeholder="Confirm your new password"
+              autocomplete="new-password"
             />
             <p v-if="passwordForm.newPassword && passwordForm.confirmPassword && passwordForm.newPassword !== passwordForm.confirmPassword" class="text-xs text-red-600 mt-1">
               Passwords do not match
@@ -206,6 +220,7 @@
 <script setup>
 import { CheckCircleIcon, ExclamationCircleIcon } from '@heroicons/vue/24/solid'
 import { useToast } from 'vue-toastification'
+import { sanitizeText, sanitizeEmail, sanitizeErrorMessage } from '~/utils/sanitize.js'
 
 definePageMeta({
   layout: 'dashboard',
@@ -260,7 +275,8 @@ const isPasswordFormValid = computed(() => {
          passwordForm.newPassword &&
          passwordForm.confirmPassword &&
          passwordForm.newPassword === passwordForm.confirmPassword &&
-         passwordForm.newPassword.length >= 8
+         passwordForm.newPassword.length >= 8 &&
+         passwordForm.newPassword.length <= 128
 })
 
 // Methods
@@ -269,47 +285,102 @@ const clearMessages = () => {
   successMessage.value = ''
 }
 
+const clearPasswordFormSecurely = () => {
+  // Overwrite password fields multiple times for security
+  const overwriteString = '0'.repeat(Math.max(
+    passwordForm.currentPassword.length,
+    passwordForm.newPassword.length,
+    passwordForm.confirmPassword.length,
+    20
+  ))
+  
+  passwordForm.currentPassword = overwriteString
+  passwordForm.newPassword = overwriteString
+  passwordForm.confirmPassword = overwriteString
+  
+  // Clear after a tick to ensure DOM is updated
+  nextTick(() => {
+    passwordForm.currentPassword = ''
+    passwordForm.newPassword = ''
+    passwordForm.confirmPassword = ''
+  })
+}
+
 const updateBasicInfo = async () => {
   clearMessages()
   
+  // Sanitize inputs before submission
+  const sanitizedName = sanitizeText(basicForm.name)
+  const sanitizedEmail = sanitizeEmail(basicForm.email)
+  
+  // Client-side validation
+  if (!sanitizedName.trim()) {
+    error.value = 'Name cannot be empty'
+    return
+  }
+  
+  if (!sanitizedEmail.trim()) {
+    error.value = 'Email cannot be empty'
+    return
+  }
+  
+  // Basic email format validation (additional to browser validation)
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  if (!emailRegex.test(sanitizedEmail)) {
+    error.value = 'Please enter a valid email address'
+    return
+  }
+  
   try {
     await authStore.updateProfile({
-      name: basicForm.name,
-      email: basicForm.email
+      name: sanitizedName,
+      email: sanitizedEmail
     })
     
     successMessage.value = 'Profile information updated successfully!'
     toast('Profile updated successfully!', { type: 'success' })
   } catch (err) {
-    error.value = err.message
-    toast(err.message, { type: 'error' })
+    const sanitizedError = sanitizeErrorMessage(err)
+    error.value = sanitizedError
+    toast(sanitizedError, { type: 'error' })
   }
 }
 
 const updatePassword = async () => {
   clearMessages()
   
+  // Client-side validation
   if (passwordForm.newPassword !== passwordForm.confirmPassword) {
     error.value = 'Passwords do not match'
+    return
+  }
+  
+  if (passwordForm.newPassword.length < 8) {
+    error.value = 'New password must be at least 8 characters long'
+    return
+  }
+  
+  if (passwordForm.newPassword.length > 128) {
+    error.value = 'Password cannot be longer than 128 characters'
     return
   }
   
   try {
     await authStore.updateProfile({
       currentPassword: passwordForm.currentPassword,
-      newPassword: passwordForm.newPassword
+      newPassword: passwordForm.newPassword,
+      confirmPassword: passwordForm.confirmPassword
     })
     
-    // Clear password form
-    passwordForm.currentPassword = ''
-    passwordForm.newPassword = ''
-    passwordForm.confirmPassword = ''
+    // Clear password form securely
+    clearPasswordFormSecurely()
     
     successMessage.value = 'Password changed successfully!'
     toast('Password changed successfully!', { type: 'success' })
   } catch (err) {
-    error.value = err.message
-    toast(err.message, { type: 'error' })
+    const sanitizedError = sanitizeErrorMessage(err)
+    error.value = sanitizedError
+    toast(sanitizedError, { type: 'error' })
   }
 }
 
@@ -324,8 +395,9 @@ const formatDate = (dateString) => {
   })
 }
 
-// Clear messages when component unmounts
+// Clear messages and password form when component unmounts
 onUnmounted(() => {
   clearMessages()
+  clearPasswordFormSecurely()
 })
 </script> 

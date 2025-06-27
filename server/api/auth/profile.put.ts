@@ -14,7 +14,7 @@ export default defineEventHandler(async (event) => {
 
     // Get request body
     const body = await readBody(event)
-    const { name, email, currentPassword, newPassword } = body
+    const { name, email, currentPassword, newPassword, confirmPassword } = body
 
     // Sanitize inputs
     const sanitizedName = name !== undefined ? sanitizeText(name) : undefined
@@ -38,6 +38,21 @@ export default defineEventHandler(async (event) => {
         })
       }
 
+      // Server-side password confirmation validation
+      if (!confirmPassword) {
+        throw createError({
+          statusCode: 400,
+          statusMessage: 'Password confirmation is required'
+        })
+      }
+
+      if (newPassword !== confirmPassword) {
+        throw createError({
+          statusCode: 400,
+          statusMessage: 'New password and confirmation do not match'
+        })
+      }
+
       const isCurrentPasswordValid = await user.comparePassword(currentPassword)
       if (!isCurrentPasswordValid) {
         throw createError({
@@ -54,6 +69,14 @@ export default defineEventHandler(async (event) => {
         })
       }
 
+      // Validate maximum password length
+      if (newPassword.length > 128) {
+        throw createError({
+          statusCode: 400,
+          statusMessage: 'Password cannot be longer than 128 characters'
+        })
+      }
+
       user.password = newPassword // Will be hashed by pre-save hook
     }
 
@@ -65,6 +88,14 @@ export default defineEventHandler(async (event) => {
           statusMessage: 'Name cannot be empty'
         })
       }
+      
+      if (sanitizedName.length > 100) {
+        throw createError({
+          statusCode: 400,
+          statusMessage: 'Name cannot be longer than 100 characters'
+        })
+      }
+      
       user.name = sanitizedName.trim()
     }
 
@@ -76,6 +107,13 @@ export default defineEventHandler(async (event) => {
         throw createError({
           statusCode: 400,
           statusMessage: 'Email cannot be empty'
+        })
+      }
+
+      if (trimmedEmail.length > 254) {
+        throw createError({
+          statusCode: 400,
+          statusMessage: 'Email cannot be longer than 254 characters'
         })
       }
 
