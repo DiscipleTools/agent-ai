@@ -73,6 +73,7 @@ export const useCsrf = () => {
   }
 
   return {
+    getCsrfToken,
     csrfRequest,
     addCsrfToForm
   }

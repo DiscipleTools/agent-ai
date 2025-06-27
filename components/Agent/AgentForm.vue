@@ -262,8 +262,8 @@
               <div class="flex-1 min-w-0">
                 <p class="text-sm font-medium text-gray-900 dark:text-white flex items-baseline">
                   <span class="truncate">{{ doc.type === 'website' ? doc.url : (doc.filename || doc.url) }}</span>
-                  <span v-if="doc.type === 'website' && doc.metadata?.totalPages" class="ml-2 flex-shrink-0 font-normal text-gray-500">
-                    ({{ doc.metadata.totalPages }} pages)
+                  <span v-if="doc.type === 'website' && getSanitizedTotalPages(doc)" class="ml-2 flex-shrink-0 font-normal text-gray-500">
+                    ({{ getSanitizedTotalPages(doc) }} pages)
                   </span>
                 </p>
                 <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500 mt-1">
@@ -397,14 +397,14 @@
                 </h4>
                 <ul v-if="expandedDocs[doc._id].data.metadata.pageUrls?.length" class="max-h-60 overflow-y-auto space-y-1 text-xs text-gray-600 dark:text-gray-400 list-disc list-inside bg-gray-100 dark:bg-gray-800 p-3 rounded-md">
                   <li v-for="url in expandedDocs[doc._id].data.metadata.pageUrls" :key="url" class="break-all">
-                    {{ url }}
+                    {{ sanitizeUrl(url) }}
                   </li>
                 </ul>
                 <p v-else class="text-sm text-gray-500">No scraped URLs found.</p>
               </template>
               <template v-else>
                 <h4 class="text-sm font-medium text-gray-900 dark:text-white">Content</h4>
-                <pre class="text-xs text-gray-700 dark:text-gray-300 whitespace-pre-wrap font-sans bg-gray-100 dark:bg-gray-800 p-3 rounded-md max-h-60 overflow-y-auto">{{ expandedDocs[doc._id].data.content || 'No content available' }}</pre>
+                <pre class="text-xs text-gray-700 dark:text-gray-300 whitespace-pre-wrap font-sans bg-gray-100 dark:bg-gray-800 p-3 rounded-md max-h-60 overflow-y-auto">{{ sanitizeText(expandedDocs[doc._id].data.content || 'No content available') }}</pre>
               </template>
             </div>
           </div>
@@ -775,6 +775,7 @@ import {
   schemas,
   validators
 } from '~/utils/sanitize'
+import { useCsrf } from '~/composables/useCsrf'
 
 const props = defineProps({
   agent: {
@@ -788,6 +789,7 @@ const emit = defineEmits(['submit', 'cancel', 'agentUpdated'])
 // Stores
 const agentsStore = useAgentsStore()
 const toast = useToast()
+const { csrfRequest, addCsrfToForm } = useCsrf()
 
 // Form state
 const form = reactive({
@@ -1076,6 +1078,14 @@ const handleSubmit = async () => {
     if (!agentData.settings.chatwootApiKey) agentData.settings.chatwootApiKey = null
 
     emit('submit', agentData)
+  } catch (error) {
+    // Handle CSRF errors specifically
+    if (error.statusCode === 403 && error.statusMessage?.includes('CSRF')) {
+      toast('Security token expired. Please refresh the page.', { type: 'error' })
+    } else {
+      console.error('Form submission error:', error)
+      toast(error.message || 'Failed to submit form', { type: 'error' })
+    }
   } finally {
     isSubmitting.value = false
   }
@@ -1100,7 +1110,7 @@ const testUrlBeforeAdd = async () => {
       success: false,
       message: 'URL test failed',
       data: { 
-        error: error.message || 'Failed to test URL',
+        error: sanitizeText(error.message || 'Failed to test URL'),
         suggestions: [
           'Check if the URL is correct and publicly accessible',
           'Ensure the website allows automated access',
@@ -1136,8 +1146,8 @@ const addContextUrl = async () => {
 }
 
 const removeContextDocument = async (docId) => {
-  if (!props.agent?._id || !docId) {
-    return
+  if (!props.agent?._id || !docId || deletingDocs.value.has(docId)) {
+    return // Already processing
   }
   
   deletingDocs.value.add(docId)
@@ -1189,13 +1199,13 @@ const refreshContextDocument = async (docId) => {
           (progress) => {
             // Update re-crawl progress state
             Object.assign(reCrawlingProgress, {
-              phase: progress.phase,
-              message: progress.message,
-              currentPage: progress.currentPage || 0,
-              totalPages: progress.totalPages || doc.metadata?.crawlOptions?.maxPages || 10,
-              percentage: progress.percentage || 0,
-              currentUrl: progress.currentUrl || '',
-              docId: docId
+              phase: sanitizeText(progress.phase || ''),
+              message: sanitizeText(progress.message || ''),
+              currentPage: sanitizeNumber(progress.currentPage || 0),
+              totalPages: sanitizeNumber(progress.totalPages || doc.metadata?.crawlOptions?.maxPages || 10),
+              percentage: sanitizeNumber(progress.percentage || 0),
+              currentUrl: sanitizeUrl(progress.currentUrl || ''),
+              docId: sanitizeText(docId)
             })
           }
         )
@@ -1319,8 +1329,8 @@ const testWebsiteBeforeAdd = async () => {
   try {
     // Sanitize crawl options
     const sanitizedCrawlOptions = {
-      maxPages: sanitizeNumber(crawlOptions.maxPages),
-      maxDepth: sanitizeNumber(crawlOptions.maxDepth),
+      maxPages: Math.min(Math.max(sanitizeNumber(crawlOptions.maxPages), 1), 200),
+      maxDepth: Math.min(Math.max(sanitizeNumber(crawlOptions.maxDepth), 1), 5),
       sameDomainOnly: Boolean(crawlOptions.sameDomainOnly)
     }
     
@@ -1334,7 +1344,7 @@ const testWebsiteBeforeAdd = async () => {
       success: false,
       message: 'Website test failed',
       data: { 
-        error: error.message || 'Failed to test website',
+        error: sanitizeText(error.message || 'Failed to test website'),
         suggestions: [
           'Check if the URL is correct and publicly accessible',
           'Ensure the website allows automated access',
@@ -1379,8 +1389,8 @@ const addContextWebsite = async () => {
   
   // Sanitize crawl options
   const sanitizedCrawlOptions = {
-    maxPages: sanitizeNumber(crawlOptions.maxPages),
-    maxDepth: sanitizeNumber(crawlOptions.maxDepth),
+    maxPages: Math.min(Math.max(sanitizeNumber(crawlOptions.maxPages), 1), 200),
+    maxDepth: Math.min(Math.max(sanitizeNumber(crawlOptions.maxDepth), 1), 5),
     sameDomainOnly: Boolean(crawlOptions.sameDomainOnly)
   }
   
@@ -1405,12 +1415,12 @@ const addContextWebsite = async () => {
         (progress) => {
           // Update progress state
           Object.assign(crawlingProgress, {
-            phase: progress.phase,
-            message: progress.message,
-            currentPage: progress.currentPage || 0,
-            totalPages: progress.totalPages || crawlOptions.maxPages,
-            percentage: progress.percentage || 0,
-            currentUrl: progress.currentUrl || ''
+            phase: sanitizeText(progress.phase || ''),
+            message: sanitizeText(progress.message || ''),
+            currentPage: sanitizeNumber(progress.currentPage || 0),
+            totalPages: sanitizeNumber(progress.totalPages || crawlOptions.maxPages),
+            percentage: sanitizeNumber(progress.percentage || 0),
+            currentUrl: sanitizeUrl(progress.currentUrl || '')
           })
         }
       )
@@ -1459,11 +1469,11 @@ const formatContentLength = (length) => {
 
 const getUrlPath = (url) => {
   try {
-    const parsedUrl = new URL(url)
-    return parsedUrl.pathname
+    const parsedUrl = new URL(sanitizeUrl(url))
+    return sanitizeText(parsedUrl.pathname)
   } catch (error) {
     console.error('Failed to parse URL:', error.message)
-    return url
+    return sanitizeText(url)
   }
 }
 
@@ -1490,6 +1500,12 @@ const copyWebhookUrl = async () => {
     console.error('Failed to copy webhook URL:', error.message)
           toast('Failed to copy webhook URL', { type: 'error' })
   }
+}
+
+// Helper function to get sanitized total pages for display
+const getSanitizedTotalPages = (doc) => {
+  if (!doc.metadata?.totalPages) return 0
+  return sanitizeNumber(doc.metadata.totalPages || 0)
 }
 </script>
 

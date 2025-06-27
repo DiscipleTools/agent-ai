@@ -71,8 +71,8 @@ const handleSubmit = async (agentData) => {
     
     toast('Agent updated successfully!', { type: 'success' })
     
-    // Navigate back to agents list
-    await router.push('/agents')
+    // Refresh the agent data to show updated information
+    await fetchAgent()
   } catch (error) {
     console.error('Failed to update agent:', error)
     toast(error.message || 'Failed to update agent', { type: 'error' })
