@@ -1,6 +1,7 @@
 import settingsService from '~/server/services/settingsService'
 import aiService from '~/server/services/aiService'
 import { requireAuth, requireAdmin } from '~/server/utils/auth'
+import { sanitizeText, sanitizeUrl, validators } from '~/utils/sanitize.js'
 
 export default defineEventHandler(async (event) => {
   try {
@@ -11,21 +12,50 @@ export default defineEventHandler(async (event) => {
     const user = event.context.user
     const body = await readBody(event)
 
-    // Validate required fields
-    if (!body.name || !body.apiKey || !body.endpoint) {
-      throw createError({
-        statusCode: 400,
-        statusMessage: 'Name, API key, and endpoint are required'
-      })
+    // Enhanced validation and sanitization
+    const validationErrors = []
+
+    // Validate and sanitize required fields
+    if (!body.name || typeof body.name !== 'string' || body.name.trim().length === 0) {
+      validationErrors.push('Connection name is required')
+    } else {
+      const sanitizedName = sanitizeText(body.name)
+      if (!validators.textLength(sanitizedName, 2, 100)) {
+        validationErrors.push('Connection name must be between 2 and 100 characters')
+      }
+      body.name = sanitizedName
     }
 
-    // Validate endpoint URL format
-    try {
-      new URL(body.endpoint)
-    } catch {
+    if (!body.apiKey || typeof body.apiKey !== 'string' || body.apiKey.trim().length === 0) {
+      validationErrors.push('API key is required')
+    } else if (body.apiKey.length > 512) {
+      validationErrors.push('API key is too long (maximum 512 characters)')
+    }
+
+    if (!body.endpoint || typeof body.endpoint !== 'string' || body.endpoint.trim().length === 0) {
+      validationErrors.push('Endpoint URL is required')
+    } else {
+      const sanitizedEndpoint = sanitizeUrl(body.endpoint)
+      if (!validators.validUrl(sanitizedEndpoint)) {
+        validationErrors.push('Please enter a valid endpoint URL')
+      }
+      body.endpoint = sanitizedEndpoint
+    }
+
+    // Validate optional fields
+    if (body.provider) {
+      const sanitizedProvider = sanitizeText(body.provider)
+      if (!['openai', 'prediction-guard', 'custom'].includes(sanitizedProvider)) {
+        validationErrors.push('Provider must be openai, prediction-guard, or custom')
+      }
+      body.provider = sanitizedProvider
+    }
+
+    // Return validation errors if any
+    if (validationErrors.length > 0) {
       throw createError({
         statusCode: 400,
-        statusMessage: 'Invalid endpoint URL format'
+        statusMessage: validationErrors.join(', ')
       })
     }
 
@@ -38,9 +68,9 @@ export default defineEventHandler(async (event) => {
       })
     }
 
-    // Create new connection
+    // Create new connection (data is already sanitized)
     const newConnection = {
-      name: body.name.trim(),
+      name: body.name,
       apiKey: body.apiKey,
       endpoint: body.endpoint,
       provider: body.provider || 'custom',

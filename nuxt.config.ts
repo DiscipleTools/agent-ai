@@ -65,6 +65,62 @@ export default defineNuxtConfig({
   nitro: {
     experimental: {
       wasm: true
+    },
+    routeRules: {
+      '/**': {
+        headers: {
+          // Content Security Policy
+          'Content-Security-Policy': [
+            "default-src 'self'",
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval'", // unsafe-inline for development, remove in production
+            "style-src 'self' 'unsafe-inline'",
+            "img-src 'self' data: https:",
+            "connect-src 'self'",
+            "font-src 'self'",
+            "object-src 'none'",
+            "media-src 'self'",
+            "frame-src 'none'",
+            "worker-src 'self'",
+            "manifest-src 'self'"
+          ].join('; '),
+          
+          // Additional Security Headers
+          'X-Content-Type-Options': 'nosniff',
+          'X-Frame-Options': 'DENY',
+          'X-XSS-Protection': '1; mode=block',
+          'Referrer-Policy': 'strict-origin-when-cross-origin',
+          'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), payment=()',
+          
+          // HSTS (only in production with HTTPS)
+          ...(process.env.NODE_ENV === 'production' ? {
+            'Strict-Transport-Security': 'max-age=31536000; includeSubDomains; preload'
+          } : {}),
+          
+          // Prevent caching of sensitive pages  
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
+      },
+      // More permissive for API endpoints that need to handle file uploads
+      '/api/agents/*/context/upload': {
+        headers: {
+          'Content-Security-Policy': [
+            "default-src 'self'",
+            "script-src 'self'",
+            "style-src 'self'",
+            "img-src 'self'",
+            "connect-src 'self'",
+            "object-src 'none'"
+          ].join('; ')
+        }
+      },
+      // Allow static assets caching
+      '/_nuxt/**': {
+        headers: {
+          'Cache-Control': 'public, max-age=31536000, immutable'
+        }
+      }
     }
   }
 })

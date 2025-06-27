@@ -1,6 +1,7 @@
 import Settings from '../../models/Settings.js'
 import settingsService from '../../services/settingsService.ts'
 import { requireAuth, requireAdmin } from '../../utils/auth.ts'
+import { sanitizeText, sanitizeEmail, sanitizeUrl, validators } from '~/utils/sanitize.js'
 
 export default defineEventHandler(async (event) => {
   try {
@@ -11,26 +12,126 @@ export default defineEventHandler(async (event) => {
     const user = event.context.user
     const body = await readBody(event)
 
-    // Validate email configuration if provided
+    // Enhanced validation and sanitization
+    const validationErrors = []
+
+    // Validate and sanitize email configuration if provided
     if (body.email) {
       if (body.email.enabled && !body.email.from?.email) {
-        throw createError({
-          statusCode: 400,
-          statusMessage: 'From email address is required when email is enabled'
-        })
+        validationErrors.push('From email address is required when email is enabled')
+      }
+
+      if (body.email.from?.email) {
+        const sanitizedEmail = sanitizeEmail(body.email.from.email)
+        if (!validators.validEmail(sanitizedEmail)) {
+          validationErrors.push('Please enter a valid from email address')
+        }
+        body.email.from.email = sanitizedEmail
+      }
+
+      if (body.email.from?.name) {
+        const sanitizedName = sanitizeText(body.email.from.name)
+        if (!validators.textLength(sanitizedName, 1, 100)) {
+          validationErrors.push('From name must be between 1 and 100 characters')
+        }
+        body.email.from.name = sanitizedName
       }
 
       // Validate SMTP settings
       if (body.email.enabled) {
         const existingSettings = await Settings.findOne()
         const hasExistingSmtpPass = existingSettings?.email?.smtp?.auth?.pass
-        if (!body.email.smtp?.host || !body.email.smtp?.auth?.user || (!hasExistingSmtpPass && !body.email.smtp?.auth?.pass)) {
-          throw createError({
-            statusCode: 400,
-            statusMessage: 'SMTP host and authentication are required when email is enabled'
-          })
+
+        if (body.email.smtp?.host) {
+          const sanitizedHost = sanitizeText(body.email.smtp.host)
+          if (!validators.textLength(sanitizedHost, 1, 255)) {
+            validationErrors.push('SMTP host must be between 1 and 255 characters')
+          }
+          body.email.smtp.host = sanitizedHost
+        } else if (body.email.enabled) {
+          validationErrors.push('SMTP host is required when email is enabled')
+        }
+
+        if (body.email.smtp?.port) {
+          if (!validators.numberRange(body.email.smtp.port, 1, 65535)) {
+            validationErrors.push('SMTP port must be between 1 and 65535')
+          }
+        }
+
+        if (body.email.smtp?.auth?.user) {
+          const sanitizedUser = sanitizeEmail(body.email.smtp.auth.user)
+          if (!validators.validEmail(sanitizedUser)) {
+            validationErrors.push('SMTP username must be a valid email address')
+          }
+          body.email.smtp.auth.user = sanitizedUser
+        } else if (body.email.enabled) {
+          validationErrors.push('SMTP username is required when email is enabled')
+        }
+
+        if (!hasExistingSmtpPass && (!body.email.smtp?.auth?.pass || body.email.smtp.auth.pass.trim().length === 0)) {
+          validationErrors.push('SMTP password is required when email is enabled')
         }
       }
+    }
+
+    // Validate and sanitize Chatwoot configuration if provided
+    if (body.chatwoot) {
+      if (body.chatwoot.url) {
+        const sanitizedUrl = sanitizeUrl(body.chatwoot.url)
+        if (!validators.validUrl(sanitizedUrl)) {
+          validationErrors.push('Please enter a valid Chatwoot URL')
+        }
+        body.chatwoot.url = sanitizedUrl
+      } else if (body.chatwoot.enabled) {
+        validationErrors.push('Chatwoot URL is required when Chatwoot is enabled')
+      }
+
+      // API token validation (don't sanitize, but validate length)
+      if (body.chatwoot.apiToken && body.chatwoot.apiToken.length > 512) {
+        validationErrors.push('Chatwoot API token is too long')
+      }
+    }
+
+    // Validate AI connections if provided
+    if (body.aiConnections && Array.isArray(body.aiConnections)) {
+      body.aiConnections.forEach((connection, index) => {
+        if (connection.name) {
+          const sanitizedName = sanitizeText(connection.name)
+          if (!validators.textLength(sanitizedName, 2, 100)) {
+            validationErrors.push(`AI connection ${index + 1} name must be between 2 and 100 characters`)
+          }
+          connection.name = sanitizedName
+        }
+
+        if (connection.endpoint) {
+          const sanitizedEndpoint = sanitizeUrl(connection.endpoint)
+          if (!validators.validUrl(sanitizedEndpoint)) {
+            validationErrors.push(`AI connection ${index + 1} endpoint must be a valid URL`)
+          }
+          connection.endpoint = sanitizedEndpoint
+        }
+
+        if (connection.provider) {
+          const sanitizedProvider = sanitizeText(connection.provider)
+          if (!['openai', 'prediction-guard', 'custom'].includes(sanitizedProvider)) {
+            validationErrors.push(`AI connection ${index + 1} provider must be openai, prediction-guard, or custom`)
+          }
+          connection.provider = sanitizedProvider
+        }
+
+        // API key validation (don't sanitize, but validate length)
+        if (connection.apiKey && connection.apiKey.length > 512) {
+          validationErrors.push(`AI connection ${index + 1} API key is too long`)
+        }
+      })
+    }
+
+    // Return validation errors if any
+    if (validationErrors.length > 0) {
+      throw createError({
+        statusCode: 400,
+        statusMessage: validationErrors.join(', ')
+      })
     }
 
     // Use the existing settings we already fetched for validation

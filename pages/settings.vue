@@ -23,8 +23,7 @@
         <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-2">
           Failed to load settings
         </h3>
-        <p class="text-gray-600 dark:text-gray-400 mb-4">
-          {{ settingsStore.error }}
+        <p class="text-gray-600 dark:text-gray-400 mb-4" v-text="settingsStore.error">
         </p>
         <button @click="fetchSettings" class="btn-primary">
           Try Again
@@ -61,8 +60,7 @@
             </svg>
             <div>
               <h4 class="font-medium text-green-800 dark:text-green-200">Default AI Connection</h4>
-              <p class="text-sm text-green-600 dark:text-green-300">
-                {{ settingsStore.defaultConnection.connection.name }} - {{ settingsStore.defaultConnection.model?.name || settingsStore.defaultConnection.model?.id }}
+              <p class="text-sm text-green-600 dark:text-green-300" v-text="`${settingsStore.defaultConnection.connection.name} - ${settingsStore.defaultConnection.model?.name || settingsStore.defaultConnection.model?.id}`">
               </p>
             </div>
           </div>
@@ -86,8 +84,8 @@
                   connection.isActive ? 'bg-green-500' : 'bg-gray-400'
                 ]"></div>
                 <div>
-                  <h4 class="font-medium text-gray-900 dark:text-white">{{ connection.name || 'Loading...' }}</h4>
-                  <p class="text-sm text-gray-500 dark:text-gray-400">{{ connection.endpoint || 'Loading...' }}</p>
+                  <h4 class="font-medium text-gray-900 dark:text-white" v-text="connection.name || 'Loading...'"></h4>
+                  <p class="text-sm text-gray-500 dark:text-gray-400" v-text="connection.endpoint || 'Loading...'"></p>
                 </div>
               </div>
               <div class="flex items-center space-x-2">
@@ -417,6 +415,7 @@
                       class="input-field pr-10"
                       :placeholder="hasSmtpPassword ? 'Leave empty to keep current password' : 'Enter SMTP password'"
                       :required="!hasSmtpPassword"
+                      autocomplete="new-password"
                     />
                     <button
                       type="button"
@@ -553,6 +552,7 @@
                   :type="showChatwootApiToken ? 'text' : 'password'"
                   class="input-field pr-10"
                   :placeholder="hasChatwootApiToken ? 'Leave empty to keep current token' : 'Enter global Chatwoot API token'"
+                  autocomplete="new-password"
                 />
                 <button
                   type="button"
@@ -894,6 +894,7 @@
 
 <script setup>
 import { useToast } from 'vue-toastification'
+import { sanitizeText, sanitizeUrl, sanitizeEmail } from '~/utils/sanitize'
 
 definePageMeta({
   layout: 'dashboard',
@@ -956,13 +957,138 @@ const ragHealthError = ref(null)
 const ragHealthLoading = ref(false)
 const checkingRAGHealth = ref(false)
 
+// Real-time input sanitization watchers
+watch(() => connectionForm.name, (newValue) => {
+  const sanitized = sanitizeText(newValue)
+  if (newValue !== sanitized) {
+    connectionForm.name = sanitized
+  }
+})
+
+watch(() => connectionForm.endpoint, (newValue) => {
+  const sanitized = sanitizeUrl(newValue)
+  if (newValue !== sanitized) {
+    connectionForm.endpoint = sanitized
+  }
+})
+
+watch(() => emailForm.fromEmail, (newValue) => {
+  const sanitized = sanitizeEmail(newValue)
+  if (newValue !== sanitized) {
+    emailForm.fromEmail = sanitized
+  }
+})
+
+watch(() => emailForm.fromName, (newValue) => {
+  const sanitized = sanitizeText(newValue)
+  if (newValue !== sanitized) {
+    emailForm.fromName = sanitized
+  }
+})
+
+watch(() => emailForm.smtp.host, (newValue) => {
+  const sanitized = sanitizeText(newValue)
+  if (newValue !== sanitized) {
+    emailForm.smtp.host = sanitized
+  }
+})
+
+watch(() => emailForm.smtp.user, (newValue) => {
+  const sanitized = sanitizeEmail(newValue)
+  if (newValue !== sanitized) {
+    emailForm.smtp.user = sanitized
+  }
+})
+
+watch(() => chatwootForm.url, (newValue) => {
+  const sanitized = sanitizeUrl(newValue)
+  if (newValue !== sanitized) {
+    chatwootForm.url = sanitized
+  }
+})
+
+// Enhanced validation functions
+const validateConnectionForm = () => {
+  const errors = {}
+  
+  if (!connectionForm.name.trim() || connectionForm.name.trim().length < 2) {
+    errors.name = 'Connection name must be at least 2 characters'
+  }
+  
+  if (!connectionForm.endpoint.trim()) {
+    errors.endpoint = 'API endpoint is required'
+  } else {
+    try {
+      const url = new URL(connectionForm.endpoint)
+      if (!['https:', 'http:'].includes(url.protocol)) {
+        errors.endpoint = 'Only HTTP and HTTPS protocols are allowed'
+      }
+    } catch {
+      errors.endpoint = 'Please enter a valid URL'
+    }
+  }
+  
+  if (!editingConnection.value && !connectionForm.apiKey.trim()) {
+    errors.apiKey = 'API key is required for new connections'
+  }
+  
+  return Object.keys(errors).length === 0 ? null : errors
+}
+
+const validateEmailForm = () => {
+  if (!emailForm.enabled) return null
+  
+  const errors = {}
+  
+  if (!emailForm.fromEmail.trim()) {
+    errors.fromEmail = 'From email is required'
+  } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailForm.fromEmail)) {
+    errors.fromEmail = 'Please enter a valid email address'
+  }
+  
+  if (!emailForm.smtp.host.trim()) {
+    errors.smtpHost = 'SMTP host is required'
+  }
+  
+  if (!emailForm.smtp.user.trim()) {
+    errors.smtpUser = 'SMTP username is required'
+  }
+  
+  if (!hasSmtpPassword.value && !emailForm.smtp.pass.trim()) {
+    errors.smtpPass = 'SMTP password is required'
+  }
+  
+  return Object.keys(errors).length === 0 ? null : errors
+}
+
+const validateChatwootForm = () => {
+  if (!chatwootForm.enabled) return null
+  
+  const errors = {}
+  
+  if (!chatwootForm.url.trim()) {
+    errors.url = 'Chatwoot URL is required'
+  } else {
+    try {
+      const url = new URL(chatwootForm.url)
+      if (!['https:', 'http:'].includes(url.protocol)) {
+        errors.url = 'Only HTTP and HTTPS protocols are allowed'
+      }
+    } catch {
+      errors.url = 'Please enter a valid URL'
+    }
+  }
+  
+  return Object.keys(errors).length === 0 ? null : errors
+}
+
 // Computed properties
 const isConnectionFormValid = computed(() => {
-  const hasName = connectionForm.name.trim().length > 0
-  const hasEndpoint = connectionForm.endpoint.trim().length > 0
-  const hasApiKey = connectionForm.apiKey.trim().length > 0 || editingConnection.value
-  
-  return hasName && hasEndpoint && hasApiKey
+  return validateConnectionForm() === null
+})
+
+const connectionFormErrors = computed(() => {
+  return validateConnectionForm() || {}
 })
 
 // Email computed properties
@@ -1007,6 +1133,43 @@ const hasChatwootApiToken = computed(() => {
   return settingsStore.settings?.chatwoot?.apiToken === '***HIDDEN***'
 })
 
+// Utility functions for security
+const logSafeData = (data, label = 'Data') => {
+  const safeData = { ...data }
+  
+  // Mask sensitive fields
+  if (safeData.apiKey) safeData.apiKey = '***MASKED***'
+  if (safeData.password) safeData.password = '***MASKED***'
+  if (safeData.pass) safeData.pass = '***MASKED***'
+  if (safeData.token) safeData.token = '***MASKED***'
+  
+  console.log(label + ':', safeData)
+  return safeData
+}
+
+const sanitizeErrorMessage = (error) => {
+  if (!error) return 'Unknown error occurred'
+  
+  // Extract safe error message
+  let message = 'Operation failed'
+  if (typeof error === 'string') {
+    message = sanitizeText(error)
+  } else if (error.message) {
+    message = sanitizeText(error.message)
+  } else if (error.data?.message) {
+    message = sanitizeText(error.data.message)
+  } else if (error.statusMessage) {
+    message = sanitizeText(error.statusMessage)
+  }
+  
+  // Remove potentially sensitive information
+  return message
+    .replace(/password/gi, 'credentials')
+    .replace(/token/gi, 'authentication')
+    .replace(/key/gi, 'authentication')
+    .substring(0, 200) // Limit length
+}
+
 // AI Connection methods
 const getEndpointPlaceholder = () => {
   switch (connectionForm.provider) {
@@ -1048,17 +1211,25 @@ const saveConnection = async () => {
     return
   }
 
+  // Validate form before submission
+  const validationErrors = validateConnectionForm()
+  if (validationErrors) {
+    const firstError = Object.values(validationErrors)[0]
+    toast(firstError, { type: 'error' })
+    return
+  }
+
   submittingConnection.value = true
 
   try {
     const connectionData = {
-      name: connectionForm.name,
-      provider: connectionForm.provider,
-      endpoint: connectionForm.endpoint,
+      name: sanitizeText(connectionForm.name),
+      provider: sanitizeText(connectionForm.provider),
+      endpoint: sanitizeUrl(connectionForm.endpoint),
       isActive: connectionForm.isActive
     }
     
-    // Only include API key if provided
+    // Only include API key if provided (don't sanitize API keys)
     if (connectionForm.apiKey.trim()) {
       connectionData.apiKey = connectionForm.apiKey
     }
@@ -1073,8 +1244,8 @@ const saveConnection = async () => {
     
     closeConnectionModal()
   } catch (error) {
-    console.error('AI connection save error:', error)
-    toast(error.message, { type: 'error' })
+    logSafeData(error, 'AI connection save error')
+    toast(sanitizeErrorMessage(error), { type: 'error' })
   } finally {
     submittingConnection.value = false
   }
@@ -1089,8 +1260,8 @@ const deleteConnection = async (connection) => {
     await settingsStore.deleteAIConnection(connection._id)
     toast('AI connection deleted successfully!', { type: 'success' })
   } catch (error) {
-    console.error('AI connection delete error:', error)
-    toast(error.message, { type: 'error' })
+    logSafeData(error, 'AI connection delete error')
+    toast(sanitizeErrorMessage(error), { type: 'error' })
   }
 }
 
@@ -1104,8 +1275,8 @@ const setAsDefault = async (connectionId, modelId) => {
     await settingsStore.setDefaultAI(connectionId, modelId)
     toast('Default AI connection updated!', { type: 'success' })
   } catch (error) {
-    console.error('Set default AI error:', error)
-    toast(error.message, { type: 'error' })
+    logSafeData(error, 'Set default AI error')
+    toast(sanitizeErrorMessage(error), { type: 'error' })
   }
 }
 
@@ -1141,8 +1312,8 @@ const toggleModelEnabledInMain = async (connection, modelIndex) => {
     }
     
   } catch (error) {
-    console.error('Toggle model error:', error)
-    toast(error.message, { type: 'error' })
+    logSafeData(error, 'Toggle model error')
+    toast(sanitizeErrorMessage(error), { type: 'error' })
   } finally {
     // Remove loading state
     updatingConnections.value.delete(connection._id)
@@ -1150,6 +1321,12 @@ const toggleModelEnabledInMain = async (connection, modelIndex) => {
 }
 
 const refreshConnectionModels = async (connection) => {
+  try {
+    checkRateLimit('modelRefresh')
+  } catch (error) {
+    toast(error.message, { type: 'warning' })
+    return
+  }
 
   try {
     // Mark this connection as updating
@@ -1169,8 +1346,8 @@ const refreshConnectionModels = async (connection) => {
     toast('Models refreshed successfully!', { type: 'success' })
     
   } catch (error) {
-    console.error('Refresh models error:', error)
-    toast(error.message || 'Failed to refresh models', { type: 'error' })
+    logSafeData(error, 'Refresh models error')
+    toast(sanitizeErrorMessage(error) || 'Failed to refresh models', { type: 'error' })
   } finally {
     // Remove loading state
     updatingConnections.value.delete(connection._id)
@@ -1205,8 +1382,8 @@ const disableAllModels = async (connection) => {
     toast('All models disabled', { type: 'success' })
     
   } catch (error) {
-    console.error('Disable all models error:', error)
-    toast(error.message || 'Failed to disable all models', { type: 'error' })
+    logSafeData(error, 'Disable all models error')
+    toast(sanitizeErrorMessage(error) || 'Failed to disable all models', { type: 'error' })
   } finally {
     // Remove loading state
     updatingConnections.value.delete(connection._id)
@@ -1241,8 +1418,8 @@ const enableAllModels = async (connection) => {
     toast('All models enabled', { type: 'success' })
     
   } catch (error) {
-    console.error('Enable all models error:', error)
-    toast(error.message || 'Failed to enable all models', { type: 'error' })
+    logSafeData(error, 'Enable all models error')
+    toast(sanitizeErrorMessage(error) || 'Failed to enable all models', { type: 'error' })
   } finally {
     // Remove loading state
     updatingConnections.value.delete(connection._id)
@@ -1251,28 +1428,36 @@ const enableAllModels = async (connection) => {
 
 // Email methods
 const handleEmailSubmit = async () => {
+  // Validate form before submission
+  const validationErrors = validateEmailForm()
+  if (validationErrors) {
+    const firstError = Object.values(validationErrors)[0]
+    toast(firstError, { type: 'error' })
+    return
+  }
+
   try {
     const updateData = {
       email: {
         enabled: emailForm.enabled,
         from: {
-          email: emailForm.fromEmail,
-          name: emailForm.fromName
+          email: sanitizeEmail(emailForm.fromEmail),
+          name: sanitizeText(emailForm.fromName)
         }
       }
     }
     
     if (emailForm.enabled) {
       updateData.email.smtp = {
-        host: emailForm.smtp.host,
+        host: sanitizeText(emailForm.smtp.host),
         port: emailForm.smtp.port,
         secure: emailForm.smtp.secure,
         auth: {
-          user: emailForm.smtp.user
+          user: sanitizeEmail(emailForm.smtp.user)
         }
       }
       
-      // Only include password if one is provided, otherwise preserve existing
+      // Only include password if one is provided, otherwise preserve existing (don't sanitize passwords)
       if (emailForm.smtp.pass.trim()) {
         updateData.email.smtp.auth.pass = emailForm.smtp.pass
       }
@@ -1289,32 +1474,21 @@ const handleEmailSubmit = async () => {
     showSmtpPassword.value = false
     
   } catch (error) {
-    console.error('Email settings save error:', error)
-    
-    let errorMessage = 'Failed to save email settings'
-    
-    try {
-      if (error && typeof error === 'object') {
-        if (typeof error.message === 'string') {
-          errorMessage = error.message
-        } else if (error.data && typeof error.data.message === 'string') {
-          errorMessage = error.data.message
-        } else if (typeof error.statusMessage === 'string') {
-          errorMessage = error.statusMessage
-        }
-      } else if (typeof error === 'string') {
-        errorMessage = error
-      }
-    } catch (parseError) {
-      console.error('Error parsing error:', parseError)
-      errorMessage = 'Failed to save email settings'
-    }
-    
-    toast(errorMessage, { type: 'error' })
+    logSafeData(error, 'Email settings save error')
+    toast(sanitizeErrorMessage(error) || 'Failed to save email settings', { type: 'error' })
   }
 }
 
 const testEmailConfiguration = async () => {
+  try {
+    checkRateLimit('emailTest')
+  } catch (error) {
+    toast(error.message, { type: 'warning' })
+    return
+  }
+
+  if (testingEmail.value) return // Prevent multiple concurrent tests
+  
   testingEmail.value = true
 
   try {
@@ -1325,28 +1499,8 @@ const testEmailConfiguration = async () => {
     
     toast(response.message || 'Email configuration test successful!', { type: 'success' })
   } catch (error) {
-    console.error('Email test error:', error)
-    
-    let errorMessage = 'Email configuration test failed'
-    
-    try {
-      if (error && typeof error === 'object') {
-        if (typeof error.message === 'string') {
-          errorMessage = error.message
-        } else if (error.data && typeof error.data.message === 'string') {
-          errorMessage = error.data.message
-        } else if (typeof error.statusMessage === 'string') {
-          errorMessage = error.statusMessage
-        }
-      } else if (typeof error === 'string') {
-        errorMessage = error
-      }
-    } catch (parseError) {
-      console.error('Error parsing error:', parseError)
-      errorMessage = 'Email configuration test failed'
-    }
-    
-    toast(errorMessage, { type: 'error' })
+    logSafeData(error, 'Email test error')
+    toast(sanitizeErrorMessage(error) || 'Email configuration test failed', { type: 'error' })
   } finally {
     testingEmail.value = false
   }
@@ -1366,16 +1520,23 @@ const resetEmailForm = () => {
 
 // Chatwoot methods
 const handleChatwootSubmit = async () => {
+  // Validate form before submission
+  const validationErrors = validateChatwootForm()
+  if (validationErrors) {
+    const firstError = Object.values(validationErrors)[0]
+    toast(firstError, { type: 'error' })
+    return
+  }
 
   try {
     const updateData = {
       chatwoot: {
         enabled: chatwootForm.enabled,
-        url: chatwootForm.url
+        url: sanitizeUrl(chatwootForm.url)
       }
     }
     
-    // Only include API token if one is provided, otherwise preserve existing
+    // Only include API token if one is provided, otherwise preserve existing (don't sanitize API tokens)
     if (chatwootForm.apiToken.trim()) {
       updateData.chatwoot.apiToken = chatwootForm.apiToken
     }
@@ -1391,28 +1552,8 @@ const handleChatwootSubmit = async () => {
     showChatwootApiToken.value = false
     
   } catch (error) {
-    console.error('Chatwoot settings error:', error)
-    
-    let errorMessage = 'Failed to save Chatwoot settings'
-    
-    try {
-      if (error && typeof error === 'object') {
-        if (typeof error.message === 'string') {
-          errorMessage = error.message
-        } else if (error.data && typeof error.data.message === 'string') {
-          errorMessage = error.data.message
-        } else if (typeof error.statusMessage === 'string') {
-          errorMessage = error.statusMessage
-        }
-      } else if (typeof error === 'string') {
-        errorMessage = error
-      }
-    } catch (parseError) {
-      console.error('Error parsing error:', parseError)
-      errorMessage = 'Failed to save Chatwoot settings'
-    }
-    
-    toast(errorMessage, { type: 'error' })
+    logSafeData(error, 'Chatwoot settings error')
+    toast(sanitizeErrorMessage(error) || 'Failed to save Chatwoot settings', { type: 'error' })
   }
 }
 
@@ -1457,22 +1598,9 @@ const fetchSettings = async () => {
       }
     }
   } catch (error) {
-    console.error('Failed to fetch settings:', error)
+    logSafeData(error, 'Failed to fetch settings')
     if (error && error.message && !error.message.includes('Access token required')) {
-      let errorMessage = 'Failed to load settings'
-      if (error && typeof error === 'object') {
-        if (error.message) {
-          errorMessage = error.message
-        } else if (error.data && error.data.message) {
-          errorMessage = error.data.message
-        } else if (error.statusMessage) {
-          errorMessage = error.statusMessage
-        }
-      } else if (typeof error === 'string') {
-        errorMessage = error
-      }
-      
-      toast(errorMessage, { type: 'error' })
+      toast(sanitizeErrorMessage(error) || 'Failed to load settings', { type: 'error' })
     }
   }
 }
@@ -1481,8 +1609,35 @@ const formatDate = (date) => {
   return new Date(date).toLocaleString()
 }
 
+// Rate limiting for expensive operations
+const rateLimiters = {
+  ragHealth: { lastCall: 0, minInterval: 5000 }, // 5 seconds
+  emailTest: { lastCall: 0, minInterval: 10000 }, // 10 seconds
+  modelRefresh: { lastCall: 0, minInterval: 3000 } // 3 seconds
+}
+
+const checkRateLimit = (operation) => {
+  const now = Date.now()
+  const limiter = rateLimiters[operation]
+  
+  if (now - limiter.lastCall < limiter.minInterval) {
+    const waitTime = Math.ceil((limiter.minInterval - (now - limiter.lastCall)) / 1000)
+    throw new Error(`Please wait ${waitTime} seconds before trying again`)
+  }
+  
+  limiter.lastCall = now
+  return true
+}
+
 // RAG health check methods
 const checkRAGHealth = async () => {
+  try {
+    checkRateLimit('ragHealth')
+  } catch (error) {
+    toast(error.message, { type: 'warning' })
+    return
+  }
+
   checkingRAGHealth.value = true
   ragHealthError.value = null
 
@@ -1496,29 +1651,10 @@ const checkRAGHealth = async () => {
     console.log('RAG health check result:', response)
     
   } catch (error) {
-    console.error('RAG health check error:', error)
+    logSafeData(error, 'RAG health check error')
     
-    let errorMessage = 'Failed to check RAG health status'
-    
-    try {
-      if (error && typeof error === 'object') {
-        if (typeof error.message === 'string') {
-          errorMessage = error.message
-        } else if (error.data && typeof error.data.message === 'string') {
-          errorMessage = error.data.message
-        } else if (typeof error.statusMessage === 'string') {
-          errorMessage = error.statusMessage
-        }
-      } else if (typeof error === 'string') {
-        errorMessage = error
-      }
-    } catch (parseError) {
-      console.error('Error parsing error:', parseError)
-      errorMessage = 'Failed to check RAG health status'
-    }
-    
+    const errorMessage = sanitizeErrorMessage(error) || 'Failed to check RAG health status'
     ragHealthError.value = errorMessage
-    
     toast(errorMessage, { type: 'error' })
   } finally {
     checkingRAGHealth.value = false
