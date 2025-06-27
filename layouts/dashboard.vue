@@ -50,16 +50,16 @@
               <div class="flex-shrink-0">
                 <div class="w-10 h-10 bg-primary-100 dark:bg-primary-900 rounded-full flex items-center justify-center group-hover:bg-primary-200 dark:group-hover:bg-primary-800 transition-colors">
                   <span class="text-sm font-medium text-primary-600 dark:text-primary-400">
-                    {{ authStore.user?.name?.charAt(0).toUpperCase() }}
+                    {{ sanitizedUser?.initial }}
                   </span>
                 </div>
               </div>
               <div class="ml-3 flex-1 min-w-0">
                 <p class="text-sm font-medium text-gray-900 dark:text-white truncate group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">
-                  {{ authStore.user?.name }}
+                  {{ sanitizedUser?.name }}
                 </p>
                 <p class="text-xs text-gray-500 dark:text-gray-400 truncate">
-                  {{ authStore.user?.email }}
+                  {{ sanitizedUser?.email }}
                 </p>
               </div>
             </NuxtLink>
@@ -120,16 +120,16 @@
                 <div class="flex-shrink-0">
                   <div class="w-10 h-10 bg-primary-100 dark:bg-primary-900 rounded-full flex items-center justify-center group-hover:bg-primary-200 dark:group-hover:bg-primary-800 transition-colors">
                     <span class="text-sm font-medium text-primary-600 dark:text-primary-400">
-                      {{ authStore.user?.name?.charAt(0).toUpperCase() }}
+                      {{ sanitizedUser?.initial }}
                     </span>
                   </div>
                 </div>
                 <div class="ml-3 flex-1 min-w-0">
                   <p class="text-sm font-medium text-gray-900 dark:text-white truncate group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">
-                    {{ authStore.user?.name }}
+                    {{ sanitizedUser?.name }}
                   </p>
                   <p class="text-xs text-gray-500 dark:text-gray-400 truncate">
-                    {{ authStore.user?.role === 'admin' ? 'Administrator' : 'User' }}
+                    {{ sanitizedUser?.role === 'admin' ? 'Administrator' : 'User' }}
                   </p>
                 </div>
               </NuxtLink>
@@ -239,6 +239,7 @@ import {
   MoonIcon,
   ChevronRightIcon
 } from '@heroicons/vue/24/outline'
+import { sanitizeText, sanitizeEmail } from '~/utils/sanitize.js'
 
 const authStore = useAuthStore()
 const agentsStore = useAgentsStore()
@@ -246,6 +247,19 @@ const colorMode = useColorMode()
 const route = useRoute()
 
 const mobileMenuOpen = ref(false)
+
+// Sanitized user data for secure display
+const sanitizedUser = computed(() => {
+  const user = authStore.user
+  if (!user) return null
+  
+  return {
+    name: sanitizeText(user.name || ''),
+    email: sanitizeEmail(user.email || ''),
+    role: sanitizeText(user.role || ''),
+    initial: sanitizeText(user.name || '').charAt(0).toUpperCase() || '?'
+  }
+})
 
 const navigation = computed(() => [
   { 
