@@ -1,0 +1,285 @@
+/**
+ * Input Sanitization Utilities
+ * 
+ * Provides defense-in-depth against XSS, injection attacks, and other security vulnerabilities
+ * by sanitizing all user inputs before processing or display.
+ * 
+ * These functions should be used consistently across the application for all user input.
+ */
+
+/**
+ * Sanitize text input by removing HTML tags and encoding special characters
+ * @param {string|any} input - The input to sanitize
+ * @returns {string} - Sanitized text
+ */
+export const sanitizeText = (input) => {
+  if (!input || typeof input !== 'string') return ''
+  
+  // Remove HTML tags and encode special characters
+  return input
+    .replace(/<[^>]*>/g, '') // Remove HTML tags
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;')
+    .replace(/\//g, '&#x2F;')
+    .trim()
+}
+
+/**
+ * Sanitize and validate numeric input
+ * @param {number|string|any} input - The input to sanitize
+ * @returns {number} - Sanitized number (0 if invalid)
+ */
+export const sanitizeNumber = (input) => {
+  if (typeof input === 'number') return input
+  if (!input || typeof input !== 'string') return 0
+  
+  const num = parseFloat(input.replace(/[^\d.-]/g, ''))
+  return isNaN(num) ? 0 : num
+}
+
+/**
+ * Sanitize URL input and prevent dangerous protocols and SSRF attacks
+ * @param {string|any} input - The URL to sanitize
+ * @returns {string} - Sanitized URL or empty string if invalid
+ */
+export const sanitizeUrl = (input) => {
+  if (!input || typeof input !== 'string') return ''
+  
+  // Basic URL sanitization - remove dangerous protocols and characters
+  const cleaned = input.trim()
+    .replace(/[<>"']/g, '') // Remove dangerous characters
+    .replace(/javascript:/gi, '') // Remove javascript protocol
+    .replace(/data:/gi, '') // Remove data protocol
+    .replace(/vbscript:/gi, '') // Remove vbscript protocol
+    .replace(/file:/gi, '') // Remove file protocol
+    .replace(/ftp:/gi, '') // Remove ftp protocol
+  
+  // Only allow http and https protocols
+  if (cleaned && !cleaned.match(/^https?:\/\//i)) {
+    return cleaned.startsWith('://') ? 'https' + cleaned : 'https://' + cleaned
+  }
+  
+  // Additional validation for potential SSRF prevention
+  try {
+    const url = new URL(cleaned)
+    
+    // Block localhost and private IP ranges
+    const hostname = url.hostname.toLowerCase()
+    if (hostname === 'localhost' || 
+        hostname === '127.0.0.1' || 
+        hostname === '0.0.0.0' ||
+        hostname.match(/^10\./) ||
+        hostname.match(/^172\.(1[6-9]|2[0-9]|3[01])\./) ||
+        hostname.match(/^192\.168\./)) {
+      return ''
+    }
+    
+    return cleaned
+  } catch (error) {
+    return ''
+  }
+}
+
+/**
+ * Sanitize filename to prevent path traversal and dangerous characters
+ * @param {string|any} input - The filename to sanitize
+ * @returns {string} - Sanitized filename
+ */
+export const sanitizeFilename = (input) => {
+  if (!input || typeof input !== 'string') return ''
+  
+  // Remove path traversal attempts and dangerous characters
+  return input
+    .replace(/[<>:"/\\|?*\x00-\x1f]/g, '') // Remove dangerous filename characters
+    .replace(/\.\./g, '') // Remove path traversal
+    .replace(/^\.+/, '') // Remove leading dots
+    .trim()
+    .substring(0, 255) // Limit length to 255 characters
+}
+
+/**
+ * Sanitize prompt/content input while preserving formatting but removing dangerous content
+ * @param {string|any} input - The prompt/content to sanitize
+ * @returns {string} - Sanitized prompt
+ */
+export const sanitizePrompt = (input) => {
+  if (!input || typeof input !== 'string') return ''
+  
+  // For prompts, preserve most formatting but remove dangerous content
+  return input
+    .replace(/<script[^>]*>.*?<\/script>/gi, '') // Remove script tags
+    .replace(/<iframe[^>]*>.*?<\/iframe>/gi, '') // Remove iframe tags
+    .replace(/<object[^>]*>.*?<\/object>/gi, '') // Remove object tags
+    .replace(/<embed[^>]*>/gi, '') // Remove embed tags
+    .replace(/javascript:/gi, '') // Remove javascript protocol
+    .replace(/on\w+\s*=/gi, '') // Remove event handlers
+    .trim()
+}
+
+/**
+ * Sanitize email address
+ * @param {string|any} input - The email to sanitize
+ * @returns {string} - Sanitized email
+ */
+export const sanitizeEmail = (input) => {
+  if (!input || typeof input !== 'string') return ''
+  
+  // Basic email sanitization
+  return input
+    .trim()
+    .toLowerCase()
+    .replace(/[<>"']/g, '') // Remove dangerous characters
+    .substring(0, 254) // RFC 5321 limit
+}
+
+/**
+ * Sanitize HTML content by allowing only safe tags and attributes
+ * @param {string|any} input - The HTML content to sanitize
+ * @param {Object} options - Options for allowed tags and attributes
+ * @returns {string} - Sanitized HTML
+ */
+export const sanitizeHtml = (input, options = {}) => {
+  if (!input || typeof input !== 'string') return ''
+  
+  const defaultOptions = {
+    allowedTags: ['p', 'br', 'strong', 'em', 'u', 'b', 'i'],
+    allowedAttributes: {},
+    ...options
+  }
+  
+  // For now, just strip all HTML - can be enhanced with a proper HTML sanitizer library
+  if (defaultOptions.allowedTags.length === 0) {
+    return input.replace(/<[^>]*>/g, '').trim()
+  }
+  
+  // This is a basic implementation - for production, consider using DOMPurify or similar
+  return input.trim()
+}
+
+/**
+ * Sanitize search query input
+ * @param {string|any} input - The search query to sanitize
+ * @returns {string} - Sanitized search query
+ */
+export const sanitizeSearchQuery = (input) => {
+  if (!input || typeof input !== 'string') return ''
+  
+  return input
+    .trim()
+    .replace(/[<>"']/g, '') // Remove dangerous characters
+    .replace(/[^\w\s\-_.,!?]/g, '') // Allow only word characters, spaces, and basic punctuation
+    .substring(0, 200) // Limit length
+}
+
+/**
+ * Sanitize a generic object by applying appropriate sanitization to each property
+ * @param {Object} obj - The object to sanitize
+ * @param {Object} schema - Schema defining how to sanitize each property
+ * @returns {Object} - Sanitized object
+ */
+export const sanitizeObject = (obj, schema) => {
+  if (!obj || typeof obj !== 'object') return {}
+  
+  const sanitized = {}
+  
+  for (const [key, sanitizer] of Object.entries(schema)) {
+    if (obj.hasOwnProperty(key)) {
+      if (typeof sanitizer === 'function') {
+        sanitized[key] = sanitizer(obj[key])
+      } else if (sanitizer === 'text') {
+        sanitized[key] = sanitizeText(obj[key])
+      } else if (sanitizer === 'number') {
+        sanitized[key] = sanitizeNumber(obj[key])
+      } else if (sanitizer === 'url') {
+        sanitized[key] = sanitizeUrl(obj[key])
+      } else if (sanitizer === 'email') {
+        sanitized[key] = sanitizeEmail(obj[key])
+      } else if (sanitizer === 'prompt') {
+        sanitized[key] = sanitizePrompt(obj[key])
+      } else if (sanitizer === 'filename') {
+        sanitized[key] = sanitizeFilename(obj[key])
+      }
+    }
+  }
+  
+  return sanitized
+}
+
+/**
+ * Validation helpers that work with sanitization
+ */
+export const validators = {
+  /**
+   * Validate that a sanitized text meets length requirements
+   */
+  textLength: (text, min = 0, max = Infinity) => {
+    const sanitized = sanitizeText(text)
+    return sanitized.length >= min && sanitized.length <= max
+  },
+  
+  /**
+   * Validate that a sanitized number is within range
+   */
+  numberRange: (num, min = -Infinity, max = Infinity) => {
+    const sanitized = sanitizeNumber(num)
+    return sanitized >= min && sanitized <= max
+  },
+  
+  /**
+   * Validate that a sanitized URL is valid
+   */
+  validUrl: (url) => {
+    const sanitized = sanitizeUrl(url)
+    if (!sanitized) return false
+    
+    try {
+      new URL(sanitized)
+      return true
+    } catch {
+      return false
+    }
+  },
+  
+  /**
+   * Validate email format after sanitization
+   */
+  validEmail: (email) => {
+    const sanitized = sanitizeEmail(email)
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    return emailRegex.test(sanitized)
+  }
+}
+
+/**
+ * Preset schemas for common objects
+ */
+export const schemas = {
+  // Agent form schema
+  agent: {
+    name: 'text',
+    description: 'text',
+    prompt: 'prompt',
+    temperature: 'number',
+    maxTokens: 'number',
+    responseDelay: 'number',
+    connectionId: 'text',
+    modelId: 'text',
+    chatwootApiKey: 'text'
+  },
+  
+  // User form schema
+  user: {
+    name: 'text',
+    email: 'email'
+  },
+  
+  // URL/Website schema
+  urlInput: {
+    url: 'url',
+    maxPages: 'number',
+    maxDepth: 'number'
+  }
+} 

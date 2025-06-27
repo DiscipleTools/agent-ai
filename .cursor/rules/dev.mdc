@@ -81,10 +81,10 @@ const handleSubmit = async () => {
   try {
     const result = await store.submitData(form)
     console.log('Submit result:', result) // DEBUG
-    toast.success('Success!')
+    toast('Success!', { type: 'success' })
   } catch (err) {
     error.value = err.message
-    toast.error(err.message)
+    toast(err.message, { type: 'error' })
   } finally {
     loading.value = false
   }

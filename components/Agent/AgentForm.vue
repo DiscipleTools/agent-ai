@@ -765,96 +765,16 @@ import { DocumentIcon, LinkIcon, ClipboardIcon } from '@heroicons/vue/24/outline
 import { useAgentsStore } from '~/stores/agents'
 import { useToast } from 'vue-toastification'
 import RAGSearchUtility from '~/components/Agent/RAGSearchUtility.vue'
-
-// Input sanitization utilities
-// These functions provide defense-in-depth against XSS and injection attacks
-// by sanitizing all user inputs before processing or display
-const sanitizeText = (input) => {
-  if (!input || typeof input !== 'string') return ''
-  
-  // Remove HTML tags and encode special characters
-  return input
-    .replace(/<[^>]*>/g, '') // Remove HTML tags
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#x27;')
-    .replace(/\//g, '&#x2F;')
-    .trim()
-}
-
-const sanitizeNumber = (input) => {
-  if (typeof input === 'number') return input
-  if (!input || typeof input !== 'string') return 0
-  
-  const num = parseFloat(input.replace(/[^\d.-]/g, ''))
-  return isNaN(num) ? 0 : num
-}
-
-const sanitizeUrl = (input) => {
-  if (!input || typeof input !== 'string') return ''
-  
-  // Basic URL sanitization - remove dangerous protocols and clean
-  const cleaned = input.trim()
-    .replace(/[<>"']/g, '') // Remove dangerous characters
-    .replace(/javascript:/gi, '') // Remove javascript protocol
-    .replace(/data:/gi, '') // Remove data protocol
-    .replace(/vbscript:/gi, '') // Remove vbscript protocol
-    .replace(/file:/gi, '') // Remove file protocol
-    .replace(/ftp:/gi, '') // Remove ftp protocol
-  
-  // Only allow http and https protocols
-  if (cleaned && !cleaned.match(/^https?:\/\//i)) {
-    return cleaned.startsWith('://') ? 'https' + cleaned : 'https://' + cleaned
-  }
-  
-  // Additional validation for potential SSRF prevention
-  try {
-    const url = new URL(cleaned)
-    
-    // Block localhost and private IP ranges
-    const hostname = url.hostname.toLowerCase()
-    if (hostname === 'localhost' || 
-        hostname === '127.0.0.1' || 
-        hostname === '0.0.0.0' ||
-        hostname.match(/^10\./) ||
-        hostname.match(/^172\.(1[6-9]|2[0-9]|3[01])\./) ||
-        hostname.match(/^192\.168\./)) {
-      return ''
-    }
-    
-    return cleaned
-  } catch (error) {
-    return ''
-  }
-}
-
-const sanitizeFilename = (input) => {
-  if (!input || typeof input !== 'string') return ''
-  
-  // Remove path traversal attempts and dangerous characters
-  return input
-    .replace(/[<>:"/\\|?*\x00-\x1f]/g, '') // Remove dangerous filename characters
-    .replace(/\.\./g, '') // Remove path traversal
-    .replace(/^\.+/, '') // Remove leading dots
-    .trim()
-    .substring(0, 255) // Limit length
-}
-
-const sanitizePrompt = (input) => {
-  if (!input || typeof input !== 'string') return ''
-  
-  // For prompts, we want to preserve most formatting but remove dangerous content
-  return input
-    .replace(/<script[^>]*>.*?<\/script>/gi, '') // Remove script tags
-    .replace(/<iframe[^>]*>.*?<\/iframe>/gi, '') // Remove iframe tags
-    .replace(/<object[^>]*>.*?<\/object>/gi, '') // Remove object tags
-    .replace(/<embed[^>]*>/gi, '') // Remove embed tags
-    .replace(/javascript:/gi, '') // Remove javascript protocol
-    .replace(/on\w+\s*=/gi, '') // Remove event handlers
-    .trim()
-}
+import { 
+  sanitizeText, 
+  sanitizeNumber, 
+  sanitizeUrl, 
+  sanitizeFilename, 
+  sanitizePrompt,
+  sanitizeObject,
+  schemas,
+  validators
+} from '~/utils/sanitize'
 
 const props = defineProps({
   agent: {
@@ -1074,46 +994,49 @@ watch(() => websiteInput.value, (newValue) => {
   }
 })
 
-// Validation
+// Validation using the sanitization library
 const validateForm = () => {
   const newErrors = {}
 
-  // Sanitize and validate name
-  const sanitizedName = sanitizeText(form.name)
-  if (!sanitizedName) {
-    newErrors.name = 'Agent name is required'
-  } else if (sanitizedName.length > 100) {
-    newErrors.name = 'Agent name cannot exceed 100 characters'
-  } else if (sanitizedName.length < 2) {
-    newErrors.name = 'Agent name must be at least 2 characters long'
+  // Validate name using validators
+  if (!validators.textLength(form.name, 2, 100)) {
+    const sanitizedName = sanitizeText(form.name)
+    if (!sanitizedName) {
+      newErrors.name = 'Agent name is required'
+    } else if (sanitizedName.length < 2) {
+      newErrors.name = 'Agent name must be at least 2 characters long'
+    } else if (sanitizedName.length > 100) {
+      newErrors.name = 'Agent name cannot exceed 100 characters'
+    }
   }
 
-  // Sanitize and validate prompt
-  const sanitizedPrompt = sanitizePrompt(form.prompt)
-  if (!sanitizedPrompt) {
-    newErrors.prompt = 'System prompt is required'
-  } else if (sanitizedPrompt.length < 10) {
-    newErrors.prompt = 'Prompt must be at least 10 characters long'
-  } else if (sanitizedPrompt.length > 2000) {
-    newErrors.prompt = 'Prompt cannot exceed 2000 characters'
+  // Validate prompt using validators
+  if (!validators.textLength(form.prompt, 10, 2000)) {
+    const sanitizedPrompt = sanitizePrompt(form.prompt)
+    if (!sanitizedPrompt) {
+      newErrors.prompt = 'System prompt is required'
+    } else if (sanitizedPrompt.length < 10) {
+      newErrors.prompt = 'Prompt must be at least 10 characters long'
+    } else if (sanitizedPrompt.length > 2000) {
+      newErrors.prompt = 'Prompt cannot exceed 2000 characters'
+    }
   }
 
-  // Sanitize and validate description
-  const sanitizedDescription = sanitizeText(form.description)
-  if (sanitizedDescription && sanitizedDescription.length > 500) {
+  // Validate description using validators
+  if (form.description && !validators.textLength(form.description, 0, 500)) {
     newErrors.description = 'Description cannot exceed 500 characters'
   }
 
-  // Validate numeric settings
-  if (form.settings.temperature < 0 || form.settings.temperature > 1) {
+  // Validate numeric settings using validators
+  if (!validators.numberRange(form.settings.temperature, 0, 1)) {
     newErrors.temperature = 'Temperature must be between 0 and 1'
   }
 
-  if (form.settings.maxTokens < 1 || form.settings.maxTokens > 2000) {
+  if (!validators.numberRange(form.settings.maxTokens, 1, 2000)) {
     newErrors.maxTokens = 'Max tokens must be between 1 and 2000'
   }
 
-  if (form.settings.responseDelay < 0 || form.settings.responseDelay > 30) {
+  if (!validators.numberRange(form.settings.responseDelay, 0, 30)) {
     newErrors.responseDelay = 'Response delay must be between 0 and 30 seconds'
   }
 
@@ -1132,19 +1055,25 @@ const handleSubmit = async () => {
   isSubmitting.value = true
 
   try {
+    // Use sanitizeObject with predefined schema for agent data
     const agentData = {
-      name: sanitizeText(form.name),
-      description: sanitizeText(form.description || ''),
-      prompt: sanitizePrompt(form.prompt),
+      ...sanitizeObject(form, schemas.agent),
       settings: {
-        temperature: sanitizeNumber(form.settings.temperature),
-        maxTokens: sanitizeNumber(form.settings.maxTokens),
-        responseDelay: sanitizeNumber(form.settings.responseDelay),
-        connectionId: sanitizeText(form.settings.connectionId) || null,
-        modelId: sanitizeText(form.settings.modelId) || null,
-        chatwootApiKey: sanitizeText(form.settings.chatwootApiKey) || null
+        ...sanitizeObject(form.settings, {
+          temperature: 'number',
+          maxTokens: 'number',
+          responseDelay: 'number',
+          connectionId: 'text',
+          modelId: 'text',
+          chatwootApiKey: 'text'
+        })
       }
     }
+    
+    // Clean up null/empty values
+    if (!agentData.settings.connectionId) agentData.settings.connectionId = null
+    if (!agentData.settings.modelId) agentData.settings.modelId = null
+    if (!agentData.settings.chatwootApiKey) agentData.settings.chatwootApiKey = null
 
     emit('submit', agentData)
   } finally {
