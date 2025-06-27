@@ -43,7 +43,7 @@
       <SettingsChatwootIntegration />
 
       <!-- Settings Info -->
-      <SettingsSettingsInfo />
+      <SettingsInfo />
 
       <!-- RAG Health Status -->
       <SettingsRAGSystemStatus />

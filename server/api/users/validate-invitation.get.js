@@ -1,5 +1,5 @@
 import User from '../../models/User.ts'
-import { connectDB } from '../../utils/db.ts'
+import { connectDB } from '../../utils/db'
 import crypto from 'crypto'
 
 export default defineEventHandler(async (event) => {

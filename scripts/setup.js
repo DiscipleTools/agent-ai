@@ -41,7 +41,7 @@ NODE_ENV=development
 console.log('\n🔍 Checking MongoDB connection...')
 try {
   // Try to connect to MongoDB
-  const { connectDB } = await import('./server/utils/db.js')
+  const { connectDB } = await import('./server/utils/db.ts')
   await connectDB()
   console.log('✅ MongoDB connection successful')
 } catch (error) {

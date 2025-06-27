@@ -1,7 +1,7 @@
 import User from '../../models/User.ts'
 import bcrypt from 'bcryptjs'
 import crypto from 'crypto'
-import { connectDB } from '../../utils/db.ts'
+import { connectDB } from '../../utils/db'
 
 export default defineEventHandler(async (event) => {
   try {
