@@ -7,7 +7,7 @@ export const useAgentsStore = defineStore('agents', () => {
   const error = ref(null)
 
   const { $api } = useApi()
-  const { csrfRequest, addCsrfToForm } = useCsrf()
+  const { csrfRequest, addCsrfToForm, getCsrfToken } = useCsrf()
 
   const fetchAgents = async () => {
     loading.value = true
@@ -213,9 +213,21 @@ export const useAgentsStore = defineStore('agents', () => {
 
   const refreshContextDocumentWithProgress = async (agentId, docId, onProgress) => {
     try {
-      // Get authentication headers from the current context
+      // Get CSRF token for the request
+      const token = await getCsrfToken()
+      if (!token) {
+        throw new Error('Could not obtain CSRF token')
+      }
+
+      // Get authentication headers including CSRF token
+      const accessToken = useCookie('access-token')
       const headers = {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'X-CSRF-Token': token
+      }
+      
+      if (accessToken.value) {
+        headers.Authorization = `Bearer ${accessToken.value}`
       }
       
       // Use fetch with streaming for progress updates
@@ -441,9 +453,21 @@ export const useAgentsStore = defineStore('agents', () => {
 
   const addContextWebsiteWithFetch = async (agentId, url, options = {}, onProgress) => {
     try {
-      // Get authentication headers from the current context
+      // Get CSRF token for the request
+      const token = await getCsrfToken()
+      if (!token) {
+        throw new Error('Could not obtain CSRF token')
+      }
+
+      // Get authentication headers including CSRF token
+      const accessToken = useCookie('access-token')
       const headers = {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'X-CSRF-Token': token
+      }
+      
+      if (accessToken.value) {
+        headers.Authorization = `Bearer ${accessToken.value}`
       }
       
       // In client-side, use browser's built-in cookie handling
