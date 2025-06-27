@@ -25,7 +25,7 @@
 
     <!-- Error State -->
     <div v-else-if="agentsStore.error" class="text-center py-12">
-      <div class="text-red-600 dark:text-red-400 mb-4">{{ agentsStore.error }}</div>
+      <div class="text-red-600 dark:text-red-400 mb-4">{{ sanitizeErrorMessage(agentsStore.error) }}</div>
       <button @click="fetchAgents" class="btn-primary">
         Try Again
       </button>
@@ -58,7 +58,7 @@
       >
         <div class="flex justify-between items-start mb-4">
           <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
-            {{ agent.name }}
+            {{ sanitizeText(agent.name) }}
           </h3>
           <span 
             :class="[
@@ -73,11 +73,11 @@
         </div>
         
         <p class="text-gray-600 dark:text-gray-300 mb-4 line-clamp-2">
-          {{ agent.description || 'No description' }}
+          {{ sanitizeText(agent.description) || 'No description' }}
         </p>
         
         <div class="flex items-center justify-between text-sm text-gray-500 dark:text-gray-400 mb-4">
-          <span>Created by {{ agent.createdBy?.name }}</span>
+          <span>Created by {{ sanitizeText(agent.createdBy?.name) }}</span>
           <span>{{ formatDate(agent.createdAt) }}</span>
         </div>
         
@@ -106,6 +106,7 @@
 import { PlusIcon, CpuChipIcon } from '@heroicons/vue/24/outline'
 import { useAgentsStore } from '~/stores/agents'
 import { useToast } from 'vue-toastification'
+import { sanitizeText, sanitizeErrorMessage } from '~/utils/sanitize'
 
 definePageMeta({
   layout: 'dashboard',
@@ -119,7 +120,8 @@ const fetchAgents = async () => {
   try {
     await agentsStore.fetchAgents()
   } catch (error) {
-    console.error('Failed to load agents:', error)
+    console.error('Failed to load agents:', sanitizeErrorMessage(error))
+    toast(sanitizeErrorMessage(error) || 'Failed to load agents', { type: 'error' })
   }
 }
 
@@ -128,23 +130,42 @@ const createAgent = () => {
 }
 
 const editAgent = (agent) => {
-  navigateTo(`/agents/${agent._id}`)
+  // Validate agent ID before navigation
+  const agentId = sanitizeText(agent._id)
+  if (!agentId || agentId.length !== 24) {
+    toast('Invalid agent ID', { type: 'error' })
+    return
+  }
+  navigateTo(`/agents/${agentId}`)
 }
 
 const deleteAgent = async (agentId) => {
+  // Validate agent ID before deletion
+  const sanitizedAgentId = sanitizeText(agentId)
+  if (!sanitizedAgentId || sanitizedAgentId.length !== 24) {
+    toast('Invalid agent ID', { type: 'error' })
+    return
+  }
+  
   if (!confirm('Are you sure you want to delete this agent?')) return
   
   try {
-    await agentsStore.deleteAgent(agentId)
+    await agentsStore.deleteAgent(sanitizedAgentId)
     toast('Agent deleted successfully', { type: 'success' })
   } catch (error) {
-    console.error('Failed to delete agent:', error)
-    toast('Failed to delete agent', { type: 'error' })
+    console.error('Failed to delete agent:', sanitizeErrorMessage(error))
+    toast(sanitizeErrorMessage(error) || 'Failed to delete agent', { type: 'error' })
   }
 }
 
 const formatDate = (date) => {
-  return new Date(date).toLocaleDateString()
+  if (!date) return 'Unknown'
+  try {
+    return new Date(date).toLocaleDateString()
+  } catch (error) {
+    console.error('Invalid date format:', error)
+    return 'Invalid date'
+  }
 }
 
 // Fetch agents on mount

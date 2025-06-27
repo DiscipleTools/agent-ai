@@ -27,6 +27,7 @@ import { ArrowLeftIcon } from '@heroicons/vue/24/outline'
 import { useAgentsStore } from '~/stores/agents'
 import AgentForm from '~/components/Agent/AgentForm.vue'
 import { useToast } from 'vue-toastification'
+import { sanitizeErrorMessage } from '~/utils/sanitize'
 
 definePageMeta({
   layout: 'dashboard',
@@ -46,8 +47,8 @@ const handleSubmit = async (agentData) => {
     // Navigate back to agents list
     await router.push('/agents')
   } catch (error) {
-    console.error('Failed to create agent:', error)
-    toast(error.message || 'Failed to create agent', { type: 'error' })
+    console.error('Failed to create agent:', sanitizeErrorMessage(error))
+    toast(sanitizeErrorMessage(error) || 'Failed to create agent', { type: 'error' })
   }
 }
 

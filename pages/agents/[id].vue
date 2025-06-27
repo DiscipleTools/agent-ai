@@ -11,7 +11,7 @@
         </button>
       </div>
       <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
-        {{ agent ? `Edit ${agent.name}` : 'Edit Agent' }}
+        {{ agent ? `Edit ${sanitizeText(agent.name)}` : 'Edit Agent' }}
       </h1>
       <p class="mt-2 text-sm text-gray-700 dark:text-gray-300">
         Update your AI agent configuration and settings
@@ -25,7 +25,7 @@
 
     <!-- Error State -->
     <div v-else-if="agentsStore.error" class="text-center py-12">
-      <div class="text-red-600 dark:text-red-400 mb-4">{{ agentsStore.error }}</div>
+      <div class="text-red-600 dark:text-red-400 mb-4">{{ sanitizeErrorMessage(agentsStore.error) }}</div>
       <button @click="fetchAgent" class="btn-primary">
         Try Again
       </button>
@@ -43,6 +43,7 @@ import { ArrowLeftIcon } from '@heroicons/vue/24/outline'
 import { useAgentsStore } from '~/stores/agents'
 import AgentForm from '~/components/Agent/AgentForm.vue'
 import { useToast } from 'vue-toastification'
+import { sanitizeText, sanitizeErrorMessage } from '~/utils/sanitize'
 
 definePageMeta({
   layout: 'dashboard',
@@ -58,24 +59,36 @@ const agent = computed(() => agentsStore.currentAgent)
 
 const fetchAgent = async () => {
   try {
-    await agentsStore.fetchAgent(route.params.id)
+    // Validate agent ID format
+    const agentId = sanitizeText(route.params.id)
+    if (!agentId || agentId.length !== 24) {
+      throw new Error('Invalid agent ID format')
+    }
+    
+    await agentsStore.fetchAgent(agentId)
   } catch (error) {
-    console.error('Failed to load agent:', error)
-    toast('Failed to load agent', { type: 'error' })
+    console.error('Failed to load agent:', sanitizeErrorMessage(error))
+    toast(sanitizeErrorMessage(error) || 'Failed to load agent', { type: 'error' })
   }
 }
 
 const handleSubmit = async (agentData) => {
   try {
-    await agentsStore.updateAgent(route.params.id, agentData)
+    // Validate agent ID format
+    const agentId = sanitizeText(route.params.id)
+    if (!agentId || agentId.length !== 24) {
+      throw new Error('Invalid agent ID format')
+    }
+    
+    await agentsStore.updateAgent(agentId, agentData)
     
     toast('Agent updated successfully!', { type: 'success' })
     
     // Refresh the agent data to show updated information
     await fetchAgent()
   } catch (error) {
-    console.error('Failed to update agent:', error)
-    toast(error.message || 'Failed to update agent', { type: 'error' })
+    console.error('Failed to update agent:', sanitizeErrorMessage(error))
+    toast(sanitizeErrorMessage(error) || 'Failed to update agent', { type: 'error' })
   }
 }
 
