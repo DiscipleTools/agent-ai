@@ -49,7 +49,7 @@
               Email Address
             </label>
             <input
-              :value="invitationData?.email"
+              :value="sanitizeEmail(invitationData?.email)"
               type="email"
               disabled
               class="input-field bg-gray-100 dark:bg-gray-600 cursor-not-allowed"
@@ -66,6 +66,7 @@
               required
               class="input-field"
               placeholder="Enter your full name"
+              maxlength="100"
             />
           </div>
 
@@ -80,6 +81,7 @@
                 required
                 minlength="8"
                 class="input-field pr-10"
+                :class="{ 'border-red-500': form.password && !isStrongPassword }"
                 placeholder="Create a secure password"
               />
               <button
@@ -96,9 +98,28 @@
                 </svg>
               </button>
             </div>
-            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-              Password must be at least 8 characters long
-            </p>
+            <div class="text-xs mt-1 space-y-1">
+              <p class="text-gray-500 dark:text-gray-400">
+                Password must contain:
+              </p>
+              <ul class="text-xs space-y-1 ml-4">
+                <li :class="form.password.length >= 8 ? 'text-green-600' : 'text-gray-500'">
+                  ✓ At least 8 characters
+                </li>
+                <li :class="/[A-Z]/.test(form.password) ? 'text-green-600' : 'text-gray-500'">
+                  ✓ One uppercase letter
+                </li>
+                <li :class="/[a-z]/.test(form.password) ? 'text-green-600' : 'text-gray-500'">
+                  ✓ One lowercase letter
+                </li>
+                <li :class="/[0-9]/.test(form.password) ? 'text-green-600' : 'text-gray-500'">
+                  ✓ One number
+                </li>
+                <li :class="/[^A-Za-z0-9]/.test(form.password) ? 'text-green-600' : 'text-gray-500'">
+                  ✓ One special character
+                </li>
+              </ul>
+            </div>
           </div>
 
           <div>
@@ -123,8 +144,8 @@
               Invitation Details
             </h4>
             <div class="text-sm text-gray-600 dark:text-gray-400 space-y-1">
-              <p><span class="font-medium">Invited by:</span> {{ invitationData.invitedBy?.name }}</p>
-              <p><span class="font-medium">Role:</span> {{ invitationData.role || 'User' }}</p>
+              <p><span class="font-medium">Invited by:</span> {{ sanitizeText(invitationData.invitedBy?.name) }}</p>
+              <p><span class="font-medium">Role:</span> {{ sanitizeText(invitationData.role || 'User') }}</p>
               <p><span class="font-medium">Invited on:</span> {{ formatDate(invitationData.createdAt) }}</p>
             </div>
           </div>
@@ -154,6 +175,7 @@
 
 <script setup>
 import { useToast } from 'vue-toastification'
+import { sanitizeText, sanitizeEmail, sanitizeErrorMessage } from '~/utils/sanitize.js'
 
 definePageMeta({
   layout: false,
@@ -179,9 +201,18 @@ const form = reactive({
 })
 
 // Computed
+const isStrongPassword = computed(() => {
+  const pwd = form.password
+  return pwd.length >= 8 && 
+         /[A-Z]/.test(pwd) && 
+         /[a-z]/.test(pwd) && 
+         /[0-9]/.test(pwd) && 
+         /[^A-Za-z0-9]/.test(pwd)
+})
+
 const isFormValid = computed(() => {
   return form.name.trim().length > 0 &&
-         form.password.length >= 8 &&
+         isStrongPassword.value &&
          form.password === form.confirmPassword
 })
 
@@ -206,7 +237,7 @@ const validateInvitation = async () => {
     
   } catch (err) {
     console.error('Invitation validation error:', err)
-    error.value = err.data?.message || err.message || 'Invalid or expired invitation token'
+    error.value = sanitizeErrorMessage(err.data?.message || err.message || 'Invalid or expired invitation token')
   } finally {
     loading.value = false
   }
@@ -224,8 +255,8 @@ const handleSubmit = async () => {
       method: 'POST',
       body: {
         token,
-        name: form.name.trim(),
-        password: form.password
+        name: sanitizeText(form.name),
+        password: form.password // Password should not be sanitized as it needs exact characters
       }
     })
 
@@ -240,7 +271,7 @@ const handleSubmit = async () => {
     }
 
     if (result.success) {
-      toast(result.message || 'Account setup completed successfully! Please sign in.', { type: 'success' })
+      toast(sanitizeText(result.message) || 'Account setup completed successfully! Please sign in.', { type: 'success' })
 
       // Redirect to login
       await router.push('/login')
@@ -251,7 +282,7 @@ const handleSubmit = async () => {
   } catch (err) {
     console.error('Account setup error:', err)
     
-    const errorMessage = err.data?.message || err.message || 'Failed to complete account setup'
+    const errorMessage = sanitizeErrorMessage(err.data?.message || err.message || 'Failed to complete account setup')
     toast(errorMessage, { type: 'error' })
     
   } finally {
