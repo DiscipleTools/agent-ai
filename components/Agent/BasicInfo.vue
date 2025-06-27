@@ -63,7 +63,7 @@
 </template>
 
 <script setup>
-import { sanitizeText, sanitizePrompt } from '~/utils/sanitize'
+import { sanitizeText, sanitizeContent } from '~/utils/sanitize'
 
 const props = defineProps({
   form: {
@@ -90,8 +90,8 @@ watch(() => props.form.description, (newValue) => {
 })
 
 watch(() => props.form.prompt, (newValue) => {
-  if (newValue !== sanitizePrompt(newValue)) {
-    props.form.prompt = sanitizePrompt(newValue)
+  if (newValue !== sanitizeContent(newValue)) {
+    props.form.prompt = sanitizeContent(newValue)
   }
 })
 </script>

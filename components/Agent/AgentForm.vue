@@ -67,7 +67,7 @@ import {
   sanitizeNumber, 
   sanitizeUrl, 
   sanitizeFilename, 
-  sanitizePrompt,
+  sanitizeContent,
   sanitizeObject,
   schemas,
   validators
@@ -92,7 +92,7 @@ const { csrfRequest, addCsrfToForm } = useCsrf()
 const form = reactive({
   name: sanitizeText(props.agent?.name || ''),
   description: sanitizeText(props.agent?.description || ''),
-  prompt: sanitizePrompt(props.agent?.prompt || ''),
+  prompt: sanitizeContent(props.agent?.prompt || ''),
   settings: {
     temperature: sanitizeNumber(props.agent?.settings?.temperature || 0.3),
     maxTokens: sanitizeNumber(props.agent?.settings?.maxTokens || 500),
@@ -147,7 +147,7 @@ watch(() => props.agent, (newAgent) => {
   if (newAgent) {
     form.name = sanitizeText(newAgent.name || '')
     form.description = sanitizeText(newAgent.description || '')
-    form.prompt = sanitizePrompt(newAgent.prompt || '')
+    form.prompt = sanitizeContent(newAgent.prompt || '')
     form.settings = {
       temperature: sanitizeNumber(newAgent.settings?.temperature || 0.3),
       maxTokens: sanitizeNumber(newAgent.settings?.maxTokens || 500),
@@ -183,7 +183,7 @@ const validateForm = () => {
 
   // Validate prompt using validators
   if (!validators.textLength(form.prompt, 10, 2000)) {
-    const sanitizedPrompt = sanitizePrompt(form.prompt)
+    const sanitizedPrompt = sanitizeContent(form.prompt)
     if (!sanitizedPrompt) {
       newErrors.prompt = 'System prompt is required'
     } else if (sanitizedPrompt.length < 10) {

@@ -101,14 +101,15 @@ export const sanitizeFilename = (input) => {
 }
 
 /**
- * Sanitize prompt/content input while preserving formatting but removing dangerous content
- * @param {string|any} input - The prompt/content to sanitize
- * @returns {string} - Sanitized prompt
+ * Sanitize content while preserving formatting but removing dangerous elements
+ * Suitable for user content, prompts, descriptions, and display text
+ * @param {string|any} input - The content to sanitize
+ * @returns {string} - Sanitized content
  */
-export const sanitizePrompt = (input) => {
+export const sanitizeContent = (input) => {
   if (!input || typeof input !== 'string') return ''
   
-  // For prompts, preserve most formatting but remove dangerous content
+  // Preserve most formatting but remove dangerous content
   return input
     .replace(/<script[^>]*>.*?<\/script>/gi, '') // Remove script tags
     .replace(/<iframe[^>]*>.*?<\/iframe>/gi, '') // Remove iframe tags
@@ -175,6 +176,46 @@ export const sanitizeSearchQuery = (input) => {
 }
 
 /**
+ * Sanitize error messages for user display by removing sensitive information
+ * @param {Error|Object|string} error - The error to sanitize
+ * @returns {string} - User-friendly error message
+ */
+export const sanitizeErrorMessage = (error) => {
+  const message = error?.message || error?.toString() || 'An error occurred'
+  
+  // Remove sensitive information patterns
+  const sanitized = message
+    .replace(/\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/g, '[IP]') // IP addresses
+    .replace(/\/[a-zA-Z0-9_\-\/]+\/[a-zA-Z0-9_\-\.]+/g, '[PATH]') // File paths
+    .replace(/Error:\s*/i, '') // Remove "Error:" prefix
+    .replace(/at\s+.*/g, '') // Remove stack trace info
+    .replace(/\s+/g, ' ') // Normalize whitespace
+  
+  // Provide user-friendly messages for common errors
+  if (message.includes('404') || message.includes('not found')) {
+    return 'The requested resource was not found'
+  }
+  
+  if (message.includes('403') || message.includes('forbidden')) {
+    return 'You do not have permission to access this resource'
+  }
+  
+  if (message.includes('500') || message.includes('internal server')) {
+    return 'A server error occurred. Please try again later'
+  }
+  
+  if (message.includes('network') || message.includes('fetch')) {
+    return 'Network error. Please check your connection and try again'
+  }
+  
+  if (message.includes('timeout')) {
+    return 'Request timed out. Please try again'
+  }
+  
+  return sanitized.trim() || 'An unexpected error occurred. Please try again'
+}
+
+/**
  * Sanitize a generic object by applying appropriate sanitization to each property
  * @param {Object} obj - The object to sanitize
  * @param {Object} schema - Schema defining how to sanitize each property
@@ -197,8 +238,8 @@ export const sanitizeObject = (obj, schema) => {
         sanitized[key] = sanitizeUrl(obj[key])
       } else if (sanitizer === 'email') {
         sanitized[key] = sanitizeEmail(obj[key])
-      } else if (sanitizer === 'prompt') {
-        sanitized[key] = sanitizePrompt(obj[key])
+      } else if (sanitizer === 'content') {
+        sanitized[key] = sanitizeContent(obj[key])
       } else if (sanitizer === 'filename') {
         sanitized[key] = sanitizeFilename(obj[key])
       }
@@ -261,7 +302,7 @@ export const schemas = {
   agent: {
     name: 'text',
     description: 'text',
-    prompt: 'prompt',
+    prompt: 'content',
     temperature: 'number',
     maxTokens: 'number',
     responseDelay: 'number',

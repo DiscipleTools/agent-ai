@@ -32,14 +32,25 @@
     <div v-if="isExpanded" class="space-y-4">
       <!-- Search Input -->
       <div class="flex space-x-2">
-        <input
-          v-model="searchQuery"
-          type="text"
-          placeholder="Enter your test query..."
-          class="flex-1 px-3 py-2 border border-blue-300 dark:border-blue-600 rounded-md text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          :disabled="searching"
-          @keydown.enter.prevent="performSearch"
-        />
+        <div class="flex-1 relative">
+          <input
+            v-model="searchQuery"
+            type="text"
+            placeholder="Enter your test query..."
+            maxlength="500"
+            class="w-full px-3 py-2 border border-blue-300 dark:border-blue-600 rounded-md text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            :class="{ 'border-red-500 dark:border-red-500': validationError }"
+            :disabled="searching"
+            @keydown.enter.prevent="handleSearchKeypress"
+            @input="handleSearchInput"
+          />
+          <div v-if="validationError" class="absolute -bottom-5 left-0 text-xs text-red-600 dark:text-red-400">
+            {{ validationError }}
+          </div>
+          <div class="absolute bottom-2 right-2 text-xs text-gray-400">
+            {{ searchQuery.length }}/500
+          </div>
+        </div>
                  <select
            v-model="searchLimit"
            class="px-3 py-2 border border-blue-300 dark:border-blue-600 rounded-md text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -61,7 +72,7 @@
         <button
           type="button"
           @click.prevent="performSearch"
-          :disabled="!searchQuery.trim() || searching"
+          :disabled="!canSearch"
           class="px-4 py-2 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <span v-if="searching" class="flex items-center">
@@ -116,10 +127,10 @@
                        <path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clip-rule="evenodd" />
                      </svg>
                      <svg v-else-if="doc.type === 'url'" class="h-3 w-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
                      </svg>
                      <svg v-else class="h-3 w-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9v-3a5 5 0 00-5-5 5 5 0 00-5 5v3m0 0h10" />
+                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9v-3a5 5 0 00-5-5 5 5 0 00-5 5v3m0 0h10" />
                      </svg>
                    </div>
                    <span class="text-gray-700 dark:text-gray-300 font-medium">{{ doc.title }}</span>
@@ -195,10 +206,10 @@
                      </div>
                      <div class="text-xs text-gray-600 dark:text-gray-400">
                        <p v-if="!showFullContent" class="line-clamp-3">
-                         {{ result.text }}
+                         {{ sanitizeContent(result.text) }}
                        </p>
                        <div v-else class="max-h-64 overflow-y-auto">
-                         <pre class="whitespace-pre-wrap font-sans">{{ result.text }}</pre>
+                         <pre class="whitespace-pre-wrap font-sans">{{ sanitizeContent(result.text) }}</pre>
                        </div>
                      </div>
                    </div>
@@ -238,10 +249,10 @@
                  </div>
                  <div class="text-xs text-gray-600 dark:text-gray-400">
                    <p v-if="!showFullContent" class="line-clamp-3">
-                     {{ result.text }}
+                     {{ sanitizeContent(result.text) }}
                    </p>
                    <div v-else class="max-h-64 overflow-y-auto">
-                     <pre class="whitespace-pre-wrap font-sans">{{ result.text }}</pre>
+                     <pre class="whitespace-pre-wrap font-sans">{{ sanitizeContent(result.text) }}</pre>
                    </div>
                  </div>
                  <div v-if="result.source" class="mt-2 text-xs text-blue-600 dark:text-blue-400 truncate">
@@ -269,6 +280,7 @@
 <script setup>
 import { useAgentsStore } from '~/stores/agents'
 import { useToast } from 'vue-toastification'
+import { sanitizeSearchQuery, sanitizeContent, sanitizeErrorMessage } from '~/utils/sanitize'
 
 const props = defineProps({
   agentId: {
@@ -289,36 +301,129 @@ const groupByPage = ref(false)
 const searching = ref(false)
 const searchResults = ref(null)
 const searchError = ref(null)
+const validationError = ref(null)
+const lastSearchTime = ref(0)
+
+// Security constants
+const MIN_QUERY_LENGTH = 2
+const MAX_QUERY_LENGTH = 500
+const SEARCH_DEBOUNCE_MS = 500
+const MIN_SEARCH_INTERVAL_MS = 1000
+
+// Input validation using sanitization utilities
+const validateSearchQuery = (query) => {
+  if (!query || typeof query !== 'string') {
+    return null // No error for empty query
+  }
+
+  const trimmed = query.trim()
+  
+  if (trimmed.length === 0) {
+    return null // No error for empty query
+  }
+  
+  if (trimmed.length < MIN_QUERY_LENGTH) {
+    return `Query must be at least ${MIN_QUERY_LENGTH} characters`
+  }
+  
+  if (trimmed.length > MAX_QUERY_LENGTH) {
+    return `Query must be less than ${MAX_QUERY_LENGTH} characters`
+  }
+  
+  // Use the existing sanitization utility to check for dangerous content
+  const sanitized = sanitizeSearchQuery(query)
+  if (sanitized !== trimmed) {
+    return 'Query contains invalid characters'
+  }
+  
+  return null
+}
+
+// Rate limiting check
+const canPerformSearch = () => {
+  const now = Date.now()
+  return now - lastSearchTime.value >= MIN_SEARCH_INTERVAL_MS
+}
+
+
 
 const performSearch = async () => {
-  if (!searchQuery.value.trim()) return
+  const query = searchQuery.value.trim()
+  
+  // Validate input
+  const validation = validateSearchQuery(query)
+  if (validation) {
+    validationError.value = validation
+    return
+  }
+  
+  if (!query) return
+  
+  // Rate limiting check
+  if (!canPerformSearch()) {
+    toast('Please wait before searching again', { type: 'warning' })
+    return
+  }
 
   searching.value = true
   searchError.value = null
   searchResults.value = null
+  validationError.value = null
+  lastSearchTime.value = Date.now()
 
   try {
+    // Sanitize the query before sending to API
+    const sanitizedQuery = sanitizeSearchQuery(query)
+    
     const result = await agentsStore.searchRAG(
       props.agentId, 
-      searchQuery.value.trim(), 
+      sanitizedQuery, 
       parseInt(searchLimit.value)
     )
     
     searchResults.value = result
     
     if (result.results.length === 0) {
-              toast(`No results found for "${searchQuery.value.trim()}"`, { type: 'info' })
+      toast(`No results found for your query`, { type: 'info' })
     } else {
-              toast(`Found ${result.results.length} relevant chunks`, { type: 'success' })
+      toast(`Found ${result.results.length} relevant chunks`, { type: 'success' })
     }
   } catch (error) {
     console.error('RAG search failed:', error)
-    searchError.value = error.message || 'Search failed'
-          toast(error.message || 'Search failed', { type: 'error' })
+    const userMessage = sanitizeErrorMessage(error)
+    searchError.value = userMessage
+    toast(userMessage, { type: 'error' })
   } finally {
     searching.value = false
   }
 }
+
+// Input handlers with debouncing
+let searchTimeout = null
+
+const handleSearchInput = () => {
+  validationError.value = validateSearchQuery(searchQuery.value)
+  
+  // Clear previous timeout
+  if (searchTimeout) {
+    clearTimeout(searchTimeout)
+  }
+}
+
+const handleSearchKeypress = () => {
+  if (canSearch.value) {
+    performSearch()
+  }
+}
+
+// Computed properties
+const canSearch = computed(() => {
+  const query = searchQuery.value.trim()
+  return query.length >= MIN_QUERY_LENGTH && 
+         !validationError.value && 
+         !searching.value &&
+         canPerformSearch()
+})
 
 // Group results by source page for better organization
 const groupedResults = computed(() => {
@@ -334,10 +439,17 @@ const groupedResults = computed(() => {
   }, {})
 })
 
+
+
 // Clear results when query changes
 watch(searchQuery, () => {
   searchResults.value = null
   searchError.value = null
+  
+  // Clear timeout on query change
+  if (searchTimeout) {
+    clearTimeout(searchTimeout)
+  }
 })
 </script>
 
