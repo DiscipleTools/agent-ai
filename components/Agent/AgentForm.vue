@@ -395,7 +395,7 @@
                 <h4 class="text-sm font-medium text-gray-900 dark:text-white">
                   Scraped URLs ({{ expandedDocs[doc._id].data.metadata?.pageUrls?.length || 0 }})
                 </h4>
-                <ul v-if="expandedDocs[doc._id].data.metadata?.pageUrls?.length" class="max-h-60 overflow-y-auto space-y-1 text-xs text-gray-600 dark:text-gray-400 list-disc list-inside bg-gray-100 dark:bg-gray-800 p-3 rounded-md">
+                <ul v-if="expandedDocs[doc._id].data.metadata.pageUrls?.length" class="max-h-60 overflow-y-auto space-y-1 text-xs text-gray-600 dark:text-gray-400 list-disc list-inside bg-gray-100 dark:bg-gray-800 p-3 rounded-md">
                   <li v-for="url in expandedDocs[doc._id].data.metadata.pageUrls" :key="url" class="break-all">
                     {{ url }}
                   </li>
@@ -765,6 +765,96 @@ import { DocumentIcon, LinkIcon, ClipboardIcon } from '@heroicons/vue/24/outline
 import { useAgentsStore } from '~/stores/agents'
 import RAGSearchUtility from '~/components/Agent/RAGSearchUtility.vue'
 
+// Input sanitization utilities
+// These functions provide defense-in-depth against XSS and injection attacks
+// by sanitizing all user inputs before processing or display
+const sanitizeText = (input) => {
+  if (!input || typeof input !== 'string') return ''
+  
+  // Remove HTML tags and encode special characters
+  return input
+    .replace(/<[^>]*>/g, '') // Remove HTML tags
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;')
+    .replace(/\//g, '&#x2F;')
+    .trim()
+}
+
+const sanitizeNumber = (input) => {
+  if (typeof input === 'number') return input
+  if (!input || typeof input !== 'string') return 0
+  
+  const num = parseFloat(input.replace(/[^\d.-]/g, ''))
+  return isNaN(num) ? 0 : num
+}
+
+const sanitizeUrl = (input) => {
+  if (!input || typeof input !== 'string') return ''
+  
+  // Basic URL sanitization - remove dangerous protocols and clean
+  const cleaned = input.trim()
+    .replace(/[<>"']/g, '') // Remove dangerous characters
+    .replace(/javascript:/gi, '') // Remove javascript protocol
+    .replace(/data:/gi, '') // Remove data protocol
+    .replace(/vbscript:/gi, '') // Remove vbscript protocol
+    .replace(/file:/gi, '') // Remove file protocol
+    .replace(/ftp:/gi, '') // Remove ftp protocol
+  
+  // Only allow http and https protocols
+  if (cleaned && !cleaned.match(/^https?:\/\//i)) {
+    return cleaned.startsWith('://') ? 'https' + cleaned : 'https://' + cleaned
+  }
+  
+  // Additional validation for potential SSRF prevention
+  try {
+    const url = new URL(cleaned)
+    
+    // Block localhost and private IP ranges
+    const hostname = url.hostname.toLowerCase()
+    if (hostname === 'localhost' || 
+        hostname === '127.0.0.1' || 
+        hostname === '0.0.0.0' ||
+        hostname.match(/^10\./) ||
+        hostname.match(/^172\.(1[6-9]|2[0-9]|3[01])\./) ||
+        hostname.match(/^192\.168\./)) {
+      return ''
+    }
+    
+    return cleaned
+  } catch (error) {
+    return ''
+  }
+}
+
+const sanitizeFilename = (input) => {
+  if (!input || typeof input !== 'string') return ''
+  
+  // Remove path traversal attempts and dangerous characters
+  return input
+    .replace(/[<>:"/\\|?*\x00-\x1f]/g, '') // Remove dangerous filename characters
+    .replace(/\.\./g, '') // Remove path traversal
+    .replace(/^\.+/, '') // Remove leading dots
+    .trim()
+    .substring(0, 255) // Limit length
+}
+
+const sanitizePrompt = (input) => {
+  if (!input || typeof input !== 'string') return ''
+  
+  // For prompts, we want to preserve most formatting but remove dangerous content
+  return input
+    .replace(/<script[^>]*>.*?<\/script>/gi, '') // Remove script tags
+    .replace(/<iframe[^>]*>.*?<\/iframe>/gi, '') // Remove iframe tags
+    .replace(/<object[^>]*>.*?<\/object>/gi, '') // Remove object tags
+    .replace(/<embed[^>]*>/gi, '') // Remove embed tags
+    .replace(/javascript:/gi, '') // Remove javascript protocol
+    .replace(/on\w+\s*=/gi, '') // Remove event handlers
+    .trim()
+}
+
 const props = defineProps({
   agent: {
     type: Object,
@@ -780,16 +870,16 @@ const toast = useToast()
 
 // Form state
 const form = reactive({
-  name: props.agent?.name || '',
-  description: props.agent?.description || '',
-  prompt: props.agent?.prompt || '',
+  name: sanitizeText(props.agent?.name || ''),
+  description: sanitizeText(props.agent?.description || ''),
+  prompt: sanitizePrompt(props.agent?.prompt || ''),
   settings: {
-    temperature: props.agent?.settings?.temperature || 0.3,
-    maxTokens: props.agent?.settings?.maxTokens || 500,
-    responseDelay: props.agent?.settings?.responseDelay || 0,
-    connectionId: props.agent?.settings?.connectionId || '',
-    modelId: props.agent?.settings?.modelId || '',
-    chatwootApiKey: props.agent?.settings?.chatwootApiKey || ''
+    temperature: sanitizeNumber(props.agent?.settings?.temperature || 0.3),
+    maxTokens: sanitizeNumber(props.agent?.settings?.maxTokens || 500),
+    responseDelay: sanitizeNumber(props.agent?.settings?.responseDelay || 0),
+    connectionId: sanitizeText(props.agent?.settings?.connectionId || ''),
+    modelId: sanitizeText(props.agent?.settings?.modelId || ''),
+    chatwootApiKey: sanitizeText(props.agent?.settings?.chatwootApiKey || '')
   }
 })
 
@@ -838,17 +928,26 @@ const allAvailableModels = computed(() => {
   availableConnections.value.forEach(connection => {
     connection.availableModels?.forEach(model => {
       models.push({
-        connectionId: connection._id,
-        connectionName: connection.name,
-        modelId: model.id,
-        modelName: model.name || model.id,
-        provider: connection.provider
+        connectionId: sanitizeText(connection._id),
+        connectionName: sanitizeText(connection.name),
+        modelId: sanitizeText(model.id),
+        modelName: sanitizeText(model.name || model.id),
+        provider: sanitizeText(connection.provider)
       })
     })
   })
   
   return models
 })
+
+// Computed properties for sanitized display values
+const sanitizedDisplayValues = computed(() => ({
+  name: sanitizeText(form.name),
+  description: sanitizeText(form.description),
+  prompt: sanitizePrompt(form.prompt),
+  urlInput: sanitizeUrl(urlInput.value),
+  websiteInput: sanitizeUrl(websiteInput.value)
+}))
 
 // Load AI connections
 const loadAIConnections = async () => {
@@ -861,7 +960,7 @@ const loadAIConnections = async () => {
     // Set initial selection based on current agent settings
     updateSelectedModelOption()
   } catch (error) {
-    console.error('Failed to load AI connections:', error)
+    console.error('Failed to load AI connections:', error.message)
     toast.error('Failed to load AI connections')
   } finally {
     loadingConnections.value = false
@@ -907,7 +1006,7 @@ const reloadAgentData = async () => {
     // Emit to parent to update the agent prop
     emit('agentUpdated', updatedAgent)
   } catch (error) {
-    console.error('Failed to reload agent data:', error)
+    console.error('Failed to reload agent data:', error.message)
     toast.error('Failed to reload agent data')
   }
 }
@@ -915,16 +1014,16 @@ const reloadAgentData = async () => {
 // Watch for prop changes (when editing)
 watch(() => props.agent, (newAgent) => {
   if (newAgent) {
-    form.name = newAgent.name || ''
-    form.description = newAgent.description || ''
-    form.prompt = newAgent.prompt || ''
+    form.name = sanitizeText(newAgent.name || '')
+    form.description = sanitizeText(newAgent.description || '')
+    form.prompt = sanitizePrompt(newAgent.prompt || '')
     form.settings = {
-      temperature: newAgent.settings?.temperature || 0.3,
-      maxTokens: newAgent.settings?.maxTokens || 500,
-      responseDelay: newAgent.settings?.responseDelay || 0,
-      connectionId: newAgent.settings?.connectionId || '',
-      modelId: newAgent.settings?.modelId || '',
-      chatwootApiKey: newAgent.settings?.chatwootApiKey || ''
+      temperature: sanitizeNumber(newAgent.settings?.temperature || 0.3),
+      maxTokens: sanitizeNumber(newAgent.settings?.maxTokens || 500),
+      responseDelay: sanitizeNumber(newAgent.settings?.responseDelay || 0),
+      connectionId: sanitizeText(newAgent.settings?.connectionId || ''),
+      modelId: sanitizeText(newAgent.settings?.modelId || ''),
+      chatwootApiKey: sanitizeText(newAgent.settings?.chatwootApiKey || '')
     }
     
     // Update selected model option
@@ -943,26 +1042,78 @@ watch(() => availableConnections.value, () => {
   updateSelectedModelOption()
 })
 
+// Sanitize form inputs as they change
+watch(() => form.name, (newValue) => {
+  if (newValue !== sanitizeText(newValue)) {
+    form.name = sanitizeText(newValue)
+  }
+})
+
+watch(() => form.description, (newValue) => {
+  if (newValue !== sanitizeText(newValue)) {
+    form.description = sanitizeText(newValue)
+  }
+})
+
+watch(() => form.prompt, (newValue) => {
+  if (newValue !== sanitizePrompt(newValue)) {
+    form.prompt = sanitizePrompt(newValue)
+  }
+})
+
+watch(() => urlInput.value, (newValue) => {
+  if (newValue && newValue !== sanitizeUrl(newValue)) {
+    urlInput.value = sanitizeUrl(newValue)
+  }
+})
+
+watch(() => websiteInput.value, (newValue) => {
+  if (newValue && newValue !== sanitizeUrl(newValue)) {
+    websiteInput.value = sanitizeUrl(newValue)
+  }
+})
+
 // Validation
 const validateForm = () => {
   const newErrors = {}
 
-  if (!form.name?.trim()) {
+  // Sanitize and validate name
+  const sanitizedName = sanitizeText(form.name)
+  if (!sanitizedName) {
     newErrors.name = 'Agent name is required'
-  } else if (form.name.length > 100) {
+  } else if (sanitizedName.length > 100) {
     newErrors.name = 'Agent name cannot exceed 100 characters'
+  } else if (sanitizedName.length < 2) {
+    newErrors.name = 'Agent name must be at least 2 characters long'
   }
 
-  if (!form.prompt?.trim()) {
+  // Sanitize and validate prompt
+  const sanitizedPrompt = sanitizePrompt(form.prompt)
+  if (!sanitizedPrompt) {
     newErrors.prompt = 'System prompt is required'
-  } else if (form.prompt.length < 10) {
+  } else if (sanitizedPrompt.length < 10) {
     newErrors.prompt = 'Prompt must be at least 10 characters long'
-  } else if (form.prompt.length > 2000) {
+  } else if (sanitizedPrompt.length > 2000) {
     newErrors.prompt = 'Prompt cannot exceed 2000 characters'
   }
 
-  if (form.description && form.description.length > 500) {
+  // Sanitize and validate description
+  const sanitizedDescription = sanitizeText(form.description)
+  if (sanitizedDescription && sanitizedDescription.length > 500) {
     newErrors.description = 'Description cannot exceed 500 characters'
+  }
+
+  // Validate numeric settings
+  if (form.settings.temperature < 0 || form.settings.temperature > 1) {
+    newErrors.temperature = 'Temperature must be between 0 and 1'
+  }
+
+  if (form.settings.maxTokens < 1 || form.settings.maxTokens > 2000) {
+    newErrors.maxTokens = 'Max tokens must be between 1 and 2000'
+  }
+
+  if (form.settings.responseDelay < 0 || form.settings.responseDelay > 30) {
+    newErrors.responseDelay = 'Response delay must be between 0 and 30 seconds'
   }
 
   // Clear previous errors and set new ones
@@ -981,16 +1132,16 @@ const handleSubmit = async () => {
 
   try {
     const agentData = {
-      name: form.name.trim(),
-      description: form.description?.trim() || '',
-      prompt: form.prompt.trim(),
+      name: sanitizeText(form.name),
+      description: sanitizeText(form.description || ''),
+      prompt: sanitizePrompt(form.prompt),
       settings: {
-        temperature: Number(form.settings.temperature),
-        maxTokens: Number(form.settings.maxTokens),
-        responseDelay: Number(form.settings.responseDelay),
-        connectionId: form.settings.connectionId || null,
-        modelId: form.settings.modelId || null,
-        chatwootApiKey: form.settings.chatwootApiKey || null
+        temperature: sanitizeNumber(form.settings.temperature),
+        maxTokens: sanitizeNumber(form.settings.maxTokens),
+        responseDelay: sanitizeNumber(form.settings.responseDelay),
+        connectionId: sanitizeText(form.settings.connectionId) || null,
+        modelId: sanitizeText(form.settings.modelId) || null,
+        chatwootApiKey: sanitizeText(form.settings.chatwootApiKey) || null
       }
     }
 
@@ -1002,23 +1153,17 @@ const handleSubmit = async () => {
 
 // Context document management
 const testUrlBeforeAdd = async () => {
-  if (!urlInput.value.trim() || !props.agent?._id) return
+  const sanitizedUrl = sanitizeUrl(urlInput.value)
+  if (!sanitizedUrl || !props.agent?._id) return
   
   urlTesting.value = true
   urlTestResult.value = null
   
   try {
-    const result = await agentsStore.testUrl(props.agent._id, urlInput.value.trim())
+    const result = await agentsStore.testUrl(props.agent._id, sanitizedUrl)
     urlTestResult.value = result
   } catch (error) {
-    console.error('Frontend: URL test failed with error:', error)
-    console.error('Frontend: Error details:', {
-      message: error.message,
-      data: error.data,
-      statusCode: error.statusCode,
-      statusMessage: error.statusMessage,
-      stack: error.stack
-    })
+    console.error('Frontend: URL test failed:', error.message)
     
     // Ensure consistent structure for error cases
     urlTestResult.value = {
@@ -1040,19 +1185,20 @@ const testUrlBeforeAdd = async () => {
 }
 
 const addContextUrl = async () => {
-  if (!urlInput.value.trim() || !props.agent?._id) return
+  const sanitizedUrl = sanitizeUrl(urlInput.value)
+  if (!sanitizedUrl || !props.agent?._id) return
   
   urlAdding.value = true
   
   try {
-    await agentsStore.addContextUrl(props.agent._id, urlInput.value.trim())
+    await agentsStore.addContextUrl(props.agent._id, sanitizedUrl)
     toast.success('URL content added successfully')
     urlInput.value = ''
     showUrlInput.value = false
     urlTestResult.value = null
     await reloadAgentData()
   } catch (error) {
-    console.error('Failed to add URL:', error)
+    console.error('Failed to add URL:', error.message)
     toast.error(error.message || 'Failed to add URL content')
   } finally {
     urlAdding.value = false
@@ -1061,7 +1207,6 @@ const addContextUrl = async () => {
 
 const removeContextDocument = async (docId) => {
   if (!props.agent?._id || !docId) {
-    console.warn('Cannot remove document: missing agent ID or document ID', { agentId: props.agent?._id, docId })
     return
   }
   
@@ -1072,7 +1217,7 @@ const removeContextDocument = async (docId) => {
     toast.success('Context document removed successfully')
     await reloadAgentData()
   } catch (error) {
-    console.error('Failed to remove document:', error)
+    console.error('Failed to remove document:', error.message)
     toast.error(error.message || 'Failed to remove context document')
   } finally {
     deletingDocs.value.delete(docId)
@@ -1081,7 +1226,6 @@ const removeContextDocument = async (docId) => {
 
 const refreshContextDocument = async (docId) => {
   if (!props.agent?._id || !docId) {
-    console.warn('Cannot refresh document: missing agent ID or document ID', { agentId: props.agent?._id, docId })
     return
   }
   
@@ -1126,7 +1270,7 @@ const refreshContextDocument = async (docId) => {
           }
         )
       } catch (progressError) {
-        console.warn('Progress version failed for website re-crawl, falling back to standard method:', progressError)
+        console.warn('Progress version failed for website re-crawl, falling back to standard method:', progressError.message)
         
         // Update progress to show fallback
         Object.assign(reCrawlingProgress, {
@@ -1150,7 +1294,7 @@ const refreshContextDocument = async (docId) => {
     toast.success(isWebsite ? 'Website re-crawled successfully' : 'Context document refreshed successfully')
     await reloadAgentData()
   } catch (error) {
-    console.error('Failed to refresh document:', error)
+    console.error('Failed to refresh document:', error.message)
     toast.error(error.message || 'Failed to refresh context document')
   } finally {
     refreshingDocs.value.delete(docId)
@@ -1164,7 +1308,6 @@ const refreshContextDocument = async (docId) => {
 const viewContextDocument = (doc) => {
   const docId = doc._id;
   if (!docId) {
-    console.warn('Cannot view document: missing document ID', { doc })
     return
   }
 
@@ -1183,10 +1326,18 @@ const handleFileUpload = async (event) => {
   const file = event.target.files[0]
   if (!file || !props.agent?._id) return
   
+  // Sanitize filename
+  const sanitizedFilename = sanitizeFilename(file.name)
+  if (!sanitizedFilename) {
+    toast.error('Invalid filename. Please rename the file and try again.')
+    event.target.value = ''
+    return
+  }
+  
   // Validate file type
   const allowedTypes = ['application/pdf', 'text/plain', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']
   const allowedExtensions = ['.pdf', '.txt', '.doc', '.docx']
-  const fileExtension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'))
+  const fileExtension = sanitizedFilename.toLowerCase().substring(sanitizedFilename.lastIndexOf('.'))
   
   if (!allowedTypes.includes(file.type) && !allowedExtensions.includes(fileExtension)) {
     toast.error('File type not supported. Please upload PDF, TXT, DOC, or DOCX files.')
@@ -1206,8 +1357,6 @@ const handleFileUpload = async (event) => {
   fileUploadProgress.value = 0
   
   try {
-    console.log(`Uploading file: ${file.name} (${file.size} bytes, ${file.type})`)
-    
     // Create FormData
     const formData = new FormData()
     formData.append('file', file)
@@ -1224,7 +1373,7 @@ const handleFileUpload = async (event) => {
     await reloadAgentData()
     
   } catch (error) {
-    console.error('File upload failed:', error)
+    console.error('File upload failed:', error.message)
     toast.error(error.message || 'Failed to upload file')
     event.target.value = '' // Clear the input on error
   } finally {
@@ -1235,23 +1384,24 @@ const handleFileUpload = async (event) => {
 
 // Website management functions
 const testWebsiteBeforeAdd = async () => {
-  if (!websiteInput.value.trim() || !props.agent?._id) return
+  const sanitizedUrl = sanitizeUrl(websiteInput.value)
+  if (!sanitizedUrl || !props.agent?._id) return
   
   websiteTesting.value = true
   websiteTestResult.value = null
   
   try {
-    const result = await agentsStore.testWebsite(props.agent._id, websiteInput.value.trim(), crawlOptions)
+    // Sanitize crawl options
+    const sanitizedCrawlOptions = {
+      maxPages: sanitizeNumber(crawlOptions.maxPages),
+      maxDepth: sanitizeNumber(crawlOptions.maxDepth),
+      sameDomainOnly: Boolean(crawlOptions.sameDomainOnly)
+    }
+    
+    const result = await agentsStore.testWebsite(props.agent._id, sanitizedUrl, sanitizedCrawlOptions)
     websiteTestResult.value = result
   } catch (error) {
-    console.error('Frontend: Website test failed with error:', error)
-    console.error('Frontend: Error details:', {
-      message: error.message,
-      data: error.data,
-      statusCode: error.statusCode,
-      statusMessage: error.statusMessage,
-      stack: error.stack
-    })
+    console.error('Frontend: Website test failed:', error.message)
     
     // Ensure consistent structure for error cases
     websiteTestResult.value = {
@@ -1296,9 +1446,17 @@ const reCrawlingProgress = reactive({
 })
 
 const addContextWebsite = async () => {
-  if (!websiteInput.value.trim() || !props.agent?._id) return
+  const sanitizedUrl = sanitizeUrl(websiteInput.value)
+  if (!sanitizedUrl || !props.agent?._id) return
   
   websiteAdding.value = true
+  
+  // Sanitize crawl options
+  const sanitizedCrawlOptions = {
+    maxPages: sanitizeNumber(crawlOptions.maxPages),
+    maxDepth: sanitizeNumber(crawlOptions.maxDepth),
+    sameDomainOnly: Boolean(crawlOptions.sameDomainOnly)
+  }
   
   // Reset progress
   Object.assign(crawlingProgress, {
@@ -1306,7 +1464,7 @@ const addContextWebsite = async () => {
     phase: 'starting',
     message: 'Initializing website crawl...',
     currentPage: 0,
-    totalPages: crawlOptions.maxPages,
+    totalPages: sanitizedCrawlOptions.maxPages,
     percentage: 0,
     currentUrl: ''
   })
@@ -1316,8 +1474,8 @@ const addContextWebsite = async () => {
     try {
       await agentsStore.addContextWebsiteWithProgress(
         props.agent._id, 
-        websiteInput.value.trim(), 
-        crawlOptions,
+        sanitizedUrl, 
+        sanitizedCrawlOptions,
         (progress) => {
           // Update progress state
           Object.assign(crawlingProgress, {
@@ -1331,20 +1489,20 @@ const addContextWebsite = async () => {
         }
       )
     } catch (progressError) {
-      console.warn('Progress version failed, falling back to standard method:', progressError)
+      console.warn('Progress version failed, falling back to standard method:', progressError.message)
       
-      // Update progress to show fallback
-      Object.assign(crawlingProgress, {
-        phase: 'crawling',
-        message: 'Crawling website (progress not available)...',
-        currentPage: 0,
-        totalPages: crawlOptions.maxPages,
-        percentage: 50, // Show indeterminate progress
-        currentUrl: ''
-      })
-      
-      // Fallback to original method
-      await agentsStore.addContextWebsite(props.agent._id, websiteInput.value.trim(), crawlOptions)
+              // Update progress to show fallback
+        Object.assign(crawlingProgress, {
+          phase: 'crawling',
+          message: 'Crawling website (progress not available)...',
+          currentPage: 0,
+          totalPages: sanitizedCrawlOptions.maxPages,
+          percentage: 50, // Show indeterminate progress
+          currentUrl: ''
+        })
+        
+        // Fallback to original method
+        await agentsStore.addContextWebsite(props.agent._id, sanitizedUrl, sanitizedCrawlOptions)
     }
     
     toast.success('Website content added successfully')
@@ -1353,7 +1511,7 @@ const addContextWebsite = async () => {
     websiteTestResult.value = null
     await reloadAgentData()
   } catch (error) {
-    console.error('Failed to add website:', error)
+    console.error('Failed to add website:', error.message)
     toast.error(error.message || 'Failed to add website content')
   } finally {
     websiteAdding.value = false
@@ -1378,7 +1536,7 @@ const getUrlPath = (url) => {
     const parsedUrl = new URL(url)
     return parsedUrl.pathname
   } catch (error) {
-    console.error('Failed to parse URL:', error)
+    console.error('Failed to parse URL:', error.message)
     return url
   }
 }
@@ -1403,7 +1561,7 @@ const copyWebhookUrl = async () => {
     await navigator.clipboard.writeText(fullUrl)
     toast.success('Webhook URL copied to clipboard')
   } catch (error) {
-    console.error('Failed to copy webhook URL:', error)
+    console.error('Failed to copy webhook URL:', error.message)
     toast.error('Failed to copy webhook URL')
   }
 }
