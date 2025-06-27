@@ -86,6 +86,7 @@ import InviteModal from '~/components/User/InviteModal.vue'
 import UserForm from '~/components/User/UserForm.vue'
 import { useAgentsStore } from '~/stores/agents'
 import { useToast } from 'vue-toastification'
+import { sanitizeErrorMessage } from '~/utils/sanitize'
 
 definePageMeta({
   layout: 'dashboard',
@@ -127,7 +128,7 @@ const handleInviteUser = async (userData) => {
     
     toast('User invited successfully', { type: 'success' })
   } catch (error) {
-    toast(error.message || 'Failed to invite user', { type: 'error' })
+    toast(sanitizeErrorMessage(error), { type: 'error' })
   }
 }
 
@@ -144,12 +145,19 @@ const handleUpdateUser = async (userId, userData) => {
     
     toast('User updated successfully', { type: 'success' })
   } catch (error) {
-    toast(error.message || 'Failed to update user', { type: 'error' })
+    toast(sanitizeErrorMessage(error), { type: 'error' })
   }
 }
 
 const handleDeleteUser = async (userId) => {
-  if (!confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
+  const user = usersStore.users.find(u => u._id === userId)
+  if (!user) return
+
+  // Enhanced confirmation for user deletion
+  const confirmMessage = `Are you sure you want to delete user "${user.name}"?\n\nThis action cannot be undone and will:\n- Remove all user data\n- Revoke all access permissions\n\nType "${user.email}" to confirm:`
+  
+  const userConfirmation = prompt(confirmMessage)
+  if (userConfirmation !== user.email) {
     return
   }
 
@@ -158,7 +166,7 @@ const handleDeleteUser = async (userId) => {
     
     toast('User deleted successfully', { type: 'success' })
   } catch (error) {
-    toast(error.message || 'Failed to delete user', { type: 'error' })
+    toast(sanitizeErrorMessage(error), { type: 'error' })
   }
 }
 
@@ -167,7 +175,9 @@ const handleToggleUserStatus = async (userId) => {
   if (!user) return
 
   const action = user.isActive ? 'deactivate' : 'activate'
-  if (!confirm(`Are you sure you want to ${action} this user?`)) {
+  const confirmMessage = `Are you sure you want to ${action} user "${user.name}"?`
+  
+  if (!confirm(confirmMessage)) {
     return
   }
 
@@ -176,7 +186,7 @@ const handleToggleUserStatus = async (userId) => {
     
     toast(`User ${action}d successfully`, { type: 'success' })
   } catch (error) {
-    toast(error.message || `Failed to ${action} user`, { type: 'error' })
+    toast(sanitizeErrorMessage(error), { type: 'error' })
   }
 }
 

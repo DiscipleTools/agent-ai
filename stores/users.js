@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia'
+import { sanitizeErrorMessage } from '~/utils/sanitize'
 
 export const useUsersStore = defineStore('users', () => {
   const users = ref([])
@@ -13,16 +14,18 @@ export const useUsersStore = defineStore('users', () => {
     error.value = null
     try {
       const { data } = await $api('/api/users')
-      users.value = data
+      users.value = Array.isArray(data) ? data : []
     } catch (err) {
-      error.value = err.data?.message || 'Failed to fetch users'
-      throw err
+      error.value = sanitizeErrorMessage(err)
+      throw new Error(sanitizeErrorMessage(err))
     } finally {
       loading.value = false
     }
   }
 
   const fetchUser = async (id) => {
+    if (!id) throw new Error('User ID is required')
+    
     loading.value = true
     error.value = null
     try {
@@ -30,14 +33,16 @@ export const useUsersStore = defineStore('users', () => {
       currentUser.value = data
       return data
     } catch (err) {
-      error.value = err.data?.message || 'Failed to fetch user'
-      throw err
+      error.value = sanitizeErrorMessage(err)
+      throw new Error(sanitizeErrorMessage(err))
     } finally {
       loading.value = false
     }
   }
 
   const inviteUser = async (userData) => {
+    if (!userData || !userData.email) throw new Error('Valid user data with email is required')
+    
     loading.value = true
     error.value = null
     try {
@@ -45,17 +50,22 @@ export const useUsersStore = defineStore('users', () => {
         method: 'POST',
         body: userData
       })
-      users.value.unshift(data)
+      if (data) {
+        users.value.unshift(data)
+      }
       return data
     } catch (err) {
-      error.value = err.data?.message || 'Failed to invite user'
-      throw err
+      error.value = sanitizeErrorMessage(err)
+      throw new Error(sanitizeErrorMessage(err))
     } finally {
       loading.value = false
     }
   }
 
   const updateUser = async (id, userData) => {
+    if (!id) throw new Error('User ID is required')
+    if (!userData) throw new Error('User data is required')
+    
     loading.value = true
     error.value = null
     try {
@@ -66,25 +76,27 @@ export const useUsersStore = defineStore('users', () => {
       
       // Update in users list
       const index = users.value.findIndex(user => user._id === id)
-      if (index !== -1) {
+      if (index !== -1 && data) {
         users.value[index] = data
       }
       
       // Update current user if it's the same
-      if (currentUser.value?._id === id) {
+      if (currentUser.value?._id === id && data) {
         currentUser.value = data
       }
       
       return data
     } catch (err) {
-      error.value = err.data?.message || 'Failed to update user'
-      throw err
+      error.value = sanitizeErrorMessage(err)
+      throw new Error(sanitizeErrorMessage(err))
     } finally {
       loading.value = false
     }
   }
 
   const deleteUser = async (id) => {
+    if (!id) throw new Error('User ID is required')
+    
     loading.value = true
     error.value = null
     try {
@@ -97,8 +109,8 @@ export const useUsersStore = defineStore('users', () => {
         currentUser.value = null
       }
     } catch (err) {
-      error.value = err.data?.message || 'Failed to delete user'
-      throw err
+      error.value = sanitizeErrorMessage(err)
+      throw new Error(sanitizeErrorMessage(err))
     } finally {
       loading.value = false
     }

@@ -24,22 +24,22 @@
         </tr>
       </thead>
       <tbody class="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
-        <tr v-for="user in users" :key="user._id" class="hover:bg-gray-50 dark:hover:bg-gray-800">
+        <tr v-for="user in validatedUsers" :key="user._id" class="hover:bg-gray-50 dark:hover:bg-gray-800">
           <td class="px-6 py-4 whitespace-nowrap">
             <div class="flex items-center">
               <div class="flex-shrink-0 h-10 w-10">
                 <div class="h-10 w-10 rounded-full bg-primary-100 dark:bg-primary-900 flex items-center justify-center">
                   <span class="text-sm font-medium text-primary-700 dark:text-primary-300">
-                    {{ user.name.charAt(0).toUpperCase() }}
+                    {{ getSafeInitial(user.name) }}
                   </span>
                 </div>
               </div>
               <div class="ml-4">
                 <div class="text-sm font-medium text-gray-900 dark:text-white">
-                  {{ user.name }}
+                  {{ sanitizeText(user.name) }}
                 </div>
                 <div class="text-sm text-gray-500 dark:text-gray-400">
-                  {{ user.email }}
+                  {{ sanitizeEmail(user.email) }}
                 </div>
               </div>
             </div>
@@ -53,7 +53,7 @@
                   : 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
               ]"
             >
-              {{ user.role }}
+              {{ sanitizeText(user.role) }}
             </span>
           </td>
           <td class="px-6 py-4 whitespace-nowrap">
@@ -69,7 +69,7 @@
             </span>
           </td>
           <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-            {{ user.invitedBy?.name || 'System' }}
+            {{ sanitizeText(user.invitedBy?.name || 'System') }}
           </td>
           <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
             {{ formatDate(user.createdAt) }}
@@ -112,6 +112,7 @@
 
 <script setup>
 import { PencilIcon, TrashIcon, XMarkIcon, CheckIcon } from '@heroicons/vue/24/outline'
+import { sanitizeText, sanitizeEmail } from '~/utils/sanitize'
 
 const props = defineProps({
   users: {
@@ -122,7 +123,30 @@ const props = defineProps({
 
 defineEmits(['edit', 'delete', 'toggle-status'])
 
+// Validate and sanitize user data
+const validatedUsers = computed(() => {
+  return props.users.filter(isValidUser)
+})
+
+const isValidUser = (user) => {
+  return user && 
+         user._id && 
+         typeof user.name === 'string' && 
+         typeof user.email === 'string' &&
+         typeof user.role === 'string' &&
+         typeof user.isActive === 'boolean'
+}
+
+const getSafeInitial = (name) => {
+  const sanitized = sanitizeText(name)
+  return sanitized ? sanitized.charAt(0).toUpperCase() : '?'
+}
+
 const formatDate = (date) => {
-  return new Date(date).toLocaleDateString()
+  try {
+    return new Date(date).toLocaleDateString()
+  } catch {
+    return 'Invalid Date'
+  }
 }
 </script> 
