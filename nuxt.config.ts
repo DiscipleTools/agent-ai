@@ -72,16 +72,18 @@ export default defineNuxtConfig({
           // Content Security Policy
           'Content-Security-Policy': [
             "default-src 'self'",
-            "script-src 'self' 'unsafe-inline' 'unsafe-eval'", // unsafe-inline for development, remove in production
-            "style-src 'self' 'unsafe-inline'",
+            "script-src 'self' 'unsafe-inline'", // unsafe-inline needed for Nuxt.js to function
+            "style-src 'self' 'unsafe-inline'", // Keep unsafe-inline for styles (required by frameworks)
             "img-src 'self' data: https:",
             "connect-src 'self'",
-            "font-src 'self'",
+            "font-src 'self' data:",
             "object-src 'none'",
             "media-src 'self'",
             "frame-src 'none'",
             "worker-src 'self'",
-            "manifest-src 'self'"
+            "manifest-src 'self'",
+            "base-uri 'self'",
+            "form-action 'self'"
           ].join('; '),
           
           // Additional Security Headers
@@ -89,7 +91,7 @@ export default defineNuxtConfig({
           'X-Frame-Options': 'DENY',
           'X-XSS-Protection': '1; mode=block',
           'Referrer-Policy': 'strict-origin-when-cross-origin',
-          'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), payment=()',
+          'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), payment=(), usb=(), magnetometer=(), gyroscope=(), accelerometer=()',
           
           // HSTS (only in production with HTTPS)
           ...(process.env.NODE_ENV === 'production' ? {
