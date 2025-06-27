@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia'
+import { sanitizeEmail, sanitizeErrorMessage } from '~/utils/sanitize.js'
 
 export const useAuthStore = defineStore('auth', () => {
   const user = ref(null)
@@ -12,10 +13,21 @@ export const useAuthStore = defineStore('auth', () => {
   const login = async (credentials) => {
     loading.value = true
     try {
+      // Sanitize inputs
+      const sanitizedCredentials = {
+        email: sanitizeEmail(credentials.email),
+        password: credentials.password // Don't sanitize passwords
+      }
+
+      // Validate sanitized inputs
+      if (!sanitizedCredentials.email || !sanitizedCredentials.password) {
+        throw new Error('Valid email and password are required')
+      }
+
       // Use regular $fetch for login since we don't have a token yet
       const { data } = await $fetch('/api/auth/login', {
         method: 'POST',
-        body: credentials
+        body: sanitizedCredentials
       })
 
       user.value = data.user
@@ -26,7 +38,7 @@ export const useAuthStore = defineStore('auth', () => {
       await router.push('/agents')
       return { success: true }
     } catch (error) {
-      const errorMessage = error.message || error.data?.message || error.statusMessage || 'Login failed'
+      const errorMessage = sanitizeErrorMessage(error)
       throw new Error(errorMessage)
     } finally {
       loading.value = false
@@ -89,7 +101,7 @@ export const useAuthStore = defineStore('auth', () => {
       
       return response
     } catch (error) {
-      const errorMessage = error.data?.message || error.message || 'Failed to update profile'
+      const errorMessage = sanitizeErrorMessage(error)
       throw new Error(errorMessage)
     } finally {
       loading.value = false

@@ -8,21 +8,48 @@
 </template>
 
 <script setup>
+import { sanitizeErrorMessage } from '~/utils/sanitize.js'
+
 definePageMeta({
   layout: 'default'
 })
 
 const authStore = useAuthStore()
+const checking = ref(false)
+
+const isValidToken = (token) => {
+  if (!token || typeof token !== 'string') return false
+  try {
+    const parts = token.split('.')
+    if (parts.length !== 3) return false
+    const payload = JSON.parse(atob(parts[1]))
+    return payload.exp * 1000 > Date.now()
+  } catch {
+    return false
+  }
+}
 
 onMounted(async () => {
-  // Check if user is authenticated
+  if (checking.value) return
+  checking.value = true
+
   const accessToken = useCookie('access-token')
   
-  if (accessToken.value && !authStore.user) {
+  // Invalid token - clear and redirect
+  if (!isValidToken(accessToken.value)) {
+    accessToken.value = null
+    await navigateTo('/login')
+    return
+  }
+
+  // No user data - fetch it
+  if (!authStore.user) {
     try {
       await authStore.fetchUser()
       await navigateTo('/agents')
     } catch (error) {
+      console.warn('Auth failed:', sanitizeErrorMessage(error))
+      accessToken.value = null
       await navigateTo('/login')
     }
   } else if (authStore.isAuthenticated) {

@@ -84,6 +84,7 @@
 
 <script setup>
 import { Form, Field } from 'vee-validate'
+import { sanitizeEmail, sanitizeErrorMessage } from '~/utils/sanitize.js'
 
 definePageMeta({
   layout: 'default'
@@ -102,9 +103,13 @@ onMounted(() => {
 const onSubmit = async (values) => {
   error.value = ''
   try {
-    await authStore.login(values)
+    const sanitizedCredentials = {
+      email: sanitizeEmail(values.email),
+      password: values.password // Don't sanitize passwords - just validate
+    }
+    await authStore.login(sanitizedCredentials)
   } catch (err) {
-    error.value = err.message
+    error.value = sanitizeErrorMessage(err)
   }
 }
 </script> 

@@ -1,5 +1,6 @@
 import { connectDB } from '~/server/utils/db'
 import authService from '~/server/services/authService'
+import { sanitizeEmail, sanitizeErrorMessage } from '~/utils/sanitize.js'
 
 export default defineEventHandler(async (event) => {
   try {
@@ -10,16 +11,20 @@ export default defineEventHandler(async (event) => {
     const body = await readBody(event)
     const { email, password } = body
 
+    // Sanitize inputs
+    const sanitizedEmail = sanitizeEmail(email)
+    const sanitizedPassword = password // Don't sanitize passwords
+
     // Validate input
-    if (!email || !password) {
+    if (!sanitizedEmail || !sanitizedPassword) {
       throw createError({
         statusCode: 400,
-        statusMessage: 'Email and password are required'
+        statusMessage: 'Valid email and password are required'
       })
     }
 
     // Authenticate user
-    const result = await authService.login(email, password)
+    const result = await authService.login(sanitizedEmail, sanitizedPassword)
 
     // Set cookies for tokens
     setCookie(event, 'access-token', result.tokens.accessToken, {
@@ -41,9 +46,10 @@ export default defineEventHandler(async (event) => {
       data: result
     }
   } catch (error) {
+    const sanitizedMessage = sanitizeErrorMessage(error)
     throw createError({
-      statusCode: 401,
-      statusMessage: error.message || 'Authentication failed'
+      statusCode: error.statusCode || 401,
+      statusMessage: sanitizedMessage
     })
   }
 }) 
