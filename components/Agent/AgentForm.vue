@@ -1122,14 +1122,14 @@ const addContextUrl = async () => {
   
   try {
     await agentsStore.addContextUrl(props.agent._id, sanitizedUrl)
-          toast('URL content added successfully', { type: 'success' })
+    toast('URL content added successfully', { type: 'success' })
     urlInput.value = ''
     showUrlInput.value = false
     urlTestResult.value = null
     await reloadAgentData()
   } catch (error) {
     console.error('Failed to add URL:', error.message)
-          toast(error.message || 'Failed to add URL content', { type: 'error' })
+    toast(error.message || 'Failed to add URL content', { type: 'error' })
   } finally {
     urlAdding.value = false
   }
@@ -1144,11 +1144,11 @@ const removeContextDocument = async (docId) => {
   
   try {
     await agentsStore.deleteContextDocument(props.agent._id, docId)
-          toast('Context document removed successfully', { type: 'success' })
+    toast('Context document removed successfully', { type: 'success' })
     await reloadAgentData()
   } catch (error) {
     console.error('Failed to remove document:', error.message)
-          toast(error.message || 'Failed to remove context document', { type: 'error' })
+    toast(error.message || 'Failed to remove context document', { type: 'error' })
   } finally {
     deletingDocs.value.delete(docId)
   }
@@ -1287,14 +1287,10 @@ const handleFileUpload = async (event) => {
   fileUploadProgress.value = 0
   
   try {
-    // Create FormData
-    const formData = new FormData()
-    formData.append('file', file)
-    
     // Upload file with progress tracking
     const response = await agentsStore.uploadContext(props.agent._id, file)
     
-          toast(`File "${file.name}" uploaded and processed successfully`, { type: 'success' })
+    toast(`File "${file.name}" uploaded and processed successfully`, { type: 'success' })
     
     // Clear the file input
     event.target.value = ''
@@ -1304,7 +1300,7 @@ const handleFileUpload = async (event) => {
     
   } catch (error) {
     console.error('File upload failed:', error.message)
-          toast(error.message || 'Failed to upload file', { type: 'error' })
+    toast(error.message || 'Failed to upload file', { type: 'error' })
     event.target.value = '' // Clear the input on error
   } finally {
     fileUploading.value = false
@@ -1421,28 +1417,28 @@ const addContextWebsite = async () => {
     } catch (progressError) {
       console.warn('Progress version failed, falling back to standard method:', progressError.message)
       
-              // Update progress to show fallback
-        Object.assign(crawlingProgress, {
-          phase: 'crawling',
-          message: 'Crawling website (progress not available)...',
-          currentPage: 0,
-          totalPages: sanitizedCrawlOptions.maxPages,
-          percentage: 50, // Show indeterminate progress
-          currentUrl: ''
-        })
-        
-        // Fallback to original method
-        await agentsStore.addContextWebsite(props.agent._id, sanitizedUrl, sanitizedCrawlOptions)
+      // Update progress to show fallback
+      Object.assign(crawlingProgress, {
+        phase: 'crawling',
+        message: 'Crawling website (progress not available)...',
+        currentPage: 0,
+        totalPages: sanitizedCrawlOptions.maxPages,
+        percentage: 50, // Show indeterminate progress
+        currentUrl: ''
+      })
+      
+      // Fallback to original method
+      await agentsStore.addContextWebsite(props.agent._id, sanitizedUrl, sanitizedCrawlOptions)
     }
     
-          toast('Website content added successfully', { type: 'success' })
+    toast('Website content added successfully', { type: 'success' })
     websiteInput.value = ''
     showWebsiteInput.value = false
     websiteTestResult.value = null
     await reloadAgentData()
   } catch (error) {
     console.error('Failed to add website:', error.message)
-          toast(error.message || 'Failed to add website content', { type: 'error' })
+    toast(error.message || 'Failed to add website content', { type: 'error' })
   } finally {
     websiteAdding.value = false
     crawlingProgress.isActive = false

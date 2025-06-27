@@ -7,7 +7,7 @@ export const useAuthStore = defineStore('auth', () => {
   const loading = ref(false)
 
   const router = useRouter()
-  const { $api } = useApi()
+  const { $api, clearCSRFCache } = useApi()
 
   const login = async (credentials) => {
     loading.value = true
@@ -19,6 +19,10 @@ export const useAuthStore = defineStore('auth', () => {
       })
 
       user.value = data.user
+      
+      // Clear CSRF cache to ensure fresh token on next request
+      clearCSRFCache()
+      
       await router.push('/agents')
       return { success: true }
     } catch (error) {
@@ -37,8 +41,9 @@ export const useAuthStore = defineStore('auth', () => {
     } catch (error) {
       console.error('Logout error:', error)
     } finally {
-      // Clear user data
+      // Clear user data and CSRF cache
       user.value = null
+      clearCSRFCache()
       await router.push('/login')
     }
   }

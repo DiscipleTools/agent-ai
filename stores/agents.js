@@ -7,6 +7,7 @@ export const useAgentsStore = defineStore('agents', () => {
   const error = ref(null)
 
   const { $api } = useApi()
+  const { csrfRequest, addCsrfToForm } = useCsrf()
 
   const fetchAgents = async () => {
     loading.value = true
@@ -45,7 +46,7 @@ export const useAgentsStore = defineStore('agents', () => {
     loading.value = true
     error.value = null
     try {
-      const response = await $api('/api/agents', {
+      const response = await csrfRequest('/api/agents', {
         method: 'POST',
         body: agentData
       })
@@ -85,7 +86,7 @@ export const useAgentsStore = defineStore('agents', () => {
     loading.value = true
     error.value = null
     try {
-      const response = await $api(`/api/agents/${id}`, {
+      const response = await csrfRequest(`/api/agents/${id}`, {
         method: 'PUT',
         body: agentData
       })
@@ -114,7 +115,7 @@ export const useAgentsStore = defineStore('agents', () => {
     loading.value = true
     error.value = null
     try {
-      await $api(`/api/agents/${id}`, {
+      await csrfRequest(`/api/agents/${id}`, {
         method: 'DELETE'
       })
       agents.value = agents.value.filter(agent => agent._id !== id)
@@ -156,7 +157,7 @@ export const useAgentsStore = defineStore('agents', () => {
 
   const deleteContextDocument = async (agentId, docId) => {
     try {
-      const response = await $api(`/api/agents/${agentId}/context/${docId}`, {
+      const response = await csrfRequest(`/api/agents/${agentId}/context/${docId}`, {
         method: 'DELETE'
       })
       
@@ -174,7 +175,7 @@ export const useAgentsStore = defineStore('agents', () => {
 
   const updateContextDocument = async (agentId, docId, updateData) => {
     try {
-      const response = await $api(`/api/agents/${agentId}/context/${docId}`, {
+      const response = await csrfRequest(`/api/agents/${agentId}/context/${docId}`, {
         method: 'PUT',
         body: updateData
       })
@@ -193,7 +194,7 @@ export const useAgentsStore = defineStore('agents', () => {
 
   const refreshContextDocument = async (agentId, docId) => {
     try {
-      const response = await $api(`/api/agents/${agentId}/context/${docId}`, {
+      const response = await csrfRequest(`/api/agents/${agentId}/context/${docId}`, {
         method: 'PUT',
         body: { refreshUrl: true }
       })
@@ -309,7 +310,7 @@ export const useAgentsStore = defineStore('agents', () => {
 
   const testUrl = async (agentId, url) => {
     try {
-      const response = await $api(`/api/agents/${agentId}/context/test-url`, {
+      const response = await csrfRequest(`/api/agents/${agentId}/context/test-url`, {
         method: 'POST',
         body: { url }
       })
@@ -335,8 +336,11 @@ export const useAgentsStore = defineStore('agents', () => {
     const formData = new FormData()
     formData.append('file', file)
     
+    // Add CSRF token to form data
+    await addCsrfToForm(formData)
+    
     try {
-      const response = await $api(`/api/agents/${agentId}/context/upload`, {
+      const response = await csrfRequest(`/api/agents/${agentId}/context/upload`, {
         method: 'POST',
         body: formData
       })
@@ -355,7 +359,7 @@ export const useAgentsStore = defineStore('agents', () => {
 
   const addContextUrl = async (agentId, url) => {
     try {
-      const response = await $api(`/api/agents/${agentId}/context/url`, {
+      const response = await csrfRequest(`/api/agents/${agentId}/context/url`, {
         method: 'POST',
         body: { url }
       })
@@ -374,7 +378,7 @@ export const useAgentsStore = defineStore('agents', () => {
 
   const testWebsite = async (agentId, url, options = {}) => {
     try {
-      const response = await $api(`/api/agents/${agentId}/context/test-website`, {
+      const response = await csrfRequest(`/api/agents/${agentId}/context/test-website`, {
         method: 'POST',
         body: { url, options }
       })
@@ -397,7 +401,7 @@ export const useAgentsStore = defineStore('agents', () => {
 
   const addContextWebsite = async (agentId, url, options = {}) => {
     try {
-      const response = await $api(`/api/agents/${agentId}/context/website`, {
+      const response = await csrfRequest(`/api/agents/${agentId}/context/website`, {
         method: 'POST',
         body: { url, options }
       })
@@ -536,7 +540,7 @@ export const useAgentsStore = defineStore('agents', () => {
   // RAG Search functionality
   const searchRAG = async (agentId, query, limit = 5) => {
     try {
-      const response = await $api(`/api/agents/${agentId}/rag/search`, {
+      const response = await csrfRequest(`/api/agents/${agentId}/rag/search`, {
         method: 'POST',
         body: { query, limit }
       })
