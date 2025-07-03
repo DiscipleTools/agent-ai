@@ -1,6 +1,20 @@
+/**
+ * AuthService
+ *
+ * This service is responsible for all authentication-related logic, including
+ * user login, token generation, token verification, and user session management.
+ *
+ * It is used by the following API endpoints:
+ * - POST /api/auth/login
+ * - POST /api/auth/logout
+ * - GET /api/auth/me
+ * - POST /api/auth/refresh
+ * - POST /api/auth/setup-account
+ */
 import jwt from 'jsonwebtoken'
 import crypto from 'crypto'
 import User from '../models/User'
+import { sanitizeEmail, sanitizePassword } from '~/utils/sanitize'
 
 class AuthService {
   /**
@@ -101,16 +115,20 @@ class AuthService {
    */
   async login(email, password) {
     try {
+      // Sanitize inputs for security
+      const sanitizedEmail = sanitizeEmail(email)
+      const sanitizedPassword = sanitizePassword(password)
+
       // Find user by email
-      const user = await User.findByEmail(email);
+      const user = await User.findByEmail(sanitizedEmail)
       if (!user) {
-        throw new Error('Invalid credentials');
+        throw new Error('Invalid credentials')
       }
 
       // Check password
-      const isPasswordValid = await user.comparePassword(password);
+      const isPasswordValid = await user.comparePassword(sanitizedPassword)
       if (!isPasswordValid) {
-        throw new Error('Invalid credentials');
+        throw new Error('Invalid credentials')
       }
 
       // Generate tokens

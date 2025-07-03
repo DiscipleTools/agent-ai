@@ -1,4 +1,16 @@
+/**
+ * Chatwoot Service
+ * 
+ * This service is responsible for all interactions with the Chatwoot API.
+ * It handles sending messages, retrieving conversation history, and updating
+ * conversation statuses. It can use system-wide Chatwoot credentials from
+ * settings or environment variables, or it can use agent-specific API keys.
+ * 
+ * Used by:
+ * - POST /api/webhook/agent/[id]/chat
+ */
 import settingsService from './settingsService'
+import { sanitizeUrl, sanitizeContent } from '../../utils/sanitize'
 
 class ChatwootService {
   private chatwootUrl: string
@@ -15,21 +27,33 @@ class ChatwootService {
       
       // Check if chatwoot is configured in settings and enabled
       if (chatwootSettings?.enabled && chatwootSettings.url) {
+        const sanitizedUrl = sanitizeUrl(chatwootSettings.url)
+        if (!sanitizedUrl) {
+          console.error('Invalid or unsafe Chatwoot URL configured in settings:', chatwootSettings.url)
+          return { url: '', apiToken: '' }
+        }
         return {
-          url: chatwootSettings.url,
+          url: sanitizedUrl,
           apiToken: chatwootSettings.apiToken || this.apiToken
         }
       }
       
       // Fall back to environment variables
+      const sanitizedUrl = sanitizeUrl(this.chatwootUrl)
+      if (!sanitizedUrl) {
+        console.error('Invalid or unsafe Chatwoot URL in environment variables')
+        return { url: '', apiToken: '' }
+      }
       return {
-        url: this.chatwootUrl,
+        url: sanitizedUrl,
         apiToken: this.apiToken
       }
     } catch (error) {
       console.error('Failed to get chatwoot config from settings, using env vars:', error)
+      // Fallback to environment variables on error, but still sanitize
+      const sanitizedUrl = sanitizeUrl(this.chatwootUrl)
       return {
-        url: this.chatwootUrl,
+        url: sanitizedUrl,
         apiToken: this.apiToken
       }
     }
@@ -52,11 +76,11 @@ class ChatwootService {
       }
 
       // Use configured URL or fall back to environment URL if we have a custom API key
-      const baseUrl = config.url || this.chatwootUrl
+      const baseUrl = config.url || sanitizeUrl(this.chatwootUrl)
       const url = `${baseUrl}/api/v1/accounts/${accountId}/conversations/${conversationId}/messages`
       
       const requestBody = {
-        content,
+        content: sanitizeContent(content),
         message_type: 'outgoing'
       }
 
@@ -153,7 +177,7 @@ class ChatwootService {
       }
 
       // Use configured URL or fall back to environment URL if we have a custom API key
-      const baseUrl = config.url || this.chatwootUrl
+      const baseUrl = config.url || sanitizeUrl(this.chatwootUrl)
       const url = `${baseUrl}/api/v1/accounts/${accountId}/conversations/${conversationId}/messages`
       
       console.log('Fetching conversation messages from:', url)
@@ -200,8 +224,14 @@ class ChatwootService {
         return { success: false, message: 'Chatwoot not configured' }
       }
 
+      // Validate status
+      const allowedStatuses = ['open', 'resolved', 'pending', 'snoozed']
+      if (!allowedStatuses.includes(status)) {
+        throw new Error(`Invalid conversation status: ${status}`)
+      }
+
       // Use configured URL or fall back to environment URL if we have a custom API key
-      const baseUrl = config.url || this.chatwootUrl
+      const baseUrl = config.url || sanitizeUrl(this.chatwootUrl)
       const url = `${baseUrl}/api/v1/accounts/${accountId}/conversations/${conversationId}/toggle_status`
       
       const requestBody = {

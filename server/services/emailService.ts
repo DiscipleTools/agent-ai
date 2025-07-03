@@ -1,8 +1,25 @@
+/**
+ * Email Service
+ *
+ * This service is responsible for handling all outgoing transactional emails from the application.
+ * It uses Nodemailer with SMTP to send emails and Handlebars for templating.
+ *
+ * It supports various email types including:
+ * - User invitations
+ * - Password resets
+ * - Welcome emails
+ *
+ * The service loads email templates from the `server/templates/email` directory and can
+ * fall back to pre-defined templates if the files are not found. Configuration is
+ * pulled from the main application settings. It also includes a utility to test
+ * the email configuration.
+ */
 import nodemailer from 'nodemailer'
 import handlebars from 'handlebars'
 import { readFileSync } from 'fs'
 import { join } from 'path'
 import settingsService from './settingsService'
+import { sanitizeText, sanitizeToken, sanitizeErrorMessage } from '../../utils/sanitize'
 
 interface EmailConfig {
   provider: 'smtp'
@@ -226,11 +243,11 @@ The {{appName}} Team
 
       const appName = config.from.name || 'Agent AI Server'
       const baseUrl = process.env.FRONTEND_URL || 'http://localhost:3000'
-      const setupUrl = `${baseUrl}/setup-account?token=${invitationToken}`
+      const setupUrl = `${baseUrl}/setup-account?token=${sanitizeToken(invitationToken)}`
 
       const templateData = {
-        userName,
-        invitedByName,
+        userName: sanitizeText(userName),
+        invitedByName: sanitizeText(invitedByName),
         appName,
         setupUrl
       }
@@ -276,10 +293,10 @@ The {{appName}} Team
 
       const appName = config.from.name || 'Agent AI Server'
       const baseUrl = process.env.FRONTEND_URL || 'http://localhost:3000'
-      const resetUrl = `${baseUrl}/reset-password?token=${resetToken}`
+      const resetUrl = `${baseUrl}/reset-password?token=${sanitizeToken(resetToken)}`
 
       const templateData = {
-        userName,
+        userName: sanitizeText(userName),
         appName,
         resetUrl
       }
@@ -324,7 +341,7 @@ The {{appName}} Team
       const baseUrl = process.env.FRONTEND_URL || 'http://localhost:3000'
 
       const templateData = {
-        userName,
+        userName: sanitizeText(userName),
         appName,
         dashboardUrl: `${baseUrl}/agents`
       }
@@ -410,7 +427,8 @@ The ${appName} Team
       
       return { success: true, message: 'Email configuration is valid and working' }
     } catch (error: any) {
-      return { success: false, message: `Email configuration error: ${error.message}` }
+      console.error('Email configuration error:', error)
+      return { success: false, message: sanitizeErrorMessage(error) }
     }
   }
 }
