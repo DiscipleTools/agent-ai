@@ -132,7 +132,8 @@ const settingsSchema = new mongoose.Schema({
     required: true
   }
 }, {
-  timestamps: true
+  timestamps: true,
+  strict: true
 })
 
 // Ensure only one settings document exists

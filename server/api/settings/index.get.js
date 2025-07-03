@@ -33,9 +33,14 @@ export default authMiddleware.admin(async (event, checker) => {
       await settings.populate('updatedBy', 'name email')
     }
 
+    const settingsObj = settings.toObject()
+    if (settingsObj.predictionGuard) {
+      delete settingsObj.predictionGuard
+    }
+
     // Don't send the actual API keys, just indicate if they're set
     const response = {
-      ...settings.toObject(),
+      ...settingsObj,
       aiConnections: settings.aiConnections?.map(conn => {
         const connObj = conn.toObject()
         return {

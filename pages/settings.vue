@@ -8,7 +8,7 @@
     </div>
 
     <!-- Loading State -->
-    <div v-if="settingsStore.loading && !settingsStore.settings" class="flex justify-center py-12">
+    <div v-if="initialLoading" class="flex justify-center py-12">
       <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
     </div>
 
@@ -58,16 +58,16 @@ definePageMeta({
 })
 
 const settingsStore = useSettingsStore()
+const initialLoading = ref(true)
 
 // Fetch settings on mount
 const fetchSettings = async () => {
   try {
-    await Promise.all([
-      settingsStore.fetchSettings(),
-      settingsStore.fetchAIConnections()
-    ])
+    await settingsStore.fetchSettings()
   } catch (error) {
     console.error('Failed to fetch settings:', error)
+  } finally {
+    initialLoading.value = false
   }
 }
 
