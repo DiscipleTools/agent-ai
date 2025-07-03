@@ -1,15 +1,11 @@
 import User from '~/server/models/User'
-import { requireAuth, requireAdmin } from '~/server/utils/auth'
+import { authMiddleware } from '~/server/utils/auth'
 import { connectDB } from '~/server/utils/db'
 
-export default defineEventHandler(async (event) => {
+export default authMiddleware.admin(async (event, checker) => {
   try {
     // Connect to database
     await connectDB()
-    
-    // Require authentication and admin role
-    await requireAuth(event)
-    await requireAdmin(event)
 
     // Get active users only (keeping isActive filtering)
     const users = await User.find({ isActive: true })

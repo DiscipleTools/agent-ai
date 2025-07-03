@@ -1,10 +1,8 @@
 import settingsService from '~/server/services/settingsService'
-import { requireAuth } from '~/server/utils/auth'
+import { authMiddleware } from '~/server/utils/auth'
 
-export default defineEventHandler(async (event) => {
+export default authMiddleware.auth(async (event, checker) => {
   try {
-    // Require authentication
-    await requireAuth(event)
 
     const connections = await settingsService.getAllAIConnections()
     const defaultConnection = await settingsService.getDefaultAIConnection()

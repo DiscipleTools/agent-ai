@@ -1,14 +1,14 @@
 import { connectDB } from '~/server/utils/db'
-import { requireAuth } from '~/server/utils/auth'
+import { authMiddleware } from '~/server/utils/auth'
 import Agent from '~/server/models/Agent'
 
-export default defineEventHandler(async (event) => {
+export default authMiddleware.auth(async (event, checker) => {
   try {
     // Connect to database
     await connectDB()
 
-    // Require authentication
-    const user = await requireAuth(event)
+    // Get user from checker
+    const user = checker.user
 
     // Build query based on user role
     let query: any = {}

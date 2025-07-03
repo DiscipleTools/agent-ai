@@ -1,14 +1,11 @@
 import settingsService from '~/server/services/settingsService'
 import aiService from '~/server/services/aiService'
-import { requireAuth, requireAdmin } from '~/server/utils/auth'
+import { authMiddleware } from '~/server/utils/auth'
 
-export default defineEventHandler(async (event) => {
+export default authMiddleware.admin(async (event, checker) => {
   try {
-    // Require authentication and admin role
-    await requireAuth(event)
-    await requireAdmin(event)
-
-    const user = event.context.user
+    // Get user from checker
+    const user = checker.user
     const connectionId = getRouterParam(event, 'id')
 
     if (!connectionId) {

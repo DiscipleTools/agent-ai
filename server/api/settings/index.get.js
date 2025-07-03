@@ -1,13 +1,10 @@
 import Settings from '../../models/Settings.js'
-import { requireAuth, requireAdmin } from '../../utils/auth.ts'
+import { authMiddleware } from '../../utils/auth.ts'
 
-export default defineEventHandler(async (event) => {
+export default authMiddleware.admin(async (event, checker) => {
   try {
-    // Require authentication and admin role
-    await requireAuth(event)
-    await requireAdmin(event)
-
-    const user = event.context.user
+    // Get user from checker
+    const user = checker.user
 
     // Get settings (there should only be one document)
     let settings = await Settings.findOne().populate('updatedBy', 'name email')

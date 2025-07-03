@@ -1,10 +1,9 @@
-import { requireAuth, requireAdmin } from '~/server/utils/auth'
+import { authMiddleware } from '~/server/utils/auth'
 import emailService from '~/server/services/emailService'
 
-export default defineEventHandler(async (event) => {
-  // Require authentication and admin role
-  const user = await requireAuth(event)
-  await requireAdmin(event)
+export default authMiddleware.admin(async (event, checker) => {
+  // Get user from checker
+  const user = checker.user
 
   try {
     // Send test email to the current user

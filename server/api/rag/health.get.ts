@@ -1,18 +1,8 @@
 import { ragService } from '~/server/services/ragService'
-import { requireAuth } from '~/server/utils/auth'
+import { authMiddleware } from '~/server/utils/auth'
 
-export default defineEventHandler(async (event) => {
+export default authMiddleware.admin(async (event, checker) => {
   try {
-    // Verify authentication
-    const user = await requireAuth(event)
-    
-    // Only allow admin users to check RAG health
-    if (user.role !== 'admin') {
-      throw createError({
-        statusCode: 403,
-        statusMessage: 'Access denied. Admin privileges required.'
-      })
-    }
 
     // Check RAG system health
     const healthStatus = await ragService.healthCheck()

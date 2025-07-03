@@ -1,11 +1,9 @@
 import User from '~/server/models/User'
-import { requireAuth, requireAdmin } from '~/server/utils/auth'
+import { authMiddleware } from '~/server/utils/auth'
 
-export default defineEventHandler(async (event) => {
-  // Require authentication and admin role
-  await requireAuth(event)
-  await requireAdmin(event)
-
+export default authMiddleware.admin(async (event, checker) => {
+  // Get user from checker
+  const user = checker.user
   const userId = getRouterParam(event, 'id')
   const body = await readBody(event)
   const { name, role, agentAccess, isActive } = body
@@ -35,7 +33,7 @@ export default defineEventHandler(async (event) => {
     }
 
     // Prevent admin from deactivating themselves
-    if (userId === event.context.user._id.toString() && isActive === false) {
+    if (userId === user._id.toString() && isActive === false) {
       throw createError({
         statusCode: 400,
         statusMessage: 'You cannot deactivate your own account'
@@ -43,7 +41,7 @@ export default defineEventHandler(async (event) => {
     }
 
     // Prevent admin from changing their own role
-    if (userId === event.context.user._id.toString() && role && role !== user.role) {
+    if (userId === user._id.toString() && role && role !== user.role) {
       throw createError({
         statusCode: 400,
         statusMessage: 'You cannot change your own role'

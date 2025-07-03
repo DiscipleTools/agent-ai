@@ -6,29 +6,17 @@
  * Returns success confirmation with deleted document details.
  */
 import { connectDB } from '~/server/utils/db'
-import { requireAuth } from '~/server/utils/auth'
+import { authMiddleware } from '~/server/utils/auth'
 import Agent from '~/server/models/Agent'
 import mongoose from 'mongoose'
 
-export default defineEventHandler(async (event) => {
+export default authMiddleware.agentAccess('write')(async (event, checker, agentId) => {
   try {
     // Connect to database
     await connectDB()
 
-    // Verify authentication
-    const user = await requireAuth(event)
-
-    // Get agent ID and document ID from params
-    const agentId = getRouterParam(event, 'id')
+    // Get document ID from params (agentId already validated by middleware)
     const docId = getRouterParam(event, 'docId')
-    
-    if (!agentId) {
-      throw createError({
-        statusCode: 400,
-        statusMessage: 'Agent ID is required'
-      })
-    }
-
     if (!docId) {
       throw createError({
         statusCode: 400,
@@ -36,28 +24,19 @@ export default defineEventHandler(async (event) => {
       })
     }
 
-    if (!mongoose.Types.ObjectId.isValid(agentId) || !mongoose.Types.ObjectId.isValid(docId)) {
+    if (!mongoose.Types.ObjectId.isValid(docId)) {
       throw createError({
         statusCode: 400,
-        statusMessage: 'Invalid ID format'
+        statusMessage: 'Invalid document ID format'
       })
     }
 
-    // Find the agent
+    // Find the agent (permission already verified by middleware)
     const agent = await Agent.findById(agentId)
     if (!agent) {
       throw createError({
         statusCode: 404,
         statusMessage: 'Agent not found'
-      })
-    }
-
-    // Check if user has access to this agent
-    const hasAccess = user.role === 'admin' || user.agentAccess?.some((id: mongoose.Types.ObjectId) => id.toString() === agentId)
-    if (!hasAccess) {
-      throw createError({
-        statusCode: 403,
-        statusMessage: 'Access denied to this agent'
       })
     }
 

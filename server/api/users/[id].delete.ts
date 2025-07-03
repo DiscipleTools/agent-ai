@@ -1,11 +1,8 @@
 import User from '~/server/models/User'
 import Agent from '~/server/models/Agent'
-import { requireAuth, requireAdmin } from '~/server/utils/auth'
+import { authMiddleware } from '~/server/utils/auth'
 
-export default defineEventHandler(async (event) => {
-  // Require authentication and admin role
-  await requireAuth(event)
-  await requireAdmin(event)
+export default authMiddleware.admin(async (event, checker) => {
 
   const userId = getRouterParam(event, 'id')
 

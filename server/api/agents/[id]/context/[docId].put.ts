@@ -24,7 +24,7 @@
  */
 
 import { connectDB } from '~/server/utils/db'
-import { requireAuth } from '~/server/utils/auth'
+import { authMiddleware } from '~/server/utils/auth'
 import { isAllowedUrl } from '~/server/utils/urlValidator'
 import Agent from '~/server/models/Agent'
 import webScrapingService from '~/server/services/webScrapingService'
@@ -200,28 +200,24 @@ function createEventStream(event: any) {
   }
 }
 
-export default defineEventHandler(async (event) => {
+export default authMiddleware.agentAccess('write')(async (event, checker, agentId) => {
   try {
     // Connect to database
     await connectDB()
 
-    // Verify authentication
-    const user = await requireAuth(event)
-
-    // Get agent ID and document ID from params
-    const agentId = getRouterParam(event, 'id')
+    // Get document ID from params
     const docId = getRouterParam(event, 'docId')
     
-    if (!agentId || !docId) {
+    if (!docId) {
       throw createError({
         statusCode: 400,
-        statusMessage: 'Agent ID and Document ID are required'
+        statusMessage: 'Document ID is required'
       })
     }
-    if (!mongoose.Types.ObjectId.isValid(agentId) || !mongoose.Types.ObjectId.isValid(docId)) {
+    if (!mongoose.Types.ObjectId.isValid(docId)) {
       throw createError({
         statusCode: 400,
-        statusMessage: 'Invalid ID format'
+        statusMessage: 'Invalid document ID format'
       })
     }
 
@@ -243,14 +239,6 @@ export default defineEventHandler(async (event) => {
       throw createError({
         statusCode: 404,
         statusMessage: 'Agent not found'
-      })
-    }
-
-    // Check if user has access to this agent
-    if (user.role !== 'admin' && !user.agentAccess?.includes(new mongoose.Types.ObjectId(agentId))) {
-      throw createError({
-        statusCode: 403,
-        statusMessage: 'Access denied to this agent'
       })
     }
 

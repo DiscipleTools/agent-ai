@@ -1,15 +1,12 @@
 import Settings from '../../models/Settings.js'
 import settingsService from '../../services/settingsService.ts'
-import { requireAuth, requireAdmin } from '../../utils/auth.ts'
+import { authMiddleware } from '../../utils/auth.ts'
 import { sanitizeText, sanitizeEmail, sanitizeUrl, validators } from '~/utils/sanitize.js'
 
-export default defineEventHandler(async (event) => {
+export default authMiddleware.admin(async (event, checker) => {
   try {
-    // Require authentication and admin role
-    await requireAuth(event)
-    await requireAdmin(event)
-
-    const user = event.context.user
+    // Get user from checker
+    const user = checker.user
     const body = await readBody(event)
 
     // Enhanced validation and sanitization

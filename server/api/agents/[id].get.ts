@@ -1,26 +1,13 @@
 import { connectDB } from '~/server/utils/db'
-import { requireAuth } from '~/server/utils/auth'
+import { authMiddleware } from '~/server/utils/auth'
 import Agent from '~/server/models/Agent'
 import { ragService } from '~/server/services/ragService'
 import mongoose from 'mongoose'
 
-export default defineEventHandler(async (event) => {
+export default authMiddleware.agentAccess('read')(async (event, checker, agentId) => {
   try {
     // Connect to database
     await connectDB()
-
-    // Require authentication
-    const user = await requireAuth(event)
-
-    // Get agent ID from params
-    const agentId = getRouterParam(event, 'id')
-
-    if (!agentId) {
-      throw createError({
-        statusCode: 400,
-        statusMessage: 'Agent ID is required'
-      })
-    }
 
     // Find agent
     const agent = await Agent.findById(agentId).populate('createdBy', 'name email')
@@ -29,14 +16,6 @@ export default defineEventHandler(async (event) => {
       throw createError({
         statusCode: 404,
         statusMessage: 'Agent not found'
-      })
-    }
-
-    // Check access permissions
-    if (user.role !== 'admin' && !user.agentAccess?.includes(new mongoose.Types.ObjectId(agentId))) {
-      throw createError({
-        statusCode: 403,
-        statusMessage: 'Access denied'
       })
     }
 

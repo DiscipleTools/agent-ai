@@ -1,16 +1,16 @@
 import User from '~/server/models/User'
-import { requireAuth } from '~/server/utils/auth'
+import { authMiddleware } from '~/server/utils/auth'
 import { connectDB } from '~/server/utils/db'
 import bcrypt from 'bcryptjs'
 import { sanitizeEmail, sanitizeText, sanitizeErrorMessage } from '~/utils/sanitize.js'
 
-export default defineEventHandler(async (event) => {
+export default authMiddleware.auth(async (event, checker) => {
   try {
     // Connect to database
     await connectDB()
 
-    // Require authentication 
-    const authUser = await requireAuth(event)
+    // Get authenticated user
+    const authUser = checker.user
 
     // Get request body
     const body = await readBody(event)

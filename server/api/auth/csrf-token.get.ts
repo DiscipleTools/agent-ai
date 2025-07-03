@@ -1,10 +1,8 @@
-import { requireAuth } from '~/server/utils/auth'
+import { authMiddleware } from '~/server/utils/auth'
 import csrfService from '~/server/services/csrfService'
 
-export default defineEventHandler(async (event) => {
+export default authMiddleware.auth(async (event, checker) => {
   try {
-    // Require authentication first
-    await requireAuth(event)
 
     // Generate CSRF token for the authenticated user
     const csrfToken = csrfService.generateFromRequest(event)

@@ -1,12 +1,10 @@
 import User from '~/server/models/User'
-import { requireAuth, requireAdmin } from '~/server/utils/auth'
+import { authMiddleware } from '~/server/utils/auth'
 import emailService from '~/server/services/emailService'
 
-export default defineEventHandler(async (event) => {
-  // Require authentication and admin role
-  await requireAuth(event)
-  await requireAdmin(event)
-
+export default authMiddleware.admin(async (event, checker) => {
+  // Get user from checker
+  const user = checker.user
   const body = await readBody(event)
   const { email, name, role = 'user', agentAccess = [] } = body
 
@@ -63,7 +61,7 @@ export default defineEventHandler(async (event) => {
       password: tempPassword, // Will be hashed by the pre-save hook
       role,
       agentAccess,
-      invitedBy: event.context.user._id,
+      invitedBy: user._id,
       isActive: false // User starts inactive until they complete setup
     })
 
@@ -81,7 +79,7 @@ export default defineEventHandler(async (event) => {
       const emailSent = await emailService.sendInvitationEmail(
         newUser.email,
         newUser.name,
-        event.context.user.name,
+        user.name,
         invitationToken
       )
 
