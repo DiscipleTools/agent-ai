@@ -3,10 +3,10 @@
  * Validates a user invitation token to ensure it is valid and not expired.
  * Returns basic user information if the token is valid.
  */
-import User from '../../models/User.ts'
-import { connectDB } from '../../utils/db'
+import User from '~/server/models/User'
+import { connectDB } from '~/server/utils/db'
 import crypto from 'crypto'
-import { sanitizeToken, sanitizeErrorMessage } from '../../../utils/sanitize.js'
+import { sanitizeToken, sanitizeErrorMessage } from '~/utils/sanitize.js'
 
 export default defineEventHandler(async (event) => {
   try {

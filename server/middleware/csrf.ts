@@ -1,12 +1,13 @@
-import { requireAuth } from '~/server/utils/auth'
-import csrfService from '~/server/services/csrfService'
-
 /**
  * CSRF Protection Middleware
  * 
  * Validates CSRF tokens on state-changing HTTP methods (POST, PUT, DELETE, PATCH)
  * to prevent Cross-Site Request Forgery attacks.
  */
+
+import { requireAuth } from '~/server/utils/auth'
+import csrfService from '~/server/services/csrfService'
+
 export default defineEventHandler(async (event) => {
   // Only apply CSRF protection to API routes
   if (!event.node.req.url?.startsWith('/api/')) {
@@ -39,7 +40,7 @@ export default defineEventHandler(async (event) => {
   }
 
   // Also skip for webhook endpoints (they have their own authentication)
-  if (requestPath.includes('/webhook/')) {
+  if (requestPath.startsWith('/api/webhook/')) {
     return
   }
 

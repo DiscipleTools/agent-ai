@@ -1,7 +1,13 @@
+/**
+ * @description Handles incoming ChatWoot webhooks for a specific agent.
+ *              It processes new messages, generates an AI response, and sends it back to the ChatWoot conversation.
+ * @endpoint POST /api/webhook/agent/[id]
+ */
 import { connectDB } from '~/server/utils/db'
 import Agent from '~/server/models/Agent'
 import chatwootService from '~/server/services/chatwootService'
 import aiService from '~/server/services/aiService'
+import { sanitizeContent, sanitizeNumber } from '~/utils/sanitize.js'
 
 interface AgentSettings {
   temperature?: number
@@ -56,11 +62,6 @@ export default defineEventHandler(async (event) => {
     // Get webhook payload
     const payload = await readBody(event)
 
-    // Print the entire payload for debugging
-    console.log('=== WEBHOOK PAYLOAD START ===')
-    console.log(JSON.stringify(payload, null, 2))
-    console.log('=== WEBHOOK PAYLOAD END ===')
-
     // Validate ChatWoot webhook payload
     if (!payload || typeof payload !== 'object') {
       throw createError({
@@ -91,6 +92,12 @@ export default defineEventHandler(async (event) => {
     const messageContent = payload.content || ''
     const conversationObj = payload.conversation
     const accountId = payload.account?.id || conversationObj?.account_id || 1
+    const conversationId = conversationObj?.id || 0
+
+    // Sanitize critical inputs from the webhook payload
+    const sanitizedMessage = sanitizeContent(messageContent)
+    const sanitizedAccountId = sanitizeNumber(accountId)
+    const sanitizedConversationId = sanitizeNumber(conversationId)
 
     // Skip if message is outgoing or template (from agent/bot/system)
     if (payload.message_type === 'outgoing' || payload.message_type === 'template') {
@@ -101,7 +108,7 @@ export default defineEventHandler(async (event) => {
     }
 
     // Skip if no message content
-    if (!messageContent || !messageContent.trim()) {
+    if (!sanitizedMessage || !sanitizedMessage.trim()) {
       return {
         success: true,
         message: 'Skipped empty message'
@@ -109,9 +116,9 @@ export default defineEventHandler(async (event) => {
     }
 
     console.log('Webhook received for agent:', agent.name)
-    console.log('Message length:', messageContent.length, 'characters')
-    console.log('Conversation ID:', conversationObj?.id || 'unknown')
-    console.log('Account ID:', accountId)
+    console.log('Message length:', sanitizedMessage.length, 'characters')
+    console.log('Conversation ID:', sanitizedConversationId || 'unknown')
+    console.log('Account ID:', sanitizedAccountId)
     console.log('Conversation status:', conversationObj?.status || 'unknown')
 
     // Check if conversation status is "pending" and update it to "open" (async, non-blocking)
@@ -119,8 +126,8 @@ export default defineEventHandler(async (event) => {
       console.log('Conversation is pending, updating status to "open" asynchronously...')
       // Run status update in background without waiting
       chatwootService.updateConversationStatus(
-        accountId,
-        conversationObj.id,
+        sanitizedAccountId,
+        sanitizedConversationId,
         'open',
         agent.settings?.chatwootApiKey
       ).then(() => {
@@ -136,8 +143,8 @@ export default defineEventHandler(async (event) => {
     try {
       // Try to fetch conversation messages via API
       const messages = await chatwootService.getConversationMessages(
-        accountId,
-        conversationObj?.id || 0,
+        sanitizedAccountId,
+        sanitizedConversationId,
         agent.settings?.chatwootApiKey
       )
       
@@ -148,7 +155,7 @@ export default defineEventHandler(async (event) => {
           .filter(msg => 
             msg.content && 
             msg.content.trim() && 
-            msg.content !== messageContent.trim() && // Exclude current message
+            msg.content !== sanitizedMessage.trim() && // Exclude current message
             msg.id !== payload.id // Exclude current message by ID too
           )
           .slice(-10) // Get last 10 messages for context
@@ -161,7 +168,7 @@ export default defineEventHandler(async (event) => {
             const role: 'user' | 'assistant' = isIncoming ? 'user' : 'assistant'
             return {
               role,
-              content: msg.content.trim()
+              content: sanitizeContent(msg.content.trim())
             }
           })
           .filter(msg => msg.content.length > 0) // Remove empty messages
@@ -192,7 +199,7 @@ export default defineEventHandler(async (event) => {
         agent._id,
         agent.prompt,
         agent.contextDocuments || [],
-        messageContent.trim(),
+        sanitizedMessage.trim(),
         {
           temperature: agent.settings?.temperature,
           maxTokens: agent.settings?.maxTokens,
@@ -206,7 +213,7 @@ export default defineEventHandler(async (event) => {
       console.log('AI response generated:', {
         agentName: agent.name,
         responseLength: responseMessage.length,
-        originalMessageLength: messageContent.length
+        originalMessageLength: sanitizedMessage.length
       })
       
     } catch (aiError: any) {
@@ -220,7 +227,7 @@ export default defineEventHandler(async (event) => {
         agentId: agent._id,
         agentName: agent.name,
         error: aiError.message,
-        userMessageLength: messageContent.length
+        userMessageLength: sanitizedMessage.length
       })
     }
 
@@ -233,8 +240,8 @@ export default defineEventHandler(async (event) => {
     // Send response back to Chatwoot
     try {
       await chatwootService.sendMessage(
-        accountId,
-        conversationObj?.id || 0,
+        sanitizedAccountId,
+        sanitizedConversationId,
         responseMessage,
         agent.settings?.chatwootApiKey
       )
@@ -247,10 +254,10 @@ export default defineEventHandler(async (event) => {
         data: {
           agentId: agent._id,
           agentName: agent.name,
-          originalMessageLength: messageContent.length,
+          originalMessageLength: sanitizedMessage.length,
           responseLength: responseMessage.length,
-          conversationId: conversationObj?.id || 0,
-          accountId: accountId,
+          conversationId: sanitizedConversationId || 0,
+          accountId: sanitizedAccountId,
           hasContextDocuments: (agent.contextDocuments || []).length > 0
         }
       }
@@ -266,7 +273,7 @@ export default defineEventHandler(async (event) => {
         data: {
           agentId: agent._id,
           agentName: agent.name,
-          originalMessageLength: messageContent.length,
+          originalMessageLength: sanitizedMessage.length,
           responseLength: responseMessage.length
         }
       }

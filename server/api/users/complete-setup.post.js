@@ -5,10 +5,10 @@
  * This endpoint is used when a new user follows an invitation link
  * to set their name and password for the first time.
  */
-import User from '../../models/User.ts'
+import User from '~/server/models/User'
 import bcrypt from 'bcryptjs'
 import crypto from 'crypto'
-import { connectDB } from '../../utils/db'
+import { connectDB } from '~/server/utils/db'
 import { sanitizeText } from '~/utils/sanitize.js'
 
 export default defineEventHandler(async (event) => {

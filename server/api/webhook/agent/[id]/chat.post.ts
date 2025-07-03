@@ -1,6 +1,11 @@
+/**
+ * @description Handle incoming chat messages for an agent via webhook.
+ * @route POST /api/webhook/agent/:id/chat
+ */
 import { connectDB } from '~/server/utils/db'
 import Agent from '~/server/models/Agent'
 import aiService from '~/server/services/aiService'
+import { sanitizePrompt } from '~/utils/sanitize.js'
 
 interface AgentSettings {
   temperature?: number
@@ -29,7 +34,7 @@ interface AgentDocument {
 export default defineEventHandler(async (event) => {
   try {
     // Only allow POST requests
-    if (getMethod(event) !== 'POST') {
+    if (event.method !== 'POST') {
       throw createError({
         statusCode: 405,
         statusMessage: 'Method not allowed'
@@ -81,8 +86,20 @@ export default defineEventHandler(async (event) => {
       })
     }
 
+    // Security: Limit message length to prevent DoS attacks
+    const MAX_MESSAGE_LENGTH = 4000;
+    if (messageContent.length > MAX_MESSAGE_LENGTH) {
+      throw createError({
+        statusCode: 413, // Payload Too Large
+        statusMessage: `Message is too long. Maximum length is ${MAX_MESSAGE_LENGTH} characters.`,
+      });
+    }
+
+    // Security: Sanitize user input to prevent prompt injection
+    const sanitizedMessage = sanitizePrompt(messageContent.trim())
+
     console.log('Chat request received for agent:', agent.name)
-    console.log('Message length:', messageContent.length, 'characters')
+    console.log('Message length:', sanitizedMessage.length, 'characters')
 
     // Generate AI response using the agent's prompt and context
     let responseMessage: string
@@ -92,7 +109,7 @@ export default defineEventHandler(async (event) => {
         agent._id,
         agent.prompt,
         agent.contextDocuments || [],
-        messageContent.trim(),
+        sanitizedMessage,
         {
           temperature: agent.settings?.temperature,
           maxTokens: agent.settings?.maxTokens,
@@ -105,7 +122,7 @@ export default defineEventHandler(async (event) => {
       console.log('AI response generated for chat:', {
         agentName: agent.name,
         responseLength: responseMessage.length,
-        originalMessageLength: messageContent.length
+        originalMessageLength: sanitizedMessage.length
       })
       
     } catch (aiError: any) {
@@ -113,10 +130,9 @@ export default defineEventHandler(async (event) => {
       
       throw createError({
         statusCode: 500,
-        statusMessage: 'Failed to generate AI response',
-        data: {
-          error: aiError.message || 'AI service error'
-        }
+        statusMessage: 'Failed to generate AI response'
+        // Security: Avoid leaking internal error details to the client.
+        // The detailed error is logged on the server.
       })
     }
 
@@ -133,7 +149,7 @@ export default defineEventHandler(async (event) => {
       data: {
         agentId: agent._id,
         agentName: agent.name,
-        originalMessageLength: messageContent.length,
+        originalMessageLength: sanitizedMessage.length,
         responseLength: responseMessage.length,
         hasContextDocuments: (agent.contextDocuments || []).length > 0
       }
@@ -150,10 +166,8 @@ export default defineEventHandler(async (event) => {
     // Otherwise, return a generic 500 error
     throw createError({
       statusCode: 500,
-      statusMessage: 'Internal server error',
-      data: {
-        error: error.message || 'Unknown error'
-      }
+      statusMessage: 'An unexpected error occurred.'
+      // Security: Avoid leaking internal error details like error.message
     })
   }
 }) 

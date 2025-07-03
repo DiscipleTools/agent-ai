@@ -488,3 +488,35 @@ export const schemas = {
     maxDepth: 'number'
   }
 }
+
+export function sanitizePrompt(text) {
+  if (typeof text !== 'string') {
+    return ''
+  }
+  // This is a basic implementation. A more robust solution might be needed.
+  const injectionKeywords = [
+    'ignore previous instructions',
+    'ignore all prior instructions',
+    'ignore the above',
+    'forget what you were told',
+    'disregard the above',
+    'system prompt',
+    'your instructions',
+    'confidential',
+    'secret instructions'
+  ];
+  const regex = new RegExp(injectionKeywords.join('|'), 'gi');
+  return text.replace(regex, '[redacted]');
+}
+
+export function sanitizeForHtml(text) {
+  if (typeof text !== 'string') return '';
+  const map = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#039;'
+  };
+  return text.replace(/[&<>"']/g, (m) => map[m]);
+}
