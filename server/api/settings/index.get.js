@@ -1,5 +1,15 @@
+/**
+ * GET /api/settings
+ *
+ * Retrieves the application settings.
+ * Ensures default settings are created if they don't exist.
+ * Scrubs sensitive information like API keys and passwords before returning the response.
+ */
+
 import Settings from '../../models/Settings.js'
 import { authMiddleware } from '../../utils/auth.ts'
+import { sanitizeModelId, sanitizeText, sanitizeUrl } from '~/utils/sanitize'
+
 
 export default authMiddleware.admin(async (event, checker) => {
   try {
@@ -26,22 +36,34 @@ export default authMiddleware.admin(async (event, checker) => {
     // Don't send the actual API keys, just indicate if they're set
     const response = {
       ...settings.toObject(),
-      aiConnections: settings.aiConnections?.map(conn => ({
-        ...conn.toObject(),
-        apiKey: '***HIDDEN***'
-      })) || [],
+      aiConnections: settings.aiConnections?.map(conn => {
+        const connObj = conn.toObject()
+        return {
+          ...connObj,
+          apiKey: '***HIDDEN***',
+          availableModels: (connObj.availableModels || []).map((model) => ({
+            ...model,
+            id: sanitizeModelId(model.id),
+            name: sanitizeText(model.name)
+          }))
+        }
+      }) || [],
       email: settings.email ? {
         ...settings.email,
+        fromAddress: sanitizeText(settings.email.fromAddress),
+        fromName: sanitizeText(settings.email.fromName),
         smtp: settings.email.smtp ? {
           ...settings.email.smtp,
           auth: settings.email.smtp.auth ? {
-            user: settings.email.smtp.auth.user,
+            user: sanitizeText(settings.email.smtp.auth.user),
             pass: settings.email.smtp.auth.pass ? '***HIDDEN***' : null
           } : undefined
         } : undefined
       } : undefined,
       chatwoot: settings.chatwoot ? {
         ...settings.chatwoot,
+        url: sanitizeUrl(settings.chatwoot.url),
+        accountId: sanitizeText(settings.chatwoot.accountId),
         apiToken: settings.chatwoot.apiToken ? '***HIDDEN***' : null
       } : undefined
     }

@@ -53,7 +53,6 @@ This test suite provides comprehensive integration testing for all API endpoints
 - **GET /api/settings**: Admin-only access
 - **PUT /api/settings**: Admin-only updates
 - **GET /api/settings/ai-models**: Authenticated access
-- **POST /api/settings/test-ai**: Authenticated AI testing
 - **POST /api/settings/test-email**: Admin-only email testing
 - **GET /api/health**: Public health check
 
@@ -87,7 +86,6 @@ This test suite provides comprehensive integration testing for all API endpoints
 | GET /api/settings | ❌ | ❌ | ✅ | Admin only |
 | PUT /api/settings | ❌ | ❌ | ✅ | Admin only |
 | GET /api/settings/ai-models | ❌ | ✅ | ✅ | Authenticated access |
-| POST /api/settings/test-ai | ❌ | ✅ | ✅ | Authenticated access |
 | POST /api/settings/test-email | ❌ | ❌ | ✅ | Admin only |
 | **Health** |
 | GET /api/health | ✅ | ✅ | ✅ | Public endpoint |

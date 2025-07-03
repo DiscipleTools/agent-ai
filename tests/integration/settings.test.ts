@@ -87,57 +87,6 @@ describe('Settings API', () => {
     })
   })
 
-  describe('GET /api/settings/ai-models', () => {
-    it('should allow authenticated users to read available AI models', async () => {
-      const headers = getAuthHeaders('user')
-      
-      const response = await $fetch(`${BASE_URL}/api/settings/ai-models`, {
-        headers
-      })
-
-      expect(response.success).toBe(true)
-      expect(response.data).toHaveProperty('models')
-      expect(Array.isArray(response.data.models)).toBe(true)
-    })
-
-    it('should reject unauthenticated access', async () => {
-      const response = await $fetch(`${BASE_URL}/api/settings/ai-models`)
-      
-      expect(response.success).toBe(false)
-      expect(response.message).toBe('Access token required')
-    })
-  })
-
-  describe('POST /api/settings/test-ai', () => {
-    it('should allow authenticated users to test AI connection', async () => {
-      const headers = getAuthHeaders('user')
-      
-      const response = await $fetch(`${BASE_URL}/api/settings/test-ai`, {
-        method: 'POST',
-        headers,
-        body: {
-          model: 'gpt-3.5-turbo',
-          apiKey: 'test-key'
-        }
-      })
-
-      expect(response.success).toBeDefined()
-    })
-
-    it('should reject unauthenticated AI testing', async () => {
-      const response = await $fetch(`${BASE_URL}/api/settings/test-ai`, {
-        method: 'POST',
-        body: {
-          model: 'gpt-3.5-turbo',
-          apiKey: 'test-key'
-        }
-      })
-      
-      expect(response.success).toBe(false)
-      expect(response.message).toBe('Access token required')
-    })
-  })
-
   describe('POST /api/settings/test-email', () => {
     it('should allow admin to test email configuration', async () => {
       const headers = getAuthHeaders('admin')

@@ -1,7 +1,13 @@
+/**
+ * @fileoverview Handles updating application settings.
+ *
+ * @endpoint PUT /api/settings
+ * @security Admin-only endpoint.
+ */
 import Settings from '../../models/Settings.js'
 import settingsService from '../../services/settingsService.ts'
 import { authMiddleware } from '../../utils/auth.ts'
-import { sanitizeText, sanitizeEmail, sanitizeUrl, validators } from '~/utils/sanitize.js'
+import { sanitizeText, sanitizeEmail, sanitizeUrl, sanitizeAlphaNumeric, validators } from '~/utils/sanitize.js'
 
 export default authMiddleware.admin(async (event, checker) => {
   try {
@@ -67,6 +73,34 @@ export default authMiddleware.admin(async (event, checker) => {
 
         if (!hasExistingSmtpPass && (!body.email.smtp?.auth?.pass || body.email.smtp.auth.pass.trim().length === 0)) {
           validationErrors.push('SMTP password is required when email is enabled')
+        }
+
+        // Add password length validation
+        if (body.email.smtp?.auth?.pass && body.email.smtp.auth.pass.length > 512) {
+          validationErrors.push('SMTP password cannot be more than 512 characters')
+        }
+      }
+    }
+
+    // Validate and sanitize server settings if provided
+    if (body.server) {
+      if (body.server.maxFileSize) {
+        if (!validators.numberRange(body.server.maxFileSize, 1, 100 * 1024 * 1024)) { // 100MB
+          validationErrors.push('Max file size must be between 1 and 104857600 bytes')
+        }
+      }
+
+      if (body.server.allowedFileTypes) {
+        if (!Array.isArray(body.server.allowedFileTypes)) {
+          validationErrors.push('Allowed file types must be an array')
+        } else {
+          body.server.allowedFileTypes.forEach((type, index) => {
+            const sanitizedType = sanitizeAlphaNumeric(type)
+            if (!validators.textLength(sanitizedType, 1, 10)) {
+              validationErrors.push(`Allowed file type at index ${index} is invalid`)
+            }
+            body.server.allowedFileTypes[index] = sanitizedType
+          })
         }
       }
     }

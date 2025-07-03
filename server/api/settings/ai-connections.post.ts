@@ -1,7 +1,11 @@
+/**
+ * @description Create a new AI connection.
+ * @route POST /api/settings/ai-connections
+ */
 import settingsService from '~/server/services/settingsService'
 import aiService from '~/server/services/aiService'
 import { authMiddleware } from '~/server/utils/auth'
-import { sanitizeText, sanitizeUrl, validators } from '~/utils/sanitize.js'
+import { sanitizeText, sanitizeUrl, validators, sanitizeAndValidateModels } from '~/utils/sanitize.js'
 
 export default authMiddleware.admin(async (event, checker) => {
   try {
@@ -46,6 +50,14 @@ export default authMiddleware.admin(async (event, checker) => {
         validationErrors.push('Provider must be openai, prediction-guard, or custom')
       }
       body.provider = sanitizedProvider
+    }
+
+    // Sanitize and validate availableModels
+    const { sanitizedData: sanitizedModels, errors: modelErrors } = sanitizeAndValidateModels(body.availableModels)
+    if (modelErrors.length > 0) {
+      validationErrors.push(...modelErrors)
+    } else {
+      body.availableModels = sanitizedModels
     }
 
     // Return validation errors if any

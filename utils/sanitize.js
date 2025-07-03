@@ -132,7 +132,7 @@ export const sanitizeEmail = (input) => {
   return input
     .trim()
     .toLowerCase()
-    .replace(/[<>"']/g, '') // Remove dangerous characters
+    .replace(/[<>"'\r\n]/g, '') // Remove dangerous characters, including newlines for header injection
     .substring(0, 254) // RFC 5321 limit
 }
 
@@ -216,6 +216,17 @@ export const sanitizeErrorMessage = (error) => {
 }
 
 /**
+ * Sanitize a model ID, allowing for special characters commonly found in them.
+ * @param {string|any} input - The model ID to sanitize.
+ * @returns {string} - Sanitized model ID.
+ */
+export const sanitizeModelId = (input) => {
+  if (!input || typeof input !== 'string') return ''
+  // Allow letters, numbers, hyphens, underscores, periods, and slashes
+  return input.replace(/[^\w\s\-./:]/g, '').trim()
+}
+
+/**
  * Sanitize password input. It only ensures it's a string.
  * It does not remove characters, as that could invalidate a correct password.
  * @param {any} input - The password to sanitize
@@ -224,6 +235,68 @@ export const sanitizeErrorMessage = (error) => {
 export const sanitizePassword = (input) => {
   if (typeof input !== 'string') return ''
   return input
+}
+
+/**
+ * Sanitize a string to contain only alphanumeric characters.
+ * @param {string|any} input - The input to sanitize.
+ * @returns {string} - Sanitized alphanumeric string.
+ */
+export const sanitizeAlphaNumeric = (input) => {
+  if (!input || typeof input !== 'string') return ''
+  return input.replace(/[^a-zA-Z0-9]/g, '').trim()
+}
+
+/**
+ * Validates and sanitizes an array of AI model objects.
+ * Each model should have an id, name, and enabled property.
+ * @param {any} input - The array of models to validate and sanitize.
+ * @returns {{sanitizedData: Array|null, errors: Array}} - An object containing the sanitized models and any validation errors.
+ */
+export const sanitizeAndValidateModels = (input) => {
+  const errors = []
+  if (!input) {
+    // If input is not provided, it's not an error; just return an empty array.
+    return { sanitizedData: [], errors }
+  }
+
+  if (!Array.isArray(input)) {
+    errors.push('availableModels must be an array of objects.')
+    return { sanitizedData: null, errors }
+  }
+
+  const sanitizedData = []
+  for (const model of input) {
+    if (typeof model !== 'object' || model === null) {
+      errors.push('Each item in availableModels must be a valid object.')
+      continue
+    }
+    if (!model.id || typeof model.id !== 'string' || !model.name || typeof model.name !== 'string') {
+      errors.push('Each model must include a string "id" and "name".')
+      continue
+    }
+
+    const sanitizedModel = {
+      id: sanitizeText(model.id),
+      name: sanitizeText(model.name),
+      enabled: model.enabled === true
+    }
+
+    if (sanitizedModel.id.length < 1 || sanitizedModel.id.length > 100) {
+      errors.push('Model ID must be between 1 and 100 characters.')
+    }
+    if (sanitizedModel.name.length < 1 || sanitizedModel.name.length > 100) {
+      errors.push('Model name must be between 1 and 100 characters.')
+    }
+
+    sanitizedData.push(sanitizedModel)
+  }
+
+  if (errors.length > 0) {
+    return { sanitizedData: null, errors }
+  }
+
+  return { sanitizedData, errors: [] }
 }
 
 /**

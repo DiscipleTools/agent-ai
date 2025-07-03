@@ -2,7 +2,7 @@
  * @description Updates an existing AI connection configuration.
  * @endpoint PUT /api/settings/ai-connections/[id]
  */
-import { sanitizeText, sanitizeUrl } from '~/utils/sanitize'
+import { sanitizeText, sanitizeUrl, sanitizeModelId } from '~/utils/sanitize'
 import settingsService from '~/server/services/settingsService'
 import aiService from '~/server/services/aiService'
 import { authMiddleware } from '~/server/utils/auth'
@@ -67,7 +67,7 @@ export default authMiddleware.admin(async (event, checker) => {
         existingConnection.availableModels = body.availableModels.map((model: any) => {
           if (model && typeof model === 'object' && model.id && model.name) {
             return {
-              id: sanitizeText(String(model.id)),
+              id: sanitizeModelId(String(model.id)),
               name: sanitizeText(String(model.name)),
               enabled: !!model.enabled,
             }

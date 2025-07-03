@@ -604,6 +604,10 @@ const toggleModelEnabledInMain = async (connection, modelIndex) => {
 }
 
 const refreshConnectionModels = async (connection) => {
+  if (!connection?._id) {
+    toast('Cannot refresh models: Invalid connection ID.', { type: 'error' })
+    return
+  }
   try {
     checkRateLimit('modelRefresh')
   } catch (error) {

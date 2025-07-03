@@ -1,5 +1,10 @@
+/**
+ * Fetches all AI connections and the default AI connection.
+ * GET /api/settings/ai-connections
+ */
 import settingsService from '~/server/services/settingsService'
 import { authMiddleware } from '~/server/utils/auth'
+import { sanitizeText, sanitizeObjectId, sanitizeModelId, sanitizeUrl } from '~/utils/sanitize'
 
 export default authMiddleware.admin(async (event, checker) => {
   try {
@@ -12,12 +17,18 @@ export default authMiddleware.admin(async (event, checker) => {
       // Convert Mongoose document to plain object if needed
       const plainConn = (conn as any).toObject ? (conn as any).toObject() : conn
       
+      const sanitizedModels = (plainConn.availableModels || []).map((model: any) => ({
+        ...model,
+        id: sanitizeModelId(model.id),
+        name: sanitizeText(model.name)
+      }))
+
       return {
-        _id: plainConn._id,
-        name: plainConn.name,
-        provider: plainConn.provider,
-        endpoint: plainConn.endpoint,
-        availableModels: plainConn.availableModels || [],
+        _id: sanitizeObjectId(plainConn._id.toString()),
+        name: sanitizeText(plainConn.name),
+        provider: sanitizeText(plainConn.provider),
+        endpoint: sanitizeUrl(plainConn.endpoint),
+        availableModels: sanitizedModels,
         isActive: plainConn.isActive,
         apiKey: '***HIDDEN***'
       }
@@ -28,8 +39,8 @@ export default authMiddleware.admin(async (event, checker) => {
       data: {
         connections: safeConnections,
         defaultConnection: defaultConnection ? {
-          connectionId: defaultConnection.connection._id,
-          modelId: defaultConnection.modelId
+          connectionId: sanitizeObjectId(defaultConnection.connection._id.toString()),
+          modelId: sanitizeModelId(defaultConnection.modelId)
         } : null
       }
     }

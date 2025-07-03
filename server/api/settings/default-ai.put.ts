@@ -1,5 +1,10 @@
+/**
+ * @description Set the default AI connection and model.
+ * @endpoint PUT /api/settings/default-ai
+ */
 import settingsService from '~/server/services/settingsService'
 import { authMiddleware } from '~/server/utils/auth'
+import { sanitizeObjectId, sanitizeModelId } from '~/utils/sanitize'
 
 export default authMiddleware.admin(async (event, checker) => {
   try {
@@ -7,7 +12,10 @@ export default authMiddleware.admin(async (event, checker) => {
     const user = checker.user
     const body = await readBody(event)
 
-    if (!body.connectionId || !body.modelId) {
+    const connectionId = sanitizeObjectId(body.connectionId)
+    const modelId = sanitizeModelId(body.modelId)
+
+    if (!connectionId || !modelId) {
       throw createError({
         statusCode: 400,
         statusMessage: 'Connection ID and model ID are required'
@@ -25,7 +33,7 @@ export default authMiddleware.admin(async (event, checker) => {
 
     // Verify connection exists and is active
     const connection = settings.aiConnections?.find(
-      (conn: any) => conn._id.toString() === body.connectionId && conn.isActive
+      (conn: any) => conn._id.toString() === connectionId && conn.isActive
     )
 
     if (!connection) {
@@ -37,7 +45,7 @@ export default authMiddleware.admin(async (event, checker) => {
 
     // Verify model exists and is enabled
     const model = connection.availableModels?.find(
-      (m: any) => m.id === body.modelId && m.enabled
+      (m: any) => m.id === modelId && m.enabled
     )
 
     if (!model) {
@@ -49,8 +57,8 @@ export default authMiddleware.admin(async (event, checker) => {
 
     // Update default connection
     settings.defaultConnection = {
-      connectionId: body.connectionId,
-      modelId: body.modelId
+      connectionId,
+      modelId
     }
 
     // Update settings
@@ -61,8 +69,8 @@ export default authMiddleware.admin(async (event, checker) => {
     return {
       success: true,
       data: {
-        connectionId: body.connectionId,
-        modelId: body.modelId,
+        connectionId,
+        modelId,
         connectionName: connection.name,
         modelName: model.name
       },
