@@ -1,7 +1,15 @@
+/**
+ * POST /api/auth/setup-account
+ * 
+ * Completes user account setup by setting a password for users who received an invitation.
+ * Validates the invitation token, sets the user's password, and returns authentication tokens.
+ */
+
 import User from '~/server/models/User'
 import crypto from 'crypto'
 import emailService from '~/server/services/emailService'
 import authService from '~/server/services/authService'
+import { sanitizeToken, sanitizePassword } from '~/utils/sanitize'
 
 export default defineEventHandler(async (event) => {
   const body = await readBody(event)
@@ -15,17 +23,37 @@ export default defineEventHandler(async (event) => {
     })
   }
 
+  // Sanitize inputs
+  const sanitizedToken = sanitizeToken(token)
+  const sanitizedPassword = sanitizePassword(password)
+
+  // Validate sanitized inputs
+  if (!sanitizedToken || !sanitizedPassword) {
+    throw createError({
+      statusCode: 400,
+      statusMessage: 'Invalid token or password format'
+    })
+  }
+
   // Validate password strength
-  if (password.length < 8) {
+  if (sanitizedPassword.length < 8) {
     throw createError({
       statusCode: 400,
       statusMessage: 'Password must be at least 8 characters long'
     })
   }
 
+  // Additional password complexity validation
+  if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(sanitizedPassword)) {
+    throw createError({
+      statusCode: 400,
+      statusMessage: 'Password must contain at least one uppercase letter, one lowercase letter, and one number'
+    })
+  }
+
   try {
     // Hash the token to match what's stored in the database
-    const hashedToken = crypto.createHash('sha256').update(token).digest('hex')
+    const hashedToken = crypto.createHash('sha256').update(sanitizedToken).digest('hex')
 
     // Find user with valid invitation token
     const user = await User.findOne({
@@ -41,7 +69,7 @@ export default defineEventHandler(async (event) => {
     }
 
     // Update user password and clear invitation token
-    user.password = password // Will be hashed by pre-save hook
+    user.password = sanitizedPassword // Will be hashed by pre-save hook
     user.invitationToken = undefined
     user.invitationTokenExpires = undefined
     user.lastLogin = new Date()

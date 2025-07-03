@@ -1,8 +1,10 @@
+// PUT /api/auth/profile
+// Updates the profile of the currently authenticated user.
+
 import User from '~/server/models/User'
 import { authMiddleware } from '~/server/utils/auth'
 import { connectDB } from '~/server/utils/db'
-import bcrypt from 'bcryptjs'
-import { sanitizeEmail, sanitizeText, sanitizeErrorMessage } from '~/utils/sanitize.js'
+import { sanitizeEmail, sanitizeText, sanitizeErrorMessage, sanitizePassword } from '~/utils/sanitize.js'
 
 export default authMiddleware.auth(async (event, checker) => {
   try {
@@ -14,11 +16,14 @@ export default authMiddleware.auth(async (event, checker) => {
 
     // Get request body
     const body = await readBody(event)
-    const { name, email, currentPassword, newPassword, confirmPassword } = body
+    let { name, email, currentPassword, newPassword, confirmPassword } = body
 
     // Sanitize inputs
     const sanitizedName = name !== undefined ? sanitizeText(name) : undefined
     const sanitizedEmail = email !== undefined ? sanitizeEmail(email) : undefined
+    currentPassword = currentPassword !== undefined ? sanitizePassword(currentPassword) : undefined
+    newPassword = newPassword !== undefined ? sanitizePassword(newPassword) : undefined
+    confirmPassword = confirmPassword !== undefined ? sanitizePassword(confirmPassword) : undefined
 
     // Validate that user exists
     const user = await User.findById(authUser._id).select('+password')
@@ -35,6 +40,14 @@ export default authMiddleware.auth(async (event, checker) => {
         throw createError({
           statusCode: 400,
           statusMessage: 'Current password is required to change password'
+        })
+      }
+
+      // Prevent overly long passwords
+      if (currentPassword.length > 128) {
+        throw createError({
+          statusCode: 400,
+          statusMessage: 'Password cannot be longer than 128 characters'
         })
       }
 

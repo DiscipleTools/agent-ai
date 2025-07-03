@@ -21,7 +21,6 @@ export const useApi = () => {
         const skipCSRFPaths = [
           '/api/auth/login',
           '/api/auth/refresh',
-          '/api/auth/logout',
           '/api/auth/setup-account',
           '/api/users/complete-setup',
           '/api/users/validate-invitation',

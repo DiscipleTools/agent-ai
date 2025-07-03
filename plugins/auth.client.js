@@ -1,16 +1,15 @@
 export default defineNuxtPlugin(async () => {
   const authStore = useAuthStore()
-  const accessToken = useCookie('access-token')
 
-  // If we have a token but no user data, fetch it
-  if (accessToken.value && !authStore.user) {
+  // If user state is not populated, try to fetch it.
+  // The browser will automatically send the httpOnly cookie.
+  if (!authStore.user) {
     try {
       await authStore.fetchUser()
     } catch (error) {
-      // If fetch fails, the token is probably invalid
-      console.error('Failed to fetch user on app init:', error)
-      // Clear the invalid token
-      accessToken.value = null
+      // This is expected if the user is not logged in.
+      // The error is already handled in the authStore's fetchUser method.
+      // We don't need to do anything here.
     }
   }
 }) 

@@ -1,5 +1,9 @@
+// GET /api/auth/me
+// This endpoint retrieves the authenticated user's profile information.
+
 import { connectDB } from '~/server/utils/db'
 import authService from '~/server/services/authService'
+import { sanitizeUserForFrontend } from '~/utils/sanitize'
 
 export default defineEventHandler(async (event) => {
   try {
@@ -23,7 +27,7 @@ export default defineEventHandler(async (event) => {
 
     return {
       success: true,
-      data: user
+      data: sanitizeUserForFrontend(user)
     }
   } catch (error) {
     throw createError({

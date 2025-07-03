@@ -216,6 +216,17 @@ export const sanitizeErrorMessage = (error) => {
 }
 
 /**
+ * Sanitize password input. It only ensures it's a string.
+ * It does not remove characters, as that could invalidate a correct password.
+ * @param {any} input - The password to sanitize
+ * @returns {string} - Sanitized password
+ */
+export const sanitizePassword = (input) => {
+  if (typeof input !== 'string') return ''
+  return input
+}
+
+/**
  * Sanitize MongoDB ObjectId to prevent injection attacks
  * @param {string|any} input - The ObjectId to sanitize
  * @returns {string} - Sanitized ObjectId or empty string if invalid
@@ -233,6 +244,18 @@ export const sanitizeObjectId = (input) => {
   if (!/^[a-fA-F0-9]{24}$/.test(sanitized)) return ''
   
   return sanitized
+}
+
+/**
+ * Sanitize a generic token (like a JWT or refresh token)
+ * @param {string|any} input - The token to sanitize
+ * @returns {string} - Sanitized token
+ */
+export const sanitizeToken = (input) => {
+  if (!input || typeof input !== 'string') return ''
+  
+  // Allow only characters typically found in tokens (alphanumeric, ., -, _)
+  return input.trim().replace(/[^a-zA-Z0-9\\._-]/g, '')
 }
 
 /**
@@ -267,6 +290,35 @@ export const sanitizeObject = (obj, schema) => {
   }
   
   return sanitized
+}
+
+/**
+ * Sanitize user object for frontend display.
+ * Removes sensitive fields and ensures data is clean.
+ * @param {Object} user - The user object from the database
+ * @returns {Object|null} - A sanitized user object or null
+ */
+export const sanitizeUserForFrontend = (user) => {
+  if (!user || typeof user !== 'object') return null
+
+  // If it's a Mongoose document, convert it to a plain object
+  const userObject = typeof user.toObject === 'function' ? user.toObject() : user
+
+  return {
+    _id: userObject._id ? sanitizeObjectId(userObject._id.toString()) : undefined,
+    id: userObject._id ? sanitizeObjectId(userObject._id.toString()) : undefined, // for convenience
+    name: userObject.name ? sanitizeText(userObject.name) : undefined,
+    email: userObject.email ? sanitizeEmail(userObject.email) : undefined,
+    role: userObject.role ? sanitizeText(userObject.role) : undefined,
+    isActive: userObject.isActive,
+    lastLogin: userObject.lastLogin,
+    createdAt: userObject.createdAt,
+    updatedAt: userObject.updatedAt,
+    mustChangePassword: userObject.mustChangePassword,
+    agentAccess: Array.isArray(userObject.agentAccess) 
+      ? userObject.agentAccess.map(id => sanitizeObjectId(id.toString())) 
+      : undefined,
+  }
 }
 
 /**
@@ -343,4 +395,4 @@ export const schemas = {
     maxPages: 'number',
     maxDepth: 'number'
   }
-} 
+}

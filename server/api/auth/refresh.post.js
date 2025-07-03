@@ -1,5 +1,13 @@
+/**
+ * POST /api/auth/refresh
+ *
+ * Refreshes a user's session by accepting a refresh token and returning a new
+ * access token and refresh token. The refresh token can be provided in either
+ * a cookie or the request body.
+ */
 import { connectDB } from '~/server/utils/db'
 import authService from '~/server/services/authService'
+import { sanitizeToken } from '~/utils/sanitize'
 
 export default defineEventHandler(async (event) => {
   try {
@@ -8,7 +16,10 @@ export default defineEventHandler(async (event) => {
 
     // Get refresh token from cookies or body
     const body = await readBody(event)
-    const refreshToken = getCookie(event, 'refresh-token') || body?.refreshToken
+    const tokenFromCookie = getCookie(event, 'refresh-token')
+    const tokenFromBody = body?.refreshToken ? sanitizeToken(body.refreshToken) : null
+    
+    const refreshToken = tokenFromCookie || tokenFromBody
 
     if (!refreshToken) {
       throw createError({

@@ -1,6 +1,10 @@
+/**
+ * POST /api/auth/login
+ * Logs in a user and sets authentication tokens.
+ */
 import { connectDB } from '~/server/utils/db'
 import authService from '~/server/services/authService'
-import { sanitizeEmail, sanitizeErrorMessage } from '~/utils/sanitize.js'
+import { sanitizeEmail, sanitizePassword, sanitizeErrorMessage } from '~/utils/sanitize.js'
 
 export default defineEventHandler(async (event) => {
   try {
@@ -13,7 +17,7 @@ export default defineEventHandler(async (event) => {
 
     // Sanitize inputs
     const sanitizedEmail = sanitizeEmail(email)
-    const sanitizedPassword = password // Don't sanitize passwords
+    const sanitizedPassword = sanitizePassword(password)
 
     // Validate input
     if (!sanitizedEmail || !sanitizedPassword) {

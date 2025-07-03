@@ -1,6 +1,9 @@
+// POST /api/auth/logout
+// Logs out a user by invalidating their refresh token and clearing authentication cookies.
 import { connectDB } from '~/server/utils/db'
 import { authMiddleware } from '~/server/utils/auth'
 import authService from '~/server/services/authService'
+import { sanitizeText } from '~/utils/sanitize'
 
 export default authMiddleware.auth(async (event, checker) => {
   try {
@@ -11,7 +14,8 @@ export default authMiddleware.auth(async (event, checker) => {
     const user = checker.user
 
     // Get refresh token from cookies or body
-    const refreshToken = getCookie(event, 'refresh-token') || (await readBody(event))?.refreshToken
+    const body = await readBody(event)
+    const refreshToken = getCookie(event, 'refresh-token') || (body?.refreshToken ? sanitizeText(body.refreshToken) : undefined)
 
     if (refreshToken) {
       // Logout with the authenticated user's ID
