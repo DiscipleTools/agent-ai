@@ -1,3 +1,10 @@
+/**
+ * DELETE /api/agents/[id]/context/[docId]
+ * 
+ * Deletes a specific context document from an agent's context documents array.
+ * Requires authentication and proper agent access permissions.
+ * Returns success confirmation with deleted document details.
+ */
 import { connectDB } from '~/server/utils/db'
 import { requireAuth } from '~/server/utils/auth'
 import Agent from '~/server/models/Agent'
@@ -29,6 +36,13 @@ export default defineEventHandler(async (event) => {
       })
     }
 
+    if (!mongoose.Types.ObjectId.isValid(agentId) || !mongoose.Types.ObjectId.isValid(docId)) {
+      throw createError({
+        statusCode: 400,
+        statusMessage: 'Invalid ID format'
+      })
+    }
+
     // Find the agent
     const agent = await Agent.findById(agentId)
     if (!agent) {
@@ -39,7 +53,8 @@ export default defineEventHandler(async (event) => {
     }
 
     // Check if user has access to this agent
-    if (user.role !== 'admin' && !user.agentAccess?.includes(new mongoose.Types.ObjectId(agentId))) {
+    const hasAccess = user.role === 'admin' || user.agentAccess?.some((id: mongoose.Types.ObjectId) => id.toString() === agentId)
+    if (!hasAccess) {
       throw createError({
         statusCode: 403,
         statusMessage: 'Access denied to this agent'
@@ -47,7 +62,7 @@ export default defineEventHandler(async (event) => {
     }
 
     // Find the context document
-    const docIndex = agent.contextDocuments.findIndex(doc => doc._id?.toString() === docId)
+    const docIndex = agent.contextDocuments.findIndex((doc: any) => doc._id?.toString() === docId)
     if (docIndex === -1) {
       throw createError({
         statusCode: 404,
@@ -80,11 +95,6 @@ export default defineEventHandler(async (event) => {
           filename: docInfo.filename,
           url: docInfo.url,
           contentLength: docInfo.contentLength
-        },
-        agent: {
-          _id: agent._id,
-          name: agent.name,
-          contextDocumentsCount: agent.contextDocuments.length
         }
       }
     }

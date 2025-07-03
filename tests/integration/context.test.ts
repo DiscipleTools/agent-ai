@@ -5,53 +5,6 @@ import { testUsers, testAgents, getAuthHeaders } from '../setup'
 const BASE_URL = 'http://localhost:3000'
 
 describe('Agent Context API', () => {
-  describe('GET /api/agents/[id]/context', () => {
-    it('should allow admin to access any agent context', async () => {
-      const headers = getAuthHeaders('admin')
-      const agentId = testAgents.publicAgent._id.toString()
-      
-      const response = await $fetch(`${BASE_URL}/api/agents/${agentId}/context`, {
-        headers
-      })
-
-      expect(response.success).toBe(true)
-      expect(response.data).toHaveProperty('contextDocuments')
-      expect(Array.isArray(response.data.contextDocuments)).toBe(true)
-    })
-
-    it('should allow users to access their assigned agent context', async () => {
-      const headers = getAuthHeaders('user')
-      const agentId = testAgents.userAgent._id.toString()
-      
-      const response = await $fetch(`${BASE_URL}/api/agents/${agentId}/context`, {
-        headers
-      })
-
-      expect(response.success).toBe(true)
-      expect(response.data).toHaveProperty('contextDocuments')
-      expect(Array.isArray(response.data.contextDocuments)).toBe(true)
-    })
-
-    it('should reject user access to non-assigned agent context', async () => {
-      const headers = getAuthHeaders('user')
-      const agentId = testAgents.publicAgent._id.toString()
-      
-      await expect(
-        $fetch(`${BASE_URL}/api/agents/${agentId}/context`, {
-          headers
-        })
-      ).rejects.toThrow()
-    })
-
-    it('should reject unauthenticated access', async () => {
-      const agentId = testAgents.publicAgent._id.toString()
-      
-      await expect(
-        $fetch(`${BASE_URL}/api/agents/${agentId}/context`)
-      ).rejects.toThrow()
-    })
-  })
-
   describe('POST /api/agents/[id]/context/url', () => {
     it('should allow admin to add URL context to any agent', async () => {
       const headers = getAuthHeaders('admin')
@@ -264,26 +217,4 @@ describe('Agent Context API', () => {
     })
   })
 
-  describe('GET /api/agents/[id]/context/[docId]', () => {
-    it('should reject unauthenticated context access', async () => {
-      const agentId = testAgents.publicAgent._id.toString()
-      const docId = 'test-doc-id'
-      
-      await expect(
-        $fetch(`${BASE_URL}/api/agents/${agentId}/context/${docId}`)
-      ).rejects.toThrow()
-    })
-
-    it('should reject user access to non-assigned agent contexts', async () => {
-      const headers = getAuthHeaders('user')
-      const agentId = testAgents.publicAgent._id.toString()
-      const docId = 'test-doc-id'
-      
-      await expect(
-        $fetch(`${BASE_URL}/api/agents/${agentId}/context/${docId}`, {
-          headers
-        })
-      ).rejects.toThrow()
-    })
-  })
 }) 

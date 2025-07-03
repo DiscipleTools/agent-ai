@@ -346,10 +346,12 @@ const refreshContextDocument = async (docId) => {
   }
   
   try {
+    let result = null
+    
     if (isWebsite) {
       // Try progress version first for websites
       try {
-        await agentsStore.refreshContextDocumentWithProgress(
+        result = await agentsStore.refreshContextDocumentWithProgress(
           props.agent._id, 
           docId,
           (progress) => {
@@ -380,15 +382,30 @@ const refreshContextDocument = async (docId) => {
         })
         
         // Fallback to original method
-        await agentsStore.refreshContextDocument(props.agent._id, docId)
+        result = await agentsStore.refreshContextDocument(props.agent._id, docId)
       }
     } else {
       // Use standard refresh for non-website documents
-      await agentsStore.refreshContextDocument(props.agent._id, docId)
+      result = await agentsStore.refreshContextDocument(props.agent._id, docId)
     }
     
     toast(isWebsite ? 'Website re-crawled successfully' : 'Context document refreshed successfully', { type: 'success' })
-    await reloadAgentData()
+    
+    // Only reload if the refresh didn't return updated data
+    if (!result || !result.contextDocument) {
+      await reloadAgentData()
+    } else {
+      // Update local context documents with the refreshed data
+      const docIndex = contextDocuments.value.findIndex(d => d._id === docId)
+      if (docIndex !== -1) {
+        contextDocuments.value[docIndex] = result.contextDocument
+      }
+      
+      // Update RAG summary if provided
+      if (result.ragSummary) {
+        ragSummary.value = result.ragSummary
+      }
+    }
   } catch (error) {
     console.error('Failed to refresh document:', error.message)
     toast(error.message || 'Failed to refresh context document', { type: 'error' })

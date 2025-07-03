@@ -135,36 +135,11 @@ export const useAgentsStore = defineStore('agents', () => {
 
   // Context Document Management Functions
 
-  const fetchContextDocuments = async (agentId) => {
-    try {
-      const response = await $api(`/api/agents/${agentId}/context`)
-      return response.data
-    } catch (err) {
-      error.value = err.data?.message || 'Failed to fetch context documents'
-      throw err
-    }
-  }
-
-  const getContextDocument = async (agentId, docId) => {
-    try {
-      const response = await $api(`/api/agents/${agentId}/context/${docId}`)
-      return response.data
-    } catch (err) {
-      error.value = err.data?.message || 'Failed to get context document'
-      throw err
-    }
-  }
-
   const deleteContextDocument = async (agentId, docId) => {
     try {
       const response = await csrfRequest(`/api/agents/${agentId}/context/${docId}`, {
         method: 'DELETE'
       })
-      
-      // Update current agent if it's loaded
-      if (currentAgent.value?._id === agentId) {
-        await fetchAgent(agentId)
-      }
       
       return response.data
     } catch (err) {
@@ -180,11 +155,6 @@ export const useAgentsStore = defineStore('agents', () => {
         body: updateData
       })
       
-      // Update current agent if it's loaded
-      if (currentAgent.value?._id === agentId) {
-        await fetchAgent(agentId)
-      }
-      
       return response.data
     } catch (err) {
       error.value = err.data?.message || 'Failed to update context document'
@@ -198,11 +168,6 @@ export const useAgentsStore = defineStore('agents', () => {
         method: 'PUT',
         body: { refreshUrl: true }
       })
-      
-      // Update current agent if it's loaded
-      if (currentAgent.value?._id === agentId) {
-        await fetchAgent(agentId)
-      }
       
       return response.data
     } catch (err) {
@@ -231,7 +196,7 @@ export const useAgentsStore = defineStore('agents', () => {
       }
       
       // Use fetch with streaming for progress updates
-      const response = await fetch(`/api/agents/${agentId}/context/${docId}?stream=true`, {
+      const response = await fetch(`/api/agents/${agentId}/context/${docId}`, {
         method: 'PUT',
         headers,
         credentials: 'include', // This will include cookies automatically
@@ -306,11 +271,6 @@ export const useAgentsStore = defineStore('agents', () => {
           }
         }
       }
-
-      // Update current agent if it's loaded
-      if (currentAgent.value?._id === agentId) {
-        await fetchAgent(agentId)
-      }
       
       return finalResult?.data || { success: true, message: 'Document refresh completed' }
     } catch (err) {
@@ -357,11 +317,6 @@ export const useAgentsStore = defineStore('agents', () => {
         body: formData
       })
       
-      // Update current agent if it's loaded
-      if (currentAgent.value?._id === agentId) {
-        await fetchAgent(agentId)
-      }
-      
       return response.data
     } catch (err) {
       error.value = err.data?.message || 'Failed to upload context'
@@ -375,11 +330,6 @@ export const useAgentsStore = defineStore('agents', () => {
         method: 'POST',
         body: { url }
       })
-      
-      // Update current agent if it's loaded
-      if (currentAgent.value?._id === agentId) {
-        await fetchAgent(agentId)
-      }
       
       return response.data
     } catch (err) {
@@ -418,11 +368,6 @@ export const useAgentsStore = defineStore('agents', () => {
         body: { url, options }
       })
       
-      // Update current agent if it's loaded
-      if (currentAgent.value?._id === agentId) {
-        await fetchAgent(agentId)
-      }
-      
       return response.data
     } catch (err) {
       error.value = err.data?.message || 'Failed to add website context'
@@ -432,19 +377,8 @@ export const useAgentsStore = defineStore('agents', () => {
 
   const addContextWebsiteWithProgress = async (agentId, url, options = {}, onProgress) => {
     try {
-      // Create EventSource for SSE
-      const params = new URLSearchParams({ stream: 'true' })
-      const eventSourceUrl = `/api/agents/${agentId}/context/website?${params}`
-      
-      return new Promise((resolve, reject) => {
-        const eventSource = new EventSource(eventSourceUrl, {
-          method: 'POST' // Note: EventSource only supports GET, we'll handle this differently
-        })
-        
-        // Note: EventSource doesn't support POST, so we need to use fetch with streaming
-        // Let's use fetch with streaming instead
-        resolve(addContextWebsiteWithFetch(agentId, url, options, onProgress))
-      })
+      // Use fetch with streaming for POST requests (EventSource only supports GET)
+      return await addContextWebsiteWithFetch(agentId, url, options, onProgress)
     } catch (err) {
       error.value = err.data?.message || 'Failed to add website context with progress'
       throw err
@@ -472,7 +406,7 @@ export const useAgentsStore = defineStore('agents', () => {
       
       // In client-side, use browser's built-in cookie handling
       // In server-side, this won't work anyway since SSE is client-only
-      const response = await fetch(`/api/agents/${agentId}/context/website?stream=true`, {
+      const response = await fetch(`/api/agents/${agentId}/context/website`, {
         method: 'POST',
         headers,
         credentials: 'include', // This will include cookies automatically
@@ -548,11 +482,6 @@ export const useAgentsStore = defineStore('agents', () => {
         }
       }
 
-      // Update current agent if it's loaded
-      if (currentAgent.value?._id === agentId) {
-        await fetchAgent(agentId)
-      }
-      
       return finalResult?.data || { success: true, message: 'Website crawling completed' }
     } catch (err) {
       console.error('Website crawling with progress failed:', err)
@@ -601,8 +530,6 @@ export const useAgentsStore = defineStore('agents', () => {
     updateAgent,
     deleteAgent,
     // Context document management
-    fetchContextDocuments,
-    getContextDocument,
     deleteContextDocument,
     updateContextDocument,
     refreshContextDocument,

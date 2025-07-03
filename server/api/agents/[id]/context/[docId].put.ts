@@ -1,9 +1,162 @@
+/**
+ * API Endpoint: PUT /api/agents/[id]/context/[docId]
+ * 
+ * Updates an existing context document for a specific agent. This endpoint supports:
+ * 1. Manual content/filename updates for any document type
+ * 2. URL content refresh (re-scrapes single URLs)
+ * 3. Website re-crawling (re-crawls entire websites with progress streaming)
+ * 4. Automatic RAG (vector embeddings) reprocessing after updates
+ * 
+ * Features:
+ * - Authentication and authorization checks
+ * - Support for streaming responses (SSE) during website re-crawling
+ * - Automatic cleanup and recreation of vector embeddings
+ * - Metadata preservation and updates
+ * - Progress tracking for long-running operations
+ * 
+ * Request Body:
+ * - content?: string - New document content (manual update)
+ * - filename?: string - New filename (manual update)  
+ * - refreshUrl?: boolean - Trigger content refresh for URL/website documents
+ * 
+ * Query Parameters:
+ * - Uses Server-Sent Events for real-time progress updates during website re-crawling
+ */
+
 import { connectDB } from '~/server/utils/db'
 import { requireAuth } from '~/server/utils/auth'
+import { isAllowedUrl } from '~/server/utils/urlValidator'
 import Agent from '~/server/models/Agent'
 import webScrapingService from '~/server/services/webScrapingService'
 import { ragService } from '~/server/services/ragService'
+import { sanitizeErrorMessage } from '~/utils/sanitize'
 import mongoose from 'mongoose'
+
+// Security constants
+const MAX_CONTENT_SIZE = 100000 // 100KB limit for all content
+
+// Helper function to process RAG for a document
+async function processDocumentRAG(
+  agentId: string, 
+  agent: any, 
+  docIndex: number, 
+  content: string,
+  documentType: 'file' | 'url' | 'website',
+  title: string,
+  source: string
+) {
+  const documentId = agent.contextDocuments[docIndex]._id?.toString()
+  
+  if (!documentId) {
+    console.warn('No document ID available for RAG processing')
+    return null
+  }
+
+  try {
+    console.log(`🔄 Reprocessing document for RAG: ${documentId}`)
+    
+    // First, delete existing chunks for this document
+    await ragService.deleteDocumentChunks(agentId, documentId)
+    
+    // Then process the new/updated content
+    const ragResult = await ragService.processDocument(
+      agentId,
+      documentId,
+      content,
+      {
+        type: documentType,
+        title: title,
+        source: source
+      }
+    )
+    
+    const ragInfo = {
+      chunksCreated: ragResult.chunksCreated,
+      collectionName: ragResult.collectionName
+    }
+    
+    // Update document metadata with RAG status
+    agent.contextDocuments[docIndex].metadata = {
+      ...agent.contextDocuments[docIndex].metadata,
+      rag: {
+        processed: true,
+        chunksCreated: ragResult.chunksCreated,
+        processedAt: new Date()
+      }
+    }
+    await agent.save()
+    
+    console.log(`✅ RAG reprocessing completed: ${ragResult.chunksCreated} chunks created`)
+    return ragInfo
+    
+  } catch (ragError: any) {
+    console.error('RAG reprocessing failed (non-critical):', ragError)
+    
+    // Update document metadata to indicate RAG processing failed
+    agent.contextDocuments[docIndex].metadata = {
+      ...agent.contextDocuments[docIndex].metadata,
+      rag: {
+        processed: false,
+        error: ragError.message || 'RAG reprocessing failed',
+        attemptedAt: new Date()
+      }
+    }
+    await agent.save()
+    
+    // RAG failure is non-critical - document is still updated in MongoDB
+    return null
+  }
+}
+
+// Helper function to update document in agent
+async function updateAgentDocument(
+  agent: any, 
+  docIndex: number, 
+  content: string, 
+  filename: string, 
+  updateTimestamp: boolean = false,
+  metadata?: any
+) {
+  const contextDoc = agent.contextDocuments[docIndex]
+  
+  agent.contextDocuments[docIndex] = {
+    ...contextDoc.toObject(),
+    type: contextDoc.type, // Explicitly preserve the type field
+    content: content,
+    filename: filename,
+    uploadedAt: updateTimestamp ? new Date() : contextDoc.uploadedAt,
+    ...(metadata && { metadata: { ...contextDoc.metadata, ...metadata } })
+  }
+  
+  await agent.save()
+  return agent.contextDocuments[docIndex]
+}
+
+// Helper function to create standardized response
+function createDocumentResponse(
+  success: boolean,
+  message: string,
+  updatedDoc: any,
+  ragInfo: any = null
+) {
+  return {
+    success,
+    message,
+    data: {
+      contextDocument: {
+        _id: updatedDoc._id,
+        type: updatedDoc.type,
+        filename: updatedDoc.filename,
+        url: updatedDoc.url,
+        uploadedAt: updatedDoc.uploadedAt,
+        contentLength: updatedDoc.content?.length || 0,
+        contentPreview: updatedDoc.content?.substring(0, 200) + (updatedDoc.content?.length > 200 ? '...' : ''),
+        ...(updatedDoc.metadata && { metadata: updatedDoc.metadata })
+      },
+      ...(ragInfo && { rag: ragInfo })
+    }
+  }
+}
 
 // Helper function to create event stream for SSE
 function createEventStream(event: any) {
@@ -65,6 +218,12 @@ export default defineEventHandler(async (event) => {
         statusMessage: 'Agent ID and Document ID are required'
       })
     }
+    if (!mongoose.Types.ObjectId.isValid(agentId) || !mongoose.Types.ObjectId.isValid(docId)) {
+      throw createError({
+        statusCode: 400,
+        statusMessage: 'Invalid ID format'
+      })
+    }
 
     // Get request body
     const body = await readBody(event)
@@ -108,120 +267,81 @@ export default defineEventHandler(async (event) => {
     let updatedContent = contextDoc.content
     let updatedFilename = contextDoc.filename
 
-    // Check if this is a streaming request for website re-crawl
-    const isStreaming = refreshUrl && contextDoc.type === 'website' && contextDoc.url && 
-                       getQuery(event).stream === 'true'
+    // Always use streaming for website re-crawl
+    const isWebsiteReCrawl = refreshUrl && contextDoc.type === 'website' && contextDoc.url
 
     // Handle URL refresh
     if (refreshUrl && contextDoc.type === 'url' && contextDoc.url) {
+      // Validate URL before scraping
+      if (!isAllowedUrl(contextDoc.url)) {
+        throw createError({
+          statusCode: 400,
+          statusMessage: 'URL not allowed or invalid'
+        })
+      }
+      
       try {
         console.log(`Refreshing URL content for: ${contextDoc.url}`)
         const scrapedContent = await webScrapingService.scrapeUrl(contextDoc.url)
         updatedContent = scrapedContent.content
         updatedFilename = scrapedContent.title || contextDoc.filename
         
+        // Check content size limit
+        if (updatedContent.length > MAX_CONTENT_SIZE) {
+          throw createError({
+            statusCode: 413,
+            statusMessage: `Content too large (${updatedContent.length} chars, max ${MAX_CONTENT_SIZE})`
+          })
+        }
+        
         console.log(`URL content refreshed: ${scrapedContent.content.length} characters`)
         
-        // Update the document first
-        agent.contextDocuments[docIndex] = {
-          ...contextDoc.toObject(),
-          type: contextDoc.type,
-          content: updatedContent,
-          filename: updatedFilename,
-          uploadedAt: new Date()
-        }
-        await agent.save()
-        
-        const updatedDoc = agent.contextDocuments[docIndex]
-        const documentId = updatedDoc._id?.toString()
+        // Update the document
+        const updatedDoc = await updateAgentDocument(
+          agent, 
+          docIndex, 
+          updatedContent, 
+          updatedFilename, 
+          true // Update timestamp
+        )
         
         // Reprocess document for RAG (vector embeddings)
-        let ragInfo = null
-        try {
-          if (documentId) {
-            console.log(`🔄 Reprocessing URL document for RAG: ${documentId}`)
-            
-            // First, delete existing chunks for this document
-            await ragService.deleteDocumentChunks(agentId, documentId)
-            console.log(`🗑️  Deleted old RAG chunks for URL document`)
-            
-            // Then process the new content
-            const ragResult = await ragService.processDocument(
-              agentId,
-              documentId,
-              updatedContent,
-              {
-                type: 'url',
-                title: updatedDoc.filename || 'URL Document',
-                source: updatedDoc.url || contextDoc.url
-              }
-            )
-            ragInfo = {
-              chunksCreated: ragResult.chunksCreated,
-              collectionName: ragResult.collectionName
-            }
-            
-            // Update document metadata with RAG status
-            agent.contextDocuments[docIndex].metadata = {
-              ...agent.contextDocuments[docIndex].metadata,
-              rag: {
-                processed: true,
-                chunksCreated: ragResult.chunksCreated,
-                processedAt: new Date()
-              }
-            }
-            await agent.save()
-            
-            console.log(`✅ RAG reprocessing completed: ${ragResult.chunksCreated} chunks created for URL`)
-          }
-        } catch (ragError: any) {
-          console.error('RAG reprocessing failed (non-critical):', ragError)
-          
-          // Update document metadata to indicate RAG processing failed
-          agent.contextDocuments[docIndex].metadata = {
-            ...agent.contextDocuments[docIndex].metadata,
-            rag: {
-              processed: false,
-              error: ragError.message || 'RAG reprocessing failed',
-              attemptedAt: new Date()
-            }
-          }
-          await agent.save()
-        }
+        const ragInfo = await processDocumentRAG(
+          agentId,
+          agent,
+          docIndex,
+          updatedContent,
+          'url',
+          updatedDoc.filename || 'URL Document',
+          updatedDoc.url || contextDoc.url
+        )
         
-        return {
-          success: true,
-          message: 'URL content refreshed successfully',
-          data: {
-            contextDocument: {
-              _id: updatedDoc._id,
-              type: updatedDoc.type,
-              filename: updatedDoc.filename,
-              url: updatedDoc.url,
-              uploadedAt: updatedDoc.uploadedAt,
-              contentLength: updatedDoc.content?.length || 0,
-              contentPreview: updatedDoc.content?.substring(0, 200) + (updatedDoc.content?.length > 200 ? '...' : '')
-            },
-            agent: {
-              _id: agent._id,
-              name: agent.name,
-              contextDocumentsCount: agent.contextDocuments.length
-            },
-            rag: ragInfo
-          }
-        }
+        return createDocumentResponse(
+          true,
+          'URL content refreshed successfully',
+          updatedDoc,
+          ragInfo
+        )
         
       } catch (error: any) {
         console.error('URL refresh failed:', error.message)
         throw createError({
           statusCode: 400,
-          statusMessage: `Failed to refresh URL content: ${error.message}`
+          statusMessage: `Failed to refresh URL content: ${sanitizeErrorMessage(error)}`
         })
       }
     }
 
     // Handle website re-crawl
     if (refreshUrl && contextDoc.type === 'website' && contextDoc.url) {
+      // Validate URL before crawling
+      if (!isAllowedUrl(contextDoc.url)) {
+        throw createError({
+          statusCode: 400,
+          statusMessage: 'URL not allowed or invalid'
+        })
+      }
+      
       try {
         console.log(`Re-crawling website for: ${contextDoc.url}`)
         
@@ -232,8 +352,8 @@ export default defineEventHandler(async (event) => {
           sameDomainOnly: true
         }
 
-        // Handle streaming re-crawl
-        if (isStreaming) {
+        // Always use streaming for website re-crawl
+        if (isWebsiteReCrawl) {
           const eventStream = createEventStream(event)
 
           // Handle the re-crawling in the background
@@ -286,6 +406,18 @@ export default defineEventHandler(async (event) => {
               
               updatedContent = combinedContent
               updatedFilename = `${new URL(websiteContent.baseUrl).hostname} (${websiteContent.totalPages} pages)`
+              
+              // Check content size limit
+              if (updatedContent.length > MAX_CONTENT_SIZE) {
+                await eventStream.push(JSON.stringify({
+                  type: 'error',
+                  phase: 'error',
+                  message: `Content too large (${updatedContent.length} chars, max ${MAX_CONTENT_SIZE})`,
+                  error: 'Content size limit exceeded'
+                }))
+                eventStream.close()
+                return
+              }
               
               // Update metadata with new crawl information
               const updatedMetadata = {
@@ -395,11 +527,6 @@ export default defineEventHandler(async (event) => {
                     contentPreview: updatedDoc.content?.substring(0, 200) + (updatedDoc.content?.length > 200 ? '...' : ''),
                     metadata: updatedDoc.metadata
                   },
-                  agent: {
-                    _id: agent._id,
-                    name: agent.name,
-                    contextDocumentsCount: agent.contextDocuments.length
-                  },
                   rag: ragInfo
                 }
               }))
@@ -413,8 +540,8 @@ export default defineEventHandler(async (event) => {
               await eventStream.push(JSON.stringify({
                 type: 'error',
                 phase: 'error',
-                message: error.message || 'Failed to re-crawl website',
-                error: error.statusMessage || error.message
+                message: sanitizeErrorMessage(error),
+                error: sanitizeErrorMessage(error)
               }))
               
               eventStream.close()
@@ -443,6 +570,14 @@ export default defineEventHandler(async (event) => {
         
         updatedContent = combinedContent
         updatedFilename = `${new URL(websiteContent.baseUrl).hostname} (${websiteContent.totalPages} pages)`
+        
+        // Check content size limit
+        if (updatedContent.length > MAX_CONTENT_SIZE) {
+          throw createError({
+            statusCode: 413,
+            statusMessage: `Content too large (${updatedContent.length} chars, max ${MAX_CONTENT_SIZE})`
+          })
+        }
         
         // Update metadata with new crawl information
         const updatedMetadata = {
@@ -539,11 +674,6 @@ export default defineEventHandler(async (event) => {
               contentPreview: updatedDoc.content?.substring(0, 200) + (updatedDoc.content?.length > 200 ? '...' : ''),
               metadata: updatedDoc.metadata
             },
-            agent: {
-              _id: agent._id,
-              name: agent.name,
-              contextDocumentsCount: agent.contextDocuments.length
-            },
             rag: ragInfo
           }
         }
@@ -552,7 +682,7 @@ export default defineEventHandler(async (event) => {
         console.error('Website re-crawl failed:', error.message)
         throw createError({
           statusCode: 400,
-          statusMessage: `Failed to re-crawl website: ${error.message}`
+          statusMessage: `Failed to re-crawl website: ${sanitizeErrorMessage(error)}`
         })
       }
     }
@@ -573,10 +703,10 @@ export default defineEventHandler(async (event) => {
         })
       }
 
-      if (content.length > 100000) { // 100KB limit
+      if (content.length > MAX_CONTENT_SIZE) {
         throw createError({
-          statusCode: 400,
-          statusMessage: 'Content too large (max 100KB)'
+          statusCode: 413,
+          statusMessage: `Content too large (max ${MAX_CONTENT_SIZE} chars)`
         })
       }
 
@@ -595,99 +725,36 @@ export default defineEventHandler(async (event) => {
     }
 
     // Update the document
-    agent.contextDocuments[docIndex] = {
-      ...contextDoc.toObject(),
-      type: contextDoc.type, // Explicitly preserve the type field
-      content: updatedContent,
-      filename: updatedFilename,
-      uploadedAt: refreshUrl ? new Date() : contextDoc.uploadedAt // Update timestamp only if refreshed
-    }
-
-    await agent.save()
-
-    const updatedDoc = agent.contextDocuments[docIndex]
-    const documentId = updatedDoc._id?.toString()
+    const updatedDoc = await updateAgentDocument(
+      agent, 
+      docIndex, 
+      updatedContent, 
+      updatedFilename, 
+      refreshUrl // Update timestamp only if refreshed
+    )
 
     console.log(`Updated context document for agent ${agent.name}: ${updatedDoc.type} - ${updatedDoc.filename || updatedDoc.url}`)
 
     // Reprocess document for RAG if content was updated
     let ragInfo = null
     if (content !== undefined || filename !== undefined) {
-      try {
-        if (documentId) {
-          console.log(`🔄 Reprocessing document for RAG after manual update: ${documentId}`)
-          
-          // First, delete existing chunks for this document
-          await ragService.deleteDocumentChunks(agentId, documentId)
-          
-          // Then process the updated content
-          const ragResult = await ragService.processDocument(
-            agentId,
-            documentId,
-            updatedContent,
-            {
-              type: updatedDoc.type as 'file' | 'url' | 'website',
-              title: updatedDoc.filename || 'Document',
-              source: updatedDoc.url || updatedDoc.filename || 'Manual update'
-            }
-          )
-          ragInfo = {
-            chunksCreated: ragResult.chunksCreated,
-            collectionName: ragResult.collectionName
-          }
-          
-          // Update document metadata with RAG status
-          agent.contextDocuments[docIndex].metadata = {
-            ...agent.contextDocuments[docIndex].metadata,
-            rag: {
-              processed: true,
-              chunksCreated: ragResult.chunksCreated,
-              processedAt: new Date()
-            }
-          }
-          await agent.save()
-          
-          console.log(`✅ RAG reprocessing completed: ${ragResult.chunksCreated} chunks created`)
-        }
-      } catch (ragError: any) {
-        console.error('RAG reprocessing failed (non-critical):', ragError)
-        
-        // Update document metadata to indicate RAG processing failed
-        agent.contextDocuments[docIndex].metadata = {
-          ...agent.contextDocuments[docIndex].metadata,
-          rag: {
-            processed: false,
-            error: ragError.message || 'RAG reprocessing failed',
-            attemptedAt: new Date()
-          }
-        }
-        await agent.save()
-        
-        // RAG failure is non-critical - document is still updated in MongoDB
-      }
+      ragInfo = await processDocumentRAG(
+        agentId,
+        agent,
+        docIndex,
+        updatedContent,
+        updatedDoc.type as 'file' | 'url' | 'website',
+        updatedDoc.filename || 'Document',
+        updatedDoc.url || updatedDoc.filename || 'Manual update'
+      )
     }
 
-    return {
-      success: true,
-      message: refreshUrl ? 'Context document refreshed successfully' : 'Context document updated successfully',
-      data: {
-        contextDocument: {
-          _id: updatedDoc._id,
-          type: updatedDoc.type,
-          filename: updatedDoc.filename,
-          url: updatedDoc.url,
-          uploadedAt: updatedDoc.uploadedAt,
-          contentLength: updatedDoc.content?.length || 0,
-          contentPreview: updatedDoc.content?.substring(0, 200) + (updatedDoc.content?.length > 200 ? '...' : '')
-        },
-        agent: {
-          _id: agent._id,
-          name: agent.name,
-          contextDocumentsCount: agent.contextDocuments.length
-        },
-        rag: ragInfo
-      }
-    }
+    return createDocumentResponse(
+      true,
+      refreshUrl ? 'Context document refreshed successfully' : 'Context document updated successfully',
+      updatedDoc,
+      ragInfo
+    )
 
   } catch (error: any) {
     console.error('Update context document error:', error)
@@ -697,10 +764,10 @@ export default defineEventHandler(async (event) => {
       throw error
     }
 
-    // Otherwise, create a generic error
+    // Otherwise, create a generic error with sanitized message
     throw createError({
       statusCode: 500,
-      statusMessage: error.message || 'Failed to update context document'
+      statusMessage: sanitizeErrorMessage(error) || 'Failed to update context document'
     })
   }
 }) 

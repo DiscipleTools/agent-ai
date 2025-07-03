@@ -159,7 +159,54 @@ class WebScrapingService {
   }
 
   /**
-   * Fetch content from URL with security checks
+   * Fetch with manual redirect handling to validate each redirect URL
+   */
+  private async fetchWithRedirectValidation(url: string, options: RequestInit, maxRedirects: number = 5): Promise<Response> {
+    let currentUrl = url
+    let redirectCount = 0
+
+    while (redirectCount <= maxRedirects) {
+      // Validate current URL before making request
+      const validation = this.validateUrl(currentUrl)
+      if (!validation.isValid) {
+        throw new Error(`Redirect URL validation failed: ${validation.error}`)
+      }
+
+      const response = await fetch(currentUrl, {
+        ...options,
+        redirect: 'manual' // Handle redirects manually
+      })
+
+      // If not a redirect, return the response
+      if (response.status < 300 || response.status >= 400) {
+        return response
+      }
+
+      // Handle redirect
+      const location = response.headers.get('location')
+      if (!location) {
+        throw new Error('Redirect response missing Location header')
+      }
+
+      // Convert relative URLs to absolute
+      try {
+        currentUrl = new URL(location, currentUrl).toString()
+      } catch (error) {
+        throw new Error(`Invalid redirect URL: ${location}`)
+      }
+
+      redirectCount++
+      
+      if (redirectCount > maxRedirects) {
+        throw new Error(`Too many redirects (max: ${maxRedirects})`)
+      }
+    }
+
+    throw new Error('Unexpected redirect handling error')
+  }
+
+  /**
+   * Fetch content from URL with security checks and redirect validation
    */
   private async fetchContent(url: string, options: ScrapingOptions, signal?: AbortSignal): Promise<{ content: string; contentType: string }> {
     // Use external signal if provided, otherwise create our own
@@ -178,11 +225,12 @@ class WebScrapingService {
     timeoutId = setTimeout(() => controller.abort(), options.timeout)
 
     try {
-      const response = await fetch(url, {
+      // Use manual redirect handling to validate each redirect URL
+      const response = await this.fetchWithRedirectValidation(url, {
         method: 'GET',
         headers: {
           'User-Agent': options.userAgent!,
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,text/plain;q=0.8,*/*;q=0.7',
+          'Accept': 'text/html,application/xhtml+xml',
           'Accept-Language': 'en-US,en;q=0.9',
           'Accept-Encoding': 'gzip, deflate',
           'DNT': '1',
@@ -190,8 +238,6 @@ class WebScrapingService {
           'Upgrade-Insecure-Requests': '1'
         },
         signal: controller.signal,
-        redirect: 'follow',
-        // Security: Don't send credentials
         credentials: 'omit'
       })
 
@@ -201,12 +247,12 @@ class WebScrapingService {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`)
       }
 
-      // Check content type
+      // Check content type - only allow HTML and XHTML
       const contentType = response.headers.get('content-type') || 'text/html'
       
-      // Only process text-based content
-      if (!contentType.includes('text/') && !contentType.includes('application/json') && !contentType.includes('application/xml')) {
-        throw new Error(`Unsupported content type: ${contentType}`)
+      // Strict content-type validation - only allow HTML content
+      if (!contentType.includes('text/html') && !contentType.includes('application/xhtml')) {
+        throw new Error(`Unsupported content type: ${contentType}. Only HTML content is allowed.`)
       }
 
       // Check content length
@@ -707,7 +753,7 @@ class WebScrapingService {
    */
   private async tryArticleExtractor(url: string, signal?: AbortSignal): Promise<{ content: string; title?: string } | null> {
     try {
-      // Create a custom fetch function that respects our abort signal
+      // Create a custom fetch function that respects our abort signal and validates redirects
       const customFetch = async (url: string) => {
         const controller = new AbortController()
         
@@ -718,13 +764,14 @@ class WebScrapingService {
           signal.addEventListener('abort', () => controller.abort())
         }
         
-        const response = await fetch(url, {
+        const response = await this.fetchWithRedirectValidation(url, {
           signal: controller.signal,
           headers: {
             'User-Agent': this.defaultOptions.userAgent!,
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept': 'text/html,application/xhtml+xml',
             'Accept-Language': 'en-US,en;q=0.9'
-          }
+          },
+          credentials: 'omit'
         })
         
         return response
@@ -882,7 +929,7 @@ class WebScrapingService {
       let extractedContent: string
       let title: string | undefined
 
-      // Process based on content type
+      // Process HTML content (only HTML content is now allowed)
       if (contentType.includes('text/html') || contentType.includes('application/xhtml')) {
         // Use simple HTML processing to avoid hanging on complex pages
         const extracted = await this.withTimeout(
@@ -893,19 +940,9 @@ class WebScrapingService {
         
         extractedContent = extracted.content
         title = extracted.title
-      } else if (contentType.includes('text/plain')) {
-        extractedContent = rawContent
-      } else if (contentType.includes('application/json')) {
-        // For JSON, just stringify it nicely
-        try {
-          const parsed = JSON.parse(rawContent)
-          extractedContent = JSON.stringify(parsed, null, 2)
-        } catch {
-          extractedContent = rawContent
-        }
       } else {
-        // For other text types, use as-is
-        extractedContent = rawContent
+        // This shouldn't happen due to content-type validation, but handle gracefully
+        throw new Error(`Unexpected content type: ${contentType}`)
       }
 
       // Sanitize content
@@ -954,13 +991,12 @@ class WebScrapingService {
       const controller = new AbortController()
       const timeoutId = setTimeout(() => controller.abort(), 5000) // 5 second timeout for test
 
-      const response = await fetch(normalizedUrl, {
+      const response = await this.fetchWithRedirectValidation(normalizedUrl, {
         method: 'HEAD', // Only get headers
         headers: {
           'User-Agent': this.defaultOptions.userAgent!
         },
         signal: controller.signal,
-        redirect: 'follow',
         credentials: 'omit'
       })
 
@@ -971,6 +1007,11 @@ class WebScrapingService {
       if (!response.ok) {
         const errorMsg = `HTTP ${response.status}: ${response.statusText}`
         return { accessible: false, error: errorMsg }
+      }
+
+      // Validate content type for HTML only
+      if (!contentType.includes('text/html') && !contentType.includes('application/xhtml')) {
+        return { accessible: false, error: `Unsupported content type: ${contentType}. Only HTML content is allowed.` }
       }
 
       return { accessible: true, contentType }

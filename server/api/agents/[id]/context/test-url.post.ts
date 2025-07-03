@@ -1,5 +1,17 @@
+/**
+ * API Endpoint: POST /api/agents/[id]/context/test-url
+ * 
+ * Tests if a URL is accessible and scrapes basic metadata before adding it as context.
+ * This endpoint verifies URL accessibility, attempts content scraping, and returns
+ * preview information including title, content length, and a content preview.
+ * Used to validate URLs before they are added to an agent's context documents.
+ * 
+ * Authentication: Required
+ * Authorization: Admin or user with agent access
+ */
 import { connectDB } from '~/server/utils/db'
 import { requireAuth } from '~/server/utils/auth'
+import { validateUrlOrThrow } from '~/server/utils/urlValidator'
 import Agent from '~/server/models/Agent'
 import webScrapingService from '~/server/services/webScrapingService'
 import mongoose from 'mongoose'
@@ -29,6 +41,16 @@ export default defineEventHandler(async (event) => {
       throw createError({
         statusCode: 400,
         statusMessage: 'URL is required and must be a string'
+      })
+    }
+
+    // Validate URL for security (prevent SSRF attacks)
+    try {
+      validateUrlOrThrow(url)
+    } catch (error: any) {
+      throw createError({
+        statusCode: 400,
+        statusMessage: error.message
       })
     }
 

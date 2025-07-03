@@ -247,6 +247,7 @@
         <!-- Website Input -->
         <WebsiteInput
           v-if="showWebsiteInput"
+          :agent-id="agentId"
           @add-website="$emit('add-website', $event)"
           @close="showWebsiteInput = false"
         />

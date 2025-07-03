@@ -1,5 +1,19 @@
+/**
+ * POST /api/agents/[id]/context/url
+ * 
+ * Adds URL content to an agent's context documents by:
+ * 1. Validating the provided URL for security (SSRF protection)
+ * 2. Scraping content from the URL using webScrapingService
+ * 3. Storing the scraped content in the agent's contextDocuments array
+ * 4. Processing the content for RAG (vector embeddings) using ragService
+ * 5. Updating document metadata with RAG processing status
+ * 
+ * Requires authentication and proper agent access permissions.
+ * Prevents duplicate URLs from being added to the same agent.
+ */
 import { connectDB } from '~/server/utils/db'
 import { requireAuth } from '~/server/utils/auth'
+import { validateUrlOrThrow } from '~/server/utils/urlValidator'
 import Agent from '~/server/models/Agent'
 import User from '~/server/models/User'
 import webScrapingService from '~/server/services/webScrapingService'
@@ -31,6 +45,16 @@ export default defineEventHandler(async (event) => {
       throw createError({
         statusCode: 400,
         statusMessage: 'URL is required and must be a string'
+      })
+    }
+
+    // Validate URL for security (prevent SSRF attacks)
+    try {
+      validateUrlOrThrow(url)
+    } catch (error: any) {
+      throw createError({
+        statusCode: 400,
+        statusMessage: error.message
       })
     }
 
@@ -75,9 +99,18 @@ export default defineEventHandler(async (event) => {
       scrapedContent = await webScrapingService.scrapeUrl(url)
     } catch (error: any) {
       console.error('URL scraping failed:', error.message)
+      
+      // Provide more specific error messages for common issues
+      let errorMessage = error.message
+      if (error.message.includes('Unsupported content type')) {
+        errorMessage = 'URL must contain HTML content. PDFs, images, and other file types are not supported.'
+      } else if (error.message.includes('Redirect URL validation failed')) {
+        errorMessage = 'URL redirects to a blocked or private network address.'
+      }
+      
       throw createError({
         statusCode: 400,
-        statusMessage: `Failed to fetch URL content: ${error.message}`
+        statusMessage: `Failed to fetch URL content: ${errorMessage}`
       })
     }
 

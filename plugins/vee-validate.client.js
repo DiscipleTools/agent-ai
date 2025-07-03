@@ -1,5 +1,6 @@
 import { defineRule, configure } from 'vee-validate'
 import { required, email, min, max, min_value, max_value } from '@vee-validate/rules'
+import { sanitizeText } from '~/utils/sanitize.js'
 
 export default defineNuxtPlugin(() => {
   // Define the rules
@@ -13,16 +14,19 @@ export default defineNuxtPlugin(() => {
   // Configure VeeValidate
   configure({
     generateMessage: (ctx) => {
+      // Sanitize field name to prevent XSS
+      const safeFieldName = sanitizeText(ctx.field)
+      
       const messages = {
-        required: `The ${ctx.field} field is required.`,
-        email: `The ${ctx.field} field must be a valid email.`,
-        min: `The ${ctx.field} field must be at least ${ctx.rule.params[0]} characters.`,
-        max: `The ${ctx.field} field must not exceed ${ctx.rule.params[0]} characters.`,
-        min_value: `The ${ctx.field} field must be at least ${ctx.rule.params[0]}.`,
-        max_value: `The ${ctx.field} field must not exceed ${ctx.rule.params[0]}.`
+        required: `The ${safeFieldName} field is required.`,
+        email: `The ${safeFieldName} field must be a valid email.`,
+        min: `The ${safeFieldName} field must be at least ${ctx.rule.params[0]} characters.`,
+        max: `The ${safeFieldName} field must not exceed ${ctx.rule.params[0]} characters.`,
+        min_value: `The ${safeFieldName} field must be at least ${ctx.rule.params[0]}.`,
+        max_value: `The ${safeFieldName} field must not exceed ${ctx.rule.params[0]}.`
       }
 
-      return messages[ctx.rule.name] || `The ${ctx.field} field is invalid.`
+      return messages[ctx.rule.name] || `The ${safeFieldName} field is invalid.`
     }
   })
 }) 

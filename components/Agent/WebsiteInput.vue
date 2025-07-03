@@ -296,16 +296,25 @@ const addWebsite = async () => {
         percentage: sanitizeNumber(progress.percentage || 0),
         currentUrl: sanitizeUrl(progress.currentUrl || '')
       })
+      
+      // Turn off progress when crawling is complete
+      if (progress.type === 'complete' || progress.type === 'error') {
+        websiteAdding.value = false
+        crawlingProgress.isActive = false
+        
+        // Reset form and close modal when done
+        websiteInput.value = ''
+        websiteTestResult.value = null
+        emit('close')
+      }
     }
     
     emit('add-website', { url: sanitizedUrl, options: sanitizedCrawlOptions, progressCallback })
     
-    websiteInput.value = ''
-    websiteTestResult.value = null
-    emit('close')
+    // Don't close immediately - wait for crawling to complete
+    // The progressCallback will handle closing when done
   } catch (error) {
     console.error('Failed to add website:', error.message)
-  } finally {
     websiteAdding.value = false
     crawlingProgress.isActive = false
   }
@@ -314,10 +323,12 @@ const addWebsite = async () => {
 const getUrlPath = (url) => {
   try {
     const parsedUrl = new URL(sanitizeUrl(url))
-    return sanitizeText(parsedUrl.pathname)
+    // Don't use sanitizeText on pathname as it encodes forward slashes
+    return parsedUrl.pathname || '/'
   } catch (error) {
     console.error('Failed to parse URL:', error.message)
-    return sanitizeText(url)
+    // For display purposes, just return the original URL without over-sanitization
+    return url || ''
   }
 }
 </script>

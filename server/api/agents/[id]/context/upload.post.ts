@@ -1,3 +1,21 @@
+/**
+ * Agent Context Document File Upload API Endpoint
+ * 
+ * Handles file uploads for agent context documents. This endpoint:
+ * - Accepts multipart file uploads (max 10MB, single file)
+ * - Validates user authentication and agent access permissions
+ * - Processes uploaded files to extract text content
+ * - Stores the document in the agent's contextDocuments array
+ * - Processes the document for RAG (Retrieval Augmented Generation) vector embeddings
+ * - Returns success response with document metadata and RAG processing info
+ * 
+ * Security features:
+ * - File size and count limits
+ * - File type validation through formidable filter
+ * - User authentication and authorization checks
+ * - Duplicate filename detection
+ * - Temporary file cleanup on errors
+ */
 import { connectDB } from '~/server/utils/db'
 import { requireAuth } from '~/server/utils/auth'
 import Agent from '~/server/models/Agent'
@@ -35,12 +53,6 @@ export default defineEventHandler(async (event) => {
       })
     }
 
-    // Defensive check: Ensure createdBy field exists (fix for legacy agents)
-    if (!agent.createdBy) {
-      console.warn(`Agent ${agent.name} missing createdBy field, setting to current user`)
-      agent.createdBy = user._id
-    }
-
     // Check if user has access to this agent
     if (user.role !== 'admin' && !user.agentAccess?.includes(new mongoose.Types.ObjectId(agentId))) {
       throw createError({
@@ -49,6 +61,18 @@ export default defineEventHandler(async (event) => {
       })
     }
 
+    // Define allowed file types for security
+    const allowedMimeTypes = [
+      'application/pdf',
+      'text/plain',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'text/csv',
+      'application/csv'
+    ]
+    
+    const allowedExtensions = ['.pdf', '.txt', '.doc', '.docx', '.csv']
+
     // Parse the multipart form data
     const form = formidable({
       uploadDir: os.tmpdir(),
@@ -56,8 +80,25 @@ export default defineEventHandler(async (event) => {
       maxFileSize: 10 * 1024 * 1024, // 10MB
       maxFiles: 1,
       filter: (part) => {
-        // Only allow file uploads (not other form fields)
-        return part.name === 'file' && !!part.originalFilename
+        // Enhanced file validation
+        if (part.name !== 'file' || !part.originalFilename) {
+          return false
+        }
+        
+        // Validate file extension
+        const ext = path.extname(part.originalFilename).toLowerCase()
+        if (!allowedExtensions.includes(ext)) {
+          console.warn(`Rejected file with disallowed extension: ${ext}`)
+          return false
+        }
+        
+        // Validate MIME type if provided
+        if (part.mimetype && !allowedMimeTypes.includes(part.mimetype)) {
+          console.warn(`Rejected file with disallowed MIME type: ${part.mimetype}`)
+          return false
+        }
+        
+        return true
       }
     })
 
@@ -93,11 +134,45 @@ export default defineEventHandler(async (event) => {
       })
     }
 
-    console.log(`Processing uploaded file: ${originalFilename} (${size} bytes, ${mimetype})`)
+    // Sanitize filename to prevent path traversal attacks
+    const sanitizedFilename = path.basename(originalFilename).replace(/[^a-zA-Z0-9.-]/g, '_')
+    
+    // Additional security validations
+    const fileExtension = path.extname(originalFilename).toLowerCase()
+    if (!allowedExtensions.includes(fileExtension)) {
+      // Clean up uploaded file
+      try {
+        await fs.promises.unlink(filepath)
+      } catch (error) {
+        console.warn('Failed to clean up uploaded file:', error)
+      }
+      
+      throw createError({
+        statusCode: 400,
+        statusMessage: `File type ${fileExtension} is not allowed. Allowed types: ${allowedExtensions.join(', ')}`
+      })
+    }
+    
+    // Validate MIME type matches allowed types
+    if (mimetype && !allowedMimeTypes.includes(mimetype)) {
+      // Clean up uploaded file
+      try {
+        await fs.promises.unlink(filepath)
+      } catch (error) {
+        console.warn('Failed to clean up uploaded file:', error)
+      }
+      
+      throw createError({
+        statusCode: 400,
+        statusMessage: `MIME type ${mimetype} is not allowed`
+      })
+    }
 
-    // Check if file with same name already exists
+    console.log(`Processing uploaded file: ${sanitizedFilename} (${size} bytes, ${mimetype})`)
+
+    // Check if file with same name already exists (using sanitized filename)
     const existingDoc = agent.contextDocuments.find((doc: any) => 
-      doc.type === 'file' && doc.filename === originalFilename
+      doc.type === 'file' && doc.filename === sanitizedFilename
     )
 
     if (existingDoc) {
@@ -119,7 +194,7 @@ export default defineEventHandler(async (event) => {
     try {
       processedFile = await fileProcessingService.processFile(
         filepath,
-        originalFilename,
+        sanitizedFilename, // Use sanitized filename
         size || 0,
         mimetype || undefined
       )
@@ -139,14 +214,31 @@ export default defineEventHandler(async (event) => {
       })
     }
 
+    // Validate extracted content length (max 1MB of text)
+    const maxContentLength = 1024 * 1024 // 1MB
+    if (processedFile.content.length > maxContentLength) {
+      // Clean up uploaded file
+      try {
+        await fs.promises.unlink(filepath)
+      } catch (error) {
+        console.warn('Failed to clean up uploaded file:', error)
+      }
+      
+      throw createError({
+        statusCode: 400,
+        statusMessage: `Extracted content too large (${processedFile.content.length} characters). Maximum allowed: ${maxContentLength} characters.`
+      })
+    }
+
     // Create context document
     const contextDocument = {
       type: 'file' as const,
       content: processedFile.content,
-      filename: processedFile.filename,
+      filename: sanitizedFilename, // Use sanitized filename for storage
       uploadedAt: new Date(),
       metadata: {
-        originalName: processedFile.originalName,
+        originalName: originalFilename, // Keep original filename in metadata
+        sanitizedName: sanitizedFilename,
         size: processedFile.size,
         mimeType: processedFile.mimeType,
         extractedAt: processedFile.extractedAt
@@ -173,8 +265,8 @@ export default defineEventHandler(async (event) => {
           processedFile.content,
           {
             type: 'file',
-            title: processedFile.filename,
-            source: processedFile.originalName
+            title: sanitizedFilename,
+            source: originalFilename
           }
         )
         ragInfo = {
@@ -224,15 +316,11 @@ export default defineEventHandler(async (event) => {
           uploadedAt: contextDocument.uploadedAt,
           contentLength: contextDocument.content.length,
           metadata: {
-            originalName: processedFile.originalName,
+            originalName: originalFilename,
+            sanitizedName: sanitizedFilename,
             size: processedFile.size,
             mimeType: processedFile.mimeType
           }
-        },
-        agent: {
-          _id: agent._id,
-          name: agent.name,
-          contextDocumentsCount: agent.contextDocuments.length
         },
         rag: ragInfo
       }
