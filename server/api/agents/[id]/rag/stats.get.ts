@@ -1,8 +1,22 @@
+/**
+ * RAG Statistics API Endpoint
+ * 
+ * This endpoint retrieves comprehensive statistics about an agent's RAG (Retrieval-Augmented Generation) system.
+ * It provides information about:
+ * - MongoDB context documents (count by type: file, url, website)
+ * - Qdrant vector database collection status and metrics
+ * - Detailed chunk analysis showing how documents are processed into RAG
+ * - Summary statistics for the agent's knowledge base
+ * 
+ * Security: Requires agent read access via authMiddleware.agentAccess('read')
+ * The agentId is validated and sanitized by the middleware before reaching this handler.
+ */
+
 import { connectDB } from '~/server/utils/db'
 import { authMiddleware } from '~/server/utils/auth'
 import Agent from '~/server/models/Agent'
 import { ragService } from '~/server/services/ragService'
-import mongoose from 'mongoose'
+import { sanitizeErrorMessage } from '~/utils/sanitize.js'
 
 export default authMiddleware.agentAccess('read')(async (event, checker, agentId) => {
   try {
@@ -107,7 +121,7 @@ export default authMiddleware.agentAccess('read')(async (event, checker, agentId
     // Otherwise, create a generic error
     throw createError({
       statusCode: 500,
-      statusMessage: error.message || 'Failed to get RAG statistics'
+      statusMessage: sanitizeErrorMessage(error.message || 'Failed to get RAG statistics')
     })
   }
 }) 

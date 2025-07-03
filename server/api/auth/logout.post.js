@@ -1,14 +1,14 @@
 import { connectDB } from '~/server/utils/db'
-import { requireAuth } from '~/server/utils/auth'
+import { authMiddleware } from '~/server/utils/auth'
 import authService from '~/server/services/authService'
 
-export default defineEventHandler(async (event) => {
+export default authMiddleware.auth(async (event, checker) => {
   try {
     // Connect to database
     await connectDB()
     
-    // Require authentication
-    const user = await requireAuth(event)
+    // Get authenticated user
+    const user = checker.user
 
     // Get refresh token from cookies or body
     const refreshToken = getCookie(event, 'refresh-token') || (await readBody(event))?.refreshToken

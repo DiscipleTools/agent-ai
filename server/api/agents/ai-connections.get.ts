@@ -1,3 +1,12 @@
+/**
+ * GET /api/agents/ai-connections
+ *
+ * Fetches all active AI connections and the default connection.
+ * This endpoint is designed to provide the necessary data for a UI component
+ * where a user can select an AI model for an agent.
+ * It filters out inactive connections and sensitive information like API keys.
+ */
+import { sanitizeText, sanitizeUrl, sanitizeErrorMessage } from '~/utils/sanitize'
 import settingsService from '~/server/services/settingsService'
 import { authMiddleware } from '~/server/utils/auth'
 
@@ -12,9 +21,9 @@ export default authMiddleware.auth(async (event, checker) => {
       .filter(conn => conn.isActive)
       .map(conn => ({
         _id: conn._id,
-        name: conn.name,
-        provider: conn.provider,
-        endpoint: conn.endpoint,
+        name: sanitizeText(conn.name),
+        provider: sanitizeText(conn.provider),
+        endpoint: sanitizeUrl(conn.endpoint),
         availableModels: conn.availableModels?.filter(model => model.enabled) || []
       }))
 
@@ -25,8 +34,8 @@ export default authMiddleware.auth(async (event, checker) => {
         defaultConnection: defaultConnection ? {
           connectionId: defaultConnection.connection._id,
           modelId: defaultConnection.modelId,
-          connectionName: defaultConnection.connection.name,
-          modelName: defaultConnection.connection.availableModels?.find(m => m.id === defaultConnection.modelId)?.name || defaultConnection.modelId
+          connectionName: sanitizeText(defaultConnection.connection.name),
+          modelName: sanitizeText(defaultConnection.connection.availableModels?.find(m => m.id === defaultConnection.modelId)?.name || defaultConnection.modelId)
         } : null
       }
     }
@@ -34,7 +43,7 @@ export default authMiddleware.auth(async (event, checker) => {
     console.error('Failed to fetch AI connections for agents:', error)
     throw createError({
       statusCode: error.statusCode || 500,
-      statusMessage: error.statusMessage || 'Failed to fetch AI connections'
+      statusMessage: sanitizeErrorMessage(error)
     })
   }
 }) 

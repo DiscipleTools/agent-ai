@@ -1,8 +1,26 @@
+/**
+ * RAG Search API Endpoint
+ * 
+ * This endpoint performs semantic search on an agent's RAG (Retrieval-Augmented Generation) 
+ * collection using vector similarity. It searches through document chunks stored in the 
+ * Qdrant vector database and returns the most relevant results based on the query.
+ * 
+ * Features:
+ * - Semantic search across agent's context documents
+ * - Configurable result limit (1-20 chunks)
+ * - Relevance scoring and ranking
+ * - Document grouping and summary
+ * - Permission-based access control
+ * 
+ * @route POST /api/agents/[id]/rag/search
+ * @requires Authentication and agent read access
+ */
+
 import { connectDB } from '~/server/utils/db'
 import { authMiddleware } from '~/server/utils/auth'
 import Agent from '~/server/models/Agent'
 import { ragService } from '~/server/services/ragService'
-import mongoose from 'mongoose'
+import { sanitizeSearchQuery, sanitizeNumber, validators } from '~/utils/sanitize'
 
 export default authMiddleware.agentAccess('read')(async (event, checker, agentId) => {
   try {
@@ -13,10 +31,30 @@ export default authMiddleware.agentAccess('read')(async (event, checker, agentId
     const body = await readBody(event)
     const { query, limit = 5 } = body
 
-    if (!query || typeof query !== 'string' || query.trim().length === 0) {
+    // Validate and sanitize query parameter
+    if (!query || typeof query !== 'string') {
       throw createError({
         statusCode: 400,
-        statusMessage: 'Query is required and must be a non-empty string'
+        statusMessage: 'Query is required and must be a string'
+      })
+    }
+
+    // Sanitize query using utility function
+    const sanitizedQuery = sanitizeSearchQuery(query)
+    
+    if (sanitizedQuery.length === 0) {
+      throw createError({
+        statusCode: 400,
+        statusMessage: 'Query cannot be empty after sanitization'
+      })
+    }
+
+    // Validate and sanitize limit parameter
+    const sanitizedLimit = sanitizeNumber(limit)
+    if (!validators.numberRange(sanitizedLimit, 1, 20)) {
+      throw createError({
+        statusCode: 400,
+        statusMessage: 'Limit must be a number between 1 and 20'
       })
     }
 
@@ -32,24 +70,24 @@ export default authMiddleware.agentAccess('read')(async (event, checker, agentId
     // Check if RAG collection exists
     const collectionInfo = await ragService.getCollectionInfo(agentId)
     if (!collectionInfo.exists || !collectionInfo.pointsCount || collectionInfo.pointsCount === 0) {
-      return {
-        success: true,
-        message: 'No RAG data available for this agent',
-        data: {
-          query: query.trim(),
-          results: [],
-          totalChunks: 0,
-          collectionExists: collectionInfo.exists,
-          totalPointsInCollection: collectionInfo.pointsCount || 0
-        }
+          return {
+      success: true,
+      message: 'No RAG data available for this agent',
+      data: {
+        query: sanitizedQuery,
+        results: [],
+        totalChunks: 0,
+        collectionExists: collectionInfo.exists,
+        totalPointsInCollection: collectionInfo.pointsCount || 0
       }
+    }
     }
 
     // Perform RAG search
     const searchResults = await ragService.searchRelevantChunks(
       agentId,
-      query.trim(),
-      Math.min(Math.max(1, parseInt(limit) || 5), 20) // Limit between 1-20
+      sanitizedQuery,
+      sanitizedLimit
     )
 
     // Transform results for frontend
@@ -87,14 +125,14 @@ export default authMiddleware.agentAccess('read')(async (event, checker, agentId
       success: true,
       message: `Found ${results.length} relevant chunks`,
       data: {
-        query: query.trim(),
+        query: sanitizedQuery,
         results,
         totalResults: results.length,
         totalChunks: collectionInfo.pointsCount,
         collectionExists: true,
         documentSummary: Object.values(documentSummary),
         searchMetadata: {
-          limit: Math.min(Math.max(1, parseInt(limit) || 5), 20),
+          limit: sanitizedLimit,
           agentId,
           agentName: agent.name,
           searchedAt: new Date().toISOString()

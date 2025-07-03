@@ -264,14 +264,24 @@ export function getRequiredAgentId(event: any): string {
     })
   }
 
-  if (!mongoose.Types.ObjectId.isValid(agentId)) {
+  // Sanitize the agentId by trimming whitespace and removing any potential injection characters
+  const sanitizedAgentId = agentId.trim().replace(/[^a-fA-F0-9]/g, '')
+  
+  if (!sanitizedAgentId || sanitizedAgentId.length !== 24) {
     throw createError({
       statusCode: 400,
       statusMessage: 'Invalid Agent ID format'
     })
   }
 
-  return agentId
+  if (!mongoose.Types.ObjectId.isValid(sanitizedAgentId)) {
+    throw createError({
+      statusCode: 400,
+      statusMessage: 'Invalid Agent ID format'
+    })
+  }
+
+  return sanitizedAgentId
 }
 
 /**

@@ -216,6 +216,26 @@ export const sanitizeErrorMessage = (error) => {
 }
 
 /**
+ * Sanitize MongoDB ObjectId to prevent injection attacks
+ * @param {string|any} input - The ObjectId to sanitize
+ * @returns {string} - Sanitized ObjectId or empty string if invalid
+ */
+export const sanitizeObjectId = (input) => {
+  if (!input || typeof input !== 'string') return ''
+  
+  // Remove any non-hex characters and trim whitespace
+  const sanitized = input.trim().replace(/[^a-fA-F0-9]/g, '')
+  
+  // MongoDB ObjectIds must be exactly 24 characters long
+  if (sanitized.length !== 24) return ''
+  
+  // Validate that it's a valid hex string
+  if (!/^[a-fA-F0-9]{24}$/.test(sanitized)) return ''
+  
+  return sanitized
+}
+
+/**
  * Sanitize a generic object by applying appropriate sanitization to each property
  * @param {Object} obj - The object to sanitize
  * @param {Object} schema - Schema defining how to sanitize each property

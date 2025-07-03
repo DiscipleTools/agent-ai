@@ -1,3 +1,11 @@
+/**
+ * GET /api/agents
+ * 
+ * Retrieves a list of agents. Admins can see all agents,
+ * while non-admin users can only see agents they have access to.
+ * 
+ */
+
 import { connectDB } from '~/server/utils/db'
 import { authMiddleware } from '~/server/utils/auth'
 import Agent from '~/server/models/Agent'
