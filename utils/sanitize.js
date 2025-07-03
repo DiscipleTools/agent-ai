@@ -227,6 +227,25 @@ export const sanitizePassword = (input) => {
 }
 
 /**
+ * Sanitize a URL that might point to an internal service for display.
+ * It obscures the hostname but preserves the port and scheme.
+ * @param {string|any} input - The URL to sanitize
+ * @returns {string} - Sanitized URL for display
+ */
+export const sanitizeInternalUrl = (input) => {
+  if (!input || typeof input !== 'string') return '';
+  try {
+    const url = new URL(input);
+    // Return scheme, a placeholder for the host, and port if it exists.
+    return `${url.protocol}//[hostname]${url.port ? `:${url.port}` : ''}`;
+  } catch (error) {
+    // Handle cases where input is not a full valid URL (e.g. "localhost:3000")
+    // or return a generic string for invalid formats.
+    return '[Invalid or partial URL]';
+  }
+};
+
+/**
  * Sanitize MongoDB ObjectId to prevent injection attacks
  * @param {string|any} input - The ObjectId to sanitize
  * @returns {string} - Sanitized ObjectId or empty string if invalid

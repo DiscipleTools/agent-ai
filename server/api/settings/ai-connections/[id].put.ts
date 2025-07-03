@@ -1,3 +1,8 @@
+/**
+ * @description Updates an existing AI connection configuration.
+ * @endpoint PUT /api/settings/ai-connections/[id]
+ */
+import { sanitizeText, sanitizeUrl } from '~/utils/sanitize'
 import settingsService from '~/server/services/settingsService'
 import aiService from '~/server/services/aiService'
 import { authMiddleware } from '~/server/utils/auth'
@@ -39,25 +44,42 @@ export default authMiddleware.admin(async (event, checker) => {
 
     const existingConnection = settings.aiConnections[connectionIndex]
 
-    // Validate endpoint URL format if provided
+    // Validate and sanitize endpoint URL if provided to prevent SSRF
     if (body.endpoint) {
-      try {
-        new URL(body.endpoint)
-      } catch {
+      const sanitizedUrl = sanitizeUrl(body.endpoint)
+      if (!sanitizedUrl) {
         throw createError({
           statusCode: 400,
-          statusMessage: 'Invalid endpoint URL format'
+          statusMessage: 'Invalid or insecure endpoint URL provided'
         })
       }
+      body.endpoint = sanitizedUrl
     }
 
-    // Update connection fields
-    if (body.name !== undefined) existingConnection.name = body.name.trim()
+    // Update connection fields with sanitized data
+    if (body.name !== undefined) existingConnection.name = sanitizeText(body.name)
     if (body.apiKey !== undefined) existingConnection.apiKey = body.apiKey
     if (body.endpoint !== undefined) existingConnection.endpoint = body.endpoint
-    if (body.provider !== undefined) existingConnection.provider = body.provider
-    if (body.availableModels !== undefined) existingConnection.availableModels = body.availableModels
-    if (body.isActive !== undefined) existingConnection.isActive = body.isActive
+    if (body.provider !== undefined) existingConnection.provider = sanitizeText(body.provider)
+
+    if (body.availableModels !== undefined) {
+      if (Array.isArray(body.availableModels)) {
+        existingConnection.availableModels = body.availableModels.map((model: any) => {
+          if (model && typeof model === 'object' && model.id && model.name) {
+            return {
+              id: sanitizeText(String(model.id)),
+              name: sanitizeText(String(model.name)),
+              enabled: !!model.enabled,
+            }
+          }
+          return null
+        }).filter(Boolean) // filter out nulls
+      } else {
+        existingConnection.availableModels = [] // Overwrite if malformed
+      }
+    }
+    
+    if (body.isActive !== undefined) existingConnection.isActive = !!body.isActive
 
     // Update settings
     const updatedSettings = await settingsService.updateSettings({

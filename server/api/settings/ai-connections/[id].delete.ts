@@ -1,16 +1,21 @@
+/**
+ * @description Deletes an AI connection by its ID.
+ * @endpoint DELETE /api/settings/ai-connections/:id
+ */
 import settingsService from '~/server/services/settingsService'
 import { authMiddleware } from '~/server/utils/auth'
+import { sanitizeObjectId, sanitizeText } from '~/utils/sanitize'
 
 export default authMiddleware.admin(async (event, checker) => {
   try {
     // Get user from checker
     const user = checker.user
-    const connectionId = getRouterParam(event, 'id')
+    const connectionId = sanitizeObjectId(getRouterParam(event, 'id'))
 
     if (!connectionId) {
       throw createError({
         statusCode: 400,
-        statusMessage: 'Connection ID is required'
+        statusMessage: 'A valid Connection ID is required'
       })
     }
 
@@ -67,9 +72,10 @@ export default authMiddleware.admin(async (event, checker) => {
       defaultConnection: settings.defaultConnection
     }, user._id)
 
+    const sanitizedName = sanitizeText(deletedConnection.name)
     return {
       success: true,
-      message: `AI connection "${deletedConnection.name}" deleted successfully`
+      message: `AI connection "${sanitizedName}" deleted successfully`
     }
   } catch (error: any) {
     console.error('Failed to delete AI connection:', error)

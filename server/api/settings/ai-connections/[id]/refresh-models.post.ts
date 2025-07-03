@@ -1,17 +1,23 @@
+/**
+ * @description Refreshes the available models for a specific AI connection.
+ * @route POST /api/settings/ai-connections/:id/refresh-models
+ */
 import settingsService from '~/server/services/settingsService'
 import aiService from '~/server/services/aiService'
 import { authMiddleware } from '~/server/utils/auth'
+import { sanitizeObjectId } from '~/utils/sanitize'
 
 export default authMiddleware.admin(async (event, checker) => {
   try {
     // Get user from checker
     const user = checker.user
-    const connectionId = getRouterParam(event, 'id')
+    const rawConnectionId = getRouterParam(event, 'id')
+    const connectionId = sanitizeObjectId(rawConnectionId)
 
     if (!connectionId) {
       throw createError({
         statusCode: 400,
-        statusMessage: 'Connection ID is required'
+        statusMessage: 'A valid Connection ID is required'
       })
     }
 

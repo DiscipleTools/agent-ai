@@ -1,5 +1,10 @@
+/**
+ * @description Checks the health of the RAG system.
+ * @endpoint GET /api/rag/health
+ */
 import { ragService } from '~/server/services/ragService'
 import { authMiddleware } from '~/server/utils/auth'
+import { sanitizeErrorMessage, sanitizeInternalUrl } from '~/utils/sanitize.js'
 
 export default authMiddleware.admin(async (event, checker) => {
   try {
@@ -13,13 +18,13 @@ export default authMiddleware.admin(async (event, checker) => {
       data: {
         qdrant: {
           connected: healthStatus.qdrantConnected,
-          url: process.env.QDRANT_URL || 'http://localhost:6333'
+          url: sanitizeInternalUrl(process.env.QDRANT_URL || 'http://localhost:6333')
         },
         embeddings: {
           modelLoaded: healthStatus.embeddingModelLoaded,
           modelName: 'Xenova/all-MiniLM-L12-v2'
         },
-        error: healthStatus.error || null,
+        error: healthStatus.error ? sanitizeErrorMessage(healthStatus.error) : null,
         timestamp: new Date().toISOString()
       }
     }
@@ -33,7 +38,7 @@ export default authMiddleware.admin(async (event, checker) => {
 
     throw createError({
       statusCode: 500,
-      statusMessage: error.message || 'RAG health check failed'
+      statusMessage: sanitizeErrorMessage(error)
     })
   }
 }) 

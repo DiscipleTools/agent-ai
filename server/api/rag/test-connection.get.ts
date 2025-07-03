@@ -1,4 +1,9 @@
+/**
+ * @description Test the connection to the RAG system.
+ * @route GET /api/rag/test-connection
+ */
 import { ragService } from '~/server/services/ragService'
+import { sanitizeErrorMessage } from '~/utils/sanitize.js'
 
 export default defineEventHandler(async (event) => {
   try {
@@ -11,7 +16,7 @@ export default defineEventHandler(async (event) => {
       data: {
         qdrantConnected: healthStatus.qdrantConnected,
         embeddingModelLoaded: healthStatus.embeddingModelLoaded,
-        error: healthStatus.error
+        error: healthStatus.error ? sanitizeErrorMessage(healthStatus.error) : undefined
       }
     }
   } catch (error: any) {
@@ -23,7 +28,7 @@ export default defineEventHandler(async (event) => {
       data: {
         qdrantConnected: false,
         embeddingModelLoaded: false,
-        error: error.message || 'Unknown error'
+        error: sanitizeErrorMessage(error)
       }
     }
   }
