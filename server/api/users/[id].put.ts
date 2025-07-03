@@ -1,9 +1,14 @@
+/**
+ * @description Updates a user.
+ * @route PUT /api/users/:id
+ */
 import User from '~/server/models/User'
 import { authMiddleware } from '~/server/utils/auth'
+import { sanitizeObjectId, sanitizeText } from '~/utils/sanitize'
 
 export default authMiddleware.admin(async (event, checker) => {
   // Get user from checker
-  const user = checker.user
+  const adminUser = checker.user
   const userId = getRouterParam(event, 'id')
   const body = await readBody(event)
   const { name, role, agentAccess, isActive } = body
@@ -24,8 +29,8 @@ export default authMiddleware.admin(async (event, checker) => {
   }
 
   try {
-    const user = await User.findById(userId)
-    if (!user) {
+    const userToUpdate = await User.findById(userId)
+    if (!userToUpdate) {
       throw createError({
         statusCode: 404,
         statusMessage: 'User not found'
@@ -33,7 +38,7 @@ export default authMiddleware.admin(async (event, checker) => {
     }
 
     // Prevent admin from deactivating themselves
-    if (userId === user._id.toString() && isActive === false) {
+    if (userId === adminUser._id.toString() && isActive === false) {
       throw createError({
         statusCode: 400,
         statusMessage: 'You cannot deactivate your own account'
@@ -41,7 +46,7 @@ export default authMiddleware.admin(async (event, checker) => {
     }
 
     // Prevent admin from changing their own role
-    if (userId === user._id.toString() && role && role !== user.role) {
+    if (userId === adminUser._id.toString() && role && role !== userToUpdate.role) {
       throw createError({
         statusCode: 400,
         statusMessage: 'You cannot change your own role'
@@ -49,20 +54,35 @@ export default authMiddleware.admin(async (event, checker) => {
     }
 
     // Update user fields
-    if (name !== undefined) user.name = name.trim()
-    if (role !== undefined) user.role = role
-    if (agentAccess !== undefined) user.agentAccess = agentAccess
-    if (isActive !== undefined) user.isActive = isActive
+    if (name !== undefined) userToUpdate.name = sanitizeText(name)
+    if (role !== undefined) userToUpdate.role = role
+    if (agentAccess !== undefined) {
+      if (!Array.isArray(agentAccess)) {
+        throw createError({
+          statusCode: 400,
+          statusMessage: 'agentAccess must be an array.'
+        })
+      }
+      const sanitizedIds = agentAccess.map((id) => sanitizeObjectId(id))
+      if (sanitizedIds.some((id) => !id)) {
+        throw createError({
+          statusCode: 400,
+          statusMessage: 'agentAccess contains invalid ObjectIds.'
+        })
+      }
+      userToUpdate.agentAccess = sanitizedIds
+    }
+    if (isActive !== undefined) userToUpdate.isActive = isActive
 
-    await user.save()
+    await userToUpdate.save()
 
     // Populate the response
-    await user.populate('invitedBy', 'name email')
-    await user.populate('agentAccess', 'name')
+    await userToUpdate.populate('invitedBy', 'name email')
+    await userToUpdate.populate('agentAccess', 'name')
 
     return {
       success: true,
-      data: user,
+      data: userToUpdate,
       message: 'User updated successfully'
     }
   } catch (error: any) {

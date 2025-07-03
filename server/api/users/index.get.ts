@@ -1,3 +1,9 @@
+/**
+ * GET /api/users
+ *
+ * Fetches all active users from the database.
+ * This endpoint is for admin use only.
+ */
 import User from '~/server/models/User'
 import { authMiddleware } from '~/server/utils/auth'
 import { connectDB } from '~/server/utils/db'

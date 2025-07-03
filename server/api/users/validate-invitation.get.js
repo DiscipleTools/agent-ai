@@ -1,6 +1,12 @@
+/**
+ * GET /api/users/validate-invitation
+ * Validates a user invitation token to ensure it is valid and not expired.
+ * Returns basic user information if the token is valid.
+ */
 import User from '../../models/User.ts'
 import { connectDB } from '../../utils/db'
 import crypto from 'crypto'
+import { sanitizeToken, sanitizeErrorMessage } from '../../../utils/sanitize.js'
 
 export default defineEventHandler(async (event) => {
   try {
@@ -8,7 +14,7 @@ export default defineEventHandler(async (event) => {
     await connectDB()
     
     const query = getQuery(event)
-    const { token } = query
+    const token = sanitizeToken(query.token)
 
     if (!token) {
       throw createError({
@@ -50,7 +56,7 @@ export default defineEventHandler(async (event) => {
     console.error('Invitation validation error:', error)
     throw createError({
       statusCode: error.statusCode || 500,
-      statusMessage: error.statusMessage || 'Failed to validate invitation'
+      statusMessage: sanitizeErrorMessage(error) || 'Failed to validate invitation'
     })
   }
 }) 

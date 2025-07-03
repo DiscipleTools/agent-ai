@@ -1,7 +1,15 @@
+/**
+ * POST /api/users/complete-setup
+ * 
+ * Completes the user account setup process using an invitation token.
+ * This endpoint is used when a new user follows an invitation link
+ * to set their name and password for the first time.
+ */
 import User from '../../models/User.ts'
 import bcrypt from 'bcryptjs'
 import crypto from 'crypto'
 import { connectDB } from '../../utils/db'
+import { sanitizeText } from '~/utils/sanitize.js'
 
 export default defineEventHandler(async (event) => {
   try {
@@ -44,7 +52,7 @@ export default defineEventHandler(async (event) => {
     }
 
     // Update user with name and password
-    user.name = name.trim()
+    user.name = sanitizeText(name)
     user.password = password // Will be hashed by the pre-save hook
     user.isActive = true // Activate the user account
     user.invitationToken = undefined

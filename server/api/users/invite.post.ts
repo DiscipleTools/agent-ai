@@ -1,6 +1,11 @@
+/**
+ * @description Invite a new user to the platform.
+ * @endpoint POST /api/users/invite
+ */
 import User from '~/server/models/User'
 import { authMiddleware } from '~/server/utils/auth'
 import emailService from '~/server/services/emailService'
+import { sanitizeText, sanitizeEmail, sanitizeObjectId } from '~/utils/sanitize'
 
 export default authMiddleware.admin(async (event, checker) => {
   // Get user from checker
@@ -16,9 +21,13 @@ export default authMiddleware.admin(async (event, checker) => {
     })
   }
 
+  // Sanitize and validate inputs
+  const sanitizedEmail = sanitizeEmail(email)
+  const sanitizedName = sanitizeText(name)
+
   // Validate email format
   const emailRegex = /^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/
-  if (!emailRegex.test(email)) {
+  if (!emailRegex.test(sanitizedEmail)) {
     throw createError({
       statusCode: 400,
       statusMessage: 'Please enter a valid email'
@@ -33,9 +42,20 @@ export default authMiddleware.admin(async (event, checker) => {
     })
   }
 
+  // Validate and sanitize agentAccess
+  if (!Array.isArray(agentAccess)) {
+    throw createError({
+      statusCode: 400,
+      statusMessage: 'agentAccess must be an array'
+    })
+  }
+  const sanitizedAgentAccess = agentAccess
+    .map((id) => sanitizeObjectId(id))
+    .filter(Boolean)
+
   try {
     // Check if any user already exists with this email (active or inactive)
-    const existingUser = await User.findOne({ email: email.toLowerCase() })
+    const existingUser = await User.findOne({ email: sanitizedEmail })
     
     if (existingUser) {
       if (existingUser.isActive) {
@@ -56,11 +76,11 @@ export default authMiddleware.admin(async (event, checker) => {
     
     // Create new user
     const newUser = new User({
-      email: email.toLowerCase(),
-      name: name.trim(),
+      email: sanitizedEmail,
+      name: sanitizedName,
       password: tempPassword, // Will be hashed by the pre-save hook
       role,
-      agentAccess,
+      agentAccess: sanitizedAgentAccess,
       invitedBy: user._id,
       isActive: false // User starts inactive until they complete setup
     })
