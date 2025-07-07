@@ -1,6 +1,36 @@
+/**
+ * RAG (Retrieval-Augmented Generation) Service
+ * 
+ * This service handles the processing, storage, and retrieval of document chunks for AI agents.
+ * It provides semantic search capabilities using vector embeddings stored in Qdrant database.
+ * 
+ * Key Features:
+ * - Multilingual text embedding using Xenova/all-MiniLM-L12-v2 model
+ * - Document chunking with configurable overlap for optimal context
+ * - Vector storage and similarity search via Qdrant
+ * - Support for multiple document types (files, URLs, websites)
+ * - Language detection and preprocessing for improved search relevance
+ * - Batch processing with connection resilience and timeout handling
+ * 
+ * Document Processing Flow:
+ * 1. Text content is cleaned and chunked into manageable pieces
+ * 2. Each chunk is converted to a vector embedding
+ * 3. Embeddings are stored in Qdrant with metadata
+ * 4. Search queries are embedded and matched against stored vectors
+ * 5. Most relevant chunks are returned with similarity scores
+ */
+
 import { pipeline } from '@xenova/transformers'
 import type { Pipeline } from '@xenova/transformers'
 import crypto from 'crypto'
+import { 
+  sanitizeContent, 
+  sanitizeSearchQuery, 
+  sanitizeUrl, 
+  sanitizeText,
+  sanitizeErrorMessage,
+  sanitizeNumber
+} from '~/utils/sanitize.js'
 
 interface ChunkData {
   id: string
@@ -40,7 +70,6 @@ class RAGService {
 
   private async initializeEmbeddingModel(): Promise<void> {
     if (!this.embeddingModel) {
-      console.log('Loading multilingual embedding model...')
       this.embeddingModel = await pipeline('feature-extraction', this.modelName, {
         quantized: false,
         progress_callback: (progress: any) => {
@@ -95,7 +124,8 @@ class RAGService {
 
         if (!createResponse.ok) {
           const error = await createResponse.text()
-          throw new Error(`Failed to create Qdrant collection: ${error}`)
+          const sanitizedError = sanitizeErrorMessage(error)
+          throw new Error(`Failed to create Qdrant collection: ${sanitizedError}`)
         }
         console.log(`✅ Collection ${collectionName} created successfully`)
       }
@@ -109,11 +139,15 @@ class RAGService {
   }
 
   private chunkText(text: string, chunkSize: number = 500, overlap: number = 50): string[] {
+    // Sanitize and validate chunk parameters to prevent resource exhaustion
+    const sanitizedChunkSize = Math.max(50, Math.min(2000, sanitizeNumber(chunkSize)))
+    const sanitizedOverlap = Math.max(0, Math.min(sanitizedChunkSize - 1, sanitizeNumber(overlap)))
+    
     const words = text.split(/\s+/)
     const chunks: string[] = []
     
-    for (let i = 0; i < words.length; i += chunkSize - overlap) {
-      const chunk = words.slice(i, i + chunkSize).join(' ')
+    for (let i = 0; i < words.length; i += sanitizedChunkSize - sanitizedOverlap) {
+      const chunk = words.slice(i, i + sanitizedChunkSize).join(' ')
       if (chunk.trim()) {
         chunks.push(chunk.trim())
       }
@@ -134,13 +168,16 @@ class RAGService {
       
       // Extract URL from the section
       const urlMatch = section.match(/^URL: (https?:\/\/[^\n]+)/m)
-      const pageUrl = urlMatch ? urlMatch[1] : ''
+      const pageUrl = urlMatch ? sanitizeUrl(urlMatch[1]) : ''
       
       // Get the content after the URL line
       const contentStart = section.indexOf('\n') + 1
       let pageContent = section.substring(contentStart).trim()
       
       if (pageContent) {
+        // Sanitize page content before processing
+        pageContent = sanitizeContent(pageContent)
+        
         // Preprocess content to reduce brand name pollution
         pageContent = this.preprocessTextForEmbedding(pageContent)
         
@@ -218,20 +255,25 @@ class RAGService {
       // Small delay to ensure Qdrant is fully ready (especially after deletions)
       await new Promise(resolve => setTimeout(resolve, 500))
       
+      // Sanitize inputs to prevent injection attacks
+      const sanitizedContent = sanitizeContent(content)
+      const sanitizedTitle = sanitizeText(metadata.title)
+      const sanitizedSource = metadata.source ? sanitizeUrl(metadata.source) : undefined
+      
       // Clean and chunk the content
-      const cleanContent = content.replace(/\s+/g, ' ').trim()
+      const cleanContent = sanitizedContent.replace(/\s+/g, ' ').trim()
       let chunks: string[] = []
       let chunkPageUrls: string[] = []
       
-      // For website documents, extract page-specific URLs for each chunk
-      if (metadata.type === 'website' && content.includes('=== WEBSITE CONTENT ===')) {
-        const { chunks: websiteChunks, pageUrls } = this.chunkWebsiteContent(content)
-        chunks = websiteChunks
-        chunkPageUrls = pageUrls
-      } else {
-        chunks = this.chunkText(cleanContent)
-        chunkPageUrls = new Array(chunks.length).fill(metadata.source || '')
-      }
+              // For website documents, extract page-specific URLs for each chunk
+        if (metadata.type === 'website' && sanitizedContent.includes('=== WEBSITE CONTENT ===')) {
+          const { chunks: websiteChunks, pageUrls } = this.chunkWebsiteContent(sanitizedContent)
+          chunks = websiteChunks
+          chunkPageUrls = pageUrls
+        } else {
+          chunks = this.chunkText(cleanContent)
+          chunkPageUrls = new Array(chunks.length).fill(sanitizedSource || '')
+        }
       
       const language = this.detectLanguage(cleanContent)
       
@@ -252,10 +294,10 @@ class RAGService {
             agentId,
             documentId,
             documentType: metadata.type,
-            documentTitle: metadata.title,
+            documentTitle: sanitizedTitle,
             chunkIndex: i,
             language,
-            source: chunkPageUrls[i] || metadata.source,
+            source: chunkPageUrls[i] || sanitizedSource,
             originalId: `${documentId}_chunk_${i}`
           }
         }
@@ -268,19 +310,14 @@ class RAGService {
       const batchSize = 10 // Insert 10 chunks at a time to avoid large payloads
       
       console.log(`📊 Starting batch insertion: ${points.length} points, ${Math.ceil(points.length/batchSize)} batches`)
-      console.log(`🔗 Qdrant URL: ${this.qdrantUrl}`)
-      console.log(`📝 Collection: ${collectionName}`)
       
       // Robust health check before starting batch processing (with retries for post-deletion scenarios)
       let healthCheckPassed = false
       for (let attempt = 1; attempt <= 5; attempt++) {
         try {
-          console.log(`🔍 Pre-insertion health check attempt ${attempt}/5`)
           const healthCheck = await this.healthCheck()
-          console.log(`Health check result ${attempt}:`, healthCheck)
           
           if (healthCheck.qdrantConnected) {
-            console.log(`✅ Pre-insertion health check passed on attempt ${attempt}`)
             healthCheckPassed = true
             break
           } else {
@@ -293,7 +330,6 @@ class RAGService {
         // Wait between attempts (longer waits for later attempts)
         if (attempt < 5) {
           const waitTime = attempt * 1000 // 1s, 2s, 3s, 4s
-          console.log(`⏳ Waiting ${waitTime}ms before retry...`)
           await new Promise(resolve => setTimeout(resolve, waitTime))
         }
       }
@@ -306,7 +342,6 @@ class RAGService {
         const batch = points.slice(i, i + batchSize)
         
         // Validate batch before sending
-        console.log(`📤 Preparing batch ${Math.floor(i/batchSize) + 1}: ${batch.length} points`)
         for (const point of batch) {
           if (!point.id || !point.vector || !Array.isArray(point.vector) || point.vector.length !== 384) {
             console.error('Invalid point structure:', { 
@@ -339,10 +374,9 @@ class RAGService {
           
           if (!insertResponse.ok) {
             const error = await insertResponse.text()
-            throw new Error(`Failed to insert batch ${Math.floor(i/batchSize) + 1}: ${error}`)
+            const sanitizedError = sanitizeErrorMessage(error)
+            throw new Error(`Failed to insert batch ${Math.floor(i/batchSize) + 1}: ${sanitizedError}`)
           }
-          
-          console.log(`✅ Inserted batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(points.length/batchSize)} (${batch.length} chunks)`)
           
           // Small delay between batches to avoid overwhelming Qdrant
           if (i + batchSize < points.length) {
@@ -364,10 +398,8 @@ class RAGService {
           
           // If it's a connection error, try to check Qdrant health first
           if (error.message.includes('fetch failed') || error.cause?.code === 'ECONNREFUSED' || error.cause?.code === 'EPIPE') {
-            console.log('🔍 Testing Qdrant connection due to fetch failure...')
             try {
               const healthCheck = await this.healthCheck()
-              console.log('Qdrant health check result:', healthCheck)
               if (!healthCheck.qdrantConnected) {
                 throw new Error(`Qdrant is not accessible at ${this.qdrantUrl}. Please check if Qdrant container is running and accessible.`)
               }
@@ -401,9 +433,31 @@ class RAGService {
     try {
       const collectionName = `agent_${agentId}`
       
+      // Sanitize and validate inputs
+      const sanitizedQuery = sanitizeSearchQuery(query)
+      if (!sanitizedQuery) {
+        console.warn('Empty or invalid search query after sanitization')
+        return []
+      }
+      
+      // Validate and clamp limit to prevent resource exhaustion
+      const sanitizedLimit = Math.max(1, Math.min(100, Math.floor(limit)))
+      
+      // Sanitize filter values if provided
+      const sanitizedFilters: { documentType?: string; language?: string } = {}
+      if (filters?.documentType) {
+        const docType = sanitizeText(filters.documentType)
+        if (['file', 'url', 'website'].includes(docType)) {
+          sanitizedFilters.documentType = docType
+        }
+      }
+      if (filters?.language) {
+        sanitizedFilters.language = sanitizeText(filters.language)
+      }
+      
       // Preprocess query to focus on meaningful terms
-      const processedQuery = this.preprocessQuery(query)
-      console.log(`🔍 Query preprocessing: "${query}" → "${processedQuery}"`)
+      const processedQuery = this.preprocessQuery(sanitizedQuery)
+      console.log(`🔍 Query preprocessing: "${sanitizedQuery}" → "${processedQuery}"`)
       
       // Generate query embedding with processed text
       const queryEmbedding = await this.generateEmbedding(processedQuery)
@@ -413,12 +467,12 @@ class RAGService {
         { key: 'agentId', match: { value: agentId } }
       ]
       
-      if (filters?.documentType) {
-        filterConditions.push({ key: 'documentType', match: { value: filters.documentType } })
+      if (sanitizedFilters.documentType) {
+        filterConditions.push({ key: 'documentType', match: { value: sanitizedFilters.documentType } })
       }
       
-      if (filters?.language) {
-        filterConditions.push({ key: 'language', match: { value: filters.language } })
+      if (sanitizedFilters.language) {
+        filterConditions.push({ key: 'language', match: { value: sanitizedFilters.language } })
       }
       
       // Search in Qdrant
@@ -427,7 +481,7 @@ class RAGService {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           vector: queryEmbedding,
-          limit,
+          limit: sanitizedLimit,
           with_payload: true,
           filter: filterConditions.length > 0 ? { must: filterConditions } : undefined
         })
@@ -435,7 +489,8 @@ class RAGService {
       
       if (!searchResponse.ok) {
         const error = await searchResponse.text()
-        throw new Error(`Qdrant search failed: ${error}`)
+        const sanitizedError = sanitizeErrorMessage(error)
+        throw new Error(`Qdrant search failed: ${sanitizedError}`)
       }
       
       const searchResults = await searchResponse.json()
@@ -460,7 +515,7 @@ class RAGService {
       // Re-sort by boosted scores
       results.sort((a, b) => b.score - a.score)
       
-      console.log(`Found ${results.length} relevant chunks for query: "${query.substring(0, 50)}..."`)
+      console.log(`Found ${results.length} relevant chunks for query: "${sanitizedQuery.substring(0, 50)}..."`)
       
       return results
     } catch (error) {
@@ -523,14 +578,12 @@ class RAGService {
       
       if (!deleteResponse.ok) {
         const error = await deleteResponse.text()
-        throw new Error(`Failed to delete document chunks: ${error}`)
+        const sanitizedError = sanitizeErrorMessage(error)
+        throw new Error(`Failed to delete document chunks: ${sanitizedError}`)
       }
-      
-      console.log(`✅ Deleted all chunks for document ${documentId}`)
       
       // Wait for Qdrant to process the deletion and stabilize
       // This prevents EPIPE/connection issues when immediately inserting after deletion
-      console.log('⏳ Waiting for Qdrant to process deletion...')
       await new Promise(resolve => setTimeout(resolve, 2000)) // 2 second wait
       
       // Verify Qdrant is responsive before returning
@@ -543,7 +596,6 @@ class RAGService {
           })
           if (testResponse.ok) {
             isResponsive = true
-            console.log('✅ Qdrant is responsive after deletion')
             break
           }
         } catch (error) {

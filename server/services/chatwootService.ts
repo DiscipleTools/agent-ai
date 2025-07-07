@@ -10,7 +10,7 @@
  * - POST /api/webhook/agent/[id]/chat
  */
 import settingsService from './settingsService'
-import { sanitizeUrl, sanitizeContent } from '../../utils/sanitize'
+import { sanitizeUrl, sanitizeContent } from '~/utils/sanitize'
 
 class ChatwootService {
   private chatwootUrl: string

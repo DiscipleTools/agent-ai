@@ -19,7 +19,7 @@ import handlebars from 'handlebars'
 import { readFileSync } from 'fs'
 import { join } from 'path'
 import settingsService from './settingsService'
-import { sanitizeText, sanitizeToken, sanitizeErrorMessage } from '../../utils/sanitize'
+import { sanitizeText, sanitizeToken, sanitizeErrorMessage } from '~/utils/sanitize'
 
 interface EmailConfig {
   provider: 'smtp'

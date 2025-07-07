@@ -1,6 +1,19 @@
+/**
+ * Settings Service
+ * 
+ * Provides methods to retrieve, update, and cache application-wide settings,
+ * including AI connections, email configuration, Chatwoot integration, and other
+ * system-level options. Handles fetching and updating settings in the database,
+ * and exposes utility methods for other services to access configuration data.
+ * 
+ * Used by: API endpoints and internal services that require access to global settings.
+ */
+
 import Settings from '~/server/models/Settings'
 import User from '~/server/models/User' // Ensure User model is registered for populate
 import { Types } from 'mongoose'
+import { sanitizeText, sanitizeEmail, sanitizeUrl, sanitizeAlphaNumeric, sanitizeAndValidateModels, sanitizeObjectId, sanitizeModelId } from '~/utils/sanitize.js'
+
 
 interface AIConnection {
   _id: string
@@ -127,14 +140,77 @@ class SettingsService {
   // Update settings and clear cache
   async updateSettings(settingsData: any, userId: string | Types.ObjectId): Promise<any> {
     try {
+      // --- Begin: Defense-in-depth sanitization and whitelisting ---
+      const sanitized: any = {}
+      // AI Connections
+      if (Array.isArray(settingsData.aiConnections)) {
+        sanitized.aiConnections = settingsData.aiConnections.map((conn: any) => ({
+          name: sanitizeText(conn.name),
+          apiKey: sanitizeText(conn.apiKey),
+          endpoint: sanitizeUrl(conn.endpoint),
+          provider: ['openai', 'prediction-guard', 'custom'].includes(conn.provider) ? conn.provider : 'custom',
+          availableModels: Array.isArray(conn.availableModels)
+            ? conn.availableModels.map((model: any) => ({
+                id: sanitizeModelId(model.id),
+                name: sanitizeText(model.name),
+                enabled: !!model.enabled
+              }))
+            : [],
+          isActive: !!conn.isActive
+        }))
+      }
+      // Default Connection
+      if (settingsData.defaultConnection && typeof settingsData.defaultConnection === 'object') {
+        sanitized.defaultConnection = {
+          connectionId: sanitizeObjectId(settingsData.defaultConnection.connectionId),
+          modelId: sanitizeModelId(settingsData.defaultConnection.modelId)
+        }
+      }
+      // Email
+      if (settingsData.email && typeof settingsData.email === 'object') {
+        sanitized.email = {
+          provider: sanitizeText(settingsData.email.provider),
+          enabled: !!settingsData.email.enabled,
+          from: settingsData.email.from ? {
+            name: sanitizeText(settingsData.email.from.name),
+            email: sanitizeEmail(settingsData.email.from.email)
+          } : undefined,
+          smtp: settingsData.email.smtp ? {
+            host: sanitizeText(settingsData.email.smtp.host),
+            port: Number(settingsData.email.smtp.port),
+            secure: !!settingsData.email.smtp.secure,
+            auth: settingsData.email.smtp.auth ? {
+              user: sanitizeEmail(settingsData.email.smtp.auth.user),
+              pass: typeof settingsData.email.smtp.auth.pass === 'string' ? settingsData.email.smtp.auth.pass : undefined
+            } : undefined
+          } : undefined
+        }
+      }
+      // Server
+      if (settingsData.server && typeof settingsData.server === 'object') {
+        sanitized.server = {
+          maxFileSize: Number(settingsData.server.maxFileSize),
+          allowedFileTypes: Array.isArray(settingsData.server.allowedFileTypes)
+            ? settingsData.server.allowedFileTypes.map(sanitizeAlphaNumeric)
+            : []
+        }
+      }
+      // Chatwoot
+      if (settingsData.chatwoot && typeof settingsData.chatwoot === 'object') {
+        sanitized.chatwoot = {
+          url: sanitizeUrl(settingsData.chatwoot.url),
+          apiToken: sanitizeText(settingsData.chatwoot.apiToken),
+          enabled: !!settingsData.chatwoot.enabled
+        }
+      }
+      // --- End: Defense-in-depth sanitization and whitelisting ---
       let settings = await Settings.findOne()
-
       if (settings) {
         // Update existing settings - use findOneAndUpdate to avoid version conflicts
         const updatedSettings = await Settings.findOneAndUpdate(
           { _id: settings._id },
           {
-            ...settingsData,
+            ...sanitized,
             updatedBy: new Types.ObjectId(userId)
           },
           { 
@@ -142,42 +218,34 @@ class SettingsService {
             runValidators: true
           }
         ).populate('updatedBy', 'name email')
-
         if (!updatedSettings) {
           throw new Error('Failed to update settings - document not found')
         }
-
         // Clear cache after update
         this.clearCache()
-
         return updatedSettings
       } else {
         // Create new settings
         settings = new Settings({
-          ...settingsData,
+          ...sanitized,
           updatedBy: new Types.ObjectId(userId)
         })
-
         await settings.save()
         await settings.populate('updatedBy', 'name email')
-
         // Clear cache after update
         this.clearCache()
-
         return settings
       }
     } catch (error: any) {
       console.error('SettingsService: Failed to update settings:', error)
       console.error('SettingsService: Error name:', error.name)
       console.error('SettingsService: Error message:', error.message)
-      
       if (error.name === 'ValidationError') {
         console.error('SettingsService: Validation errors:', error.errors)
       }
       if (error.name === 'CastError') {
         console.error('SettingsService: Cast error details:', error)
       }
-      
       throw error
     }
   }

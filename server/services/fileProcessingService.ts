@@ -1,6 +1,15 @@
+/**
+ * File Processing Service
+ * 
+ * Handles secure upload, validation, and text extraction from various file types including
+ * PDF, Word documents (.doc/.docx), and plain text files. Provides comprehensive file
+ * validation, content extraction, and cleanup operations while maintaining data integrity.
+ */
+
 import fs from 'fs'
 import path from 'path'
 import mammoth from 'mammoth'
+import { sanitizeFilename, sanitizeContent, sanitizeText } from '~/utils/sanitize.js'
 
 interface ProcessedFile {
   content: string
@@ -32,6 +41,15 @@ class FileProcessingService {
    * Validate file type and size
    */
   validateFile(filename: string, size: number, mimeType?: string): FileValidationResult {
+    // Sanitize filename to prevent path traversal
+    const sanitizedFilename = sanitizeFilename(filename)
+    if (!sanitizedFilename) {
+      return {
+        isValid: false,
+        error: 'Invalid filename'
+      }
+    }
+
     // Check file size
     if (size > this.maxFileSize) {
       return {
@@ -40,8 +58,8 @@ class FileProcessingService {
       }
     }
 
-    // Get file extension
-    const fileExtension = path.extname(filename).toLowerCase()
+    // Get file extension from sanitized filename
+    const fileExtension = path.extname(sanitizedFilename).toLowerCase()
     
     // Check file extension
     if (!this.allowedExtensions.includes(fileExtension)) {
@@ -70,8 +88,20 @@ class FileProcessingService {
    * Extract text content from uploaded file
    */
   async processFile(filePath: string, originalName: string, size: number, mimeType?: string): Promise<ProcessedFile> {
+    // Sanitize inputs
+    const sanitizedOriginalName = sanitizeFilename(originalName)
+    if (!sanitizedOriginalName) {
+      throw new Error('Invalid filename provided')
+    }
+
+    // Validate file path to prevent path traversal
+    const resolvedPath = path.resolve(filePath)
+    if (!resolvedPath.includes('/tmp/') && !resolvedPath.includes('\\temp\\')) {
+      throw new Error('Invalid file path')
+    }
+
     // Validate file
-    const validation = this.validateFile(originalName, size, mimeType)
+    const validation = this.validateFile(sanitizedOriginalName, size, mimeType)
     if (!validation.isValid) {
       throw new Error(validation.error!)
     }
@@ -80,8 +110,11 @@ class FileProcessingService {
     let extractedContent: string
 
     try {
+      // Verify file exists and is readable
+      await fs.promises.access(resolvedPath, fs.constants.R_OK)
+      
       // Read file buffer
-      const fileBuffer = await fs.promises.readFile(filePath)
+      const fileBuffer = await fs.promises.readFile(resolvedPath)
 
       // Extract text based on file type
       switch (fileExtension) {
@@ -104,31 +137,32 @@ class FileProcessingService {
         throw new Error('No text content could be extracted from the file')
       }
 
-      // Clean up the content
+      // Clean up the content and sanitize for security
       const cleanedContent = this.cleanExtractedText(extractedContent)
+      const sanitizedContent = this.sanitizeExtractedContent(cleanedContent)
 
-      if (cleanedContent.length < 10) {
+      if (sanitizedContent.length < 10) {
         throw new Error('Extracted content is too short (minimum 10 characters)')
       }
 
       return {
-        content: cleanedContent,
-        filename: this.generateCleanFilename(originalName),
-        originalName,
+        content: sanitizedContent,
+        filename: this.generateCleanFilename(sanitizedOriginalName),
+        originalName: sanitizedOriginalName,
         size,
         mimeType: mimeType || this.getMimeTypeFromExtension(fileExtension),
         extractedAt: new Date()
       }
 
     } catch (error: any) {
-      console.error(`File processing error for ${originalName}:`, error.message)
+      console.error(`File processing error for ${sanitizedOriginalName}:`, error.message)
       throw new Error(`Failed to process file: ${error.message}`)
     } finally {
       // Clean up temporary file
       try {
-        await fs.promises.unlink(filePath)
+        await fs.promises.unlink(resolvedPath)
       } catch (error) {
-        console.warn(`Failed to clean up temporary file: ${filePath}`)
+        console.warn(`Failed to clean up temporary file: ${resolvedPath}`)
       }
     }
   }
@@ -186,17 +220,28 @@ class FileProcessingService {
   }
 
   /**
+   * Sanitize extracted content for security
+   */
+  private sanitizeExtractedContent(text: string): string {
+    // Use the sanitizeContent function to remove potentially dangerous content
+    return sanitizeContent(text)
+  }
+
+  /**
    * Generate a clean filename for storage
    */
   private generateCleanFilename(originalName: string): string {
-    const extension = path.extname(originalName)
-    const baseName = path.basename(originalName, extension)
+    // Use the sanitizeFilename function for consistent sanitization
+    const sanitized = sanitizeFilename(originalName)
+    if (!sanitized) {
+      return 'unknown_file.txt'
+    }
     
-    // Clean the filename
-    const cleanName = baseName
-      .replace(/[^a-zA-Z0-9\-_\s]/g, '')
-      .replace(/\s+/g, '_')
-      .substring(0, 50) // Limit length
+    const extension = path.extname(sanitized)
+    const baseName = path.basename(sanitized, extension)
+    
+    // Additional cleaning and length limitation
+    const cleanName = baseName.substring(0, 50) // Limit length
     
     return `${cleanName}${extension}`
   }
