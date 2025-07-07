@@ -568,10 +568,7 @@ export const sanitizeScrapedHtml = (html) => {
     .replace(/\s*autofocus\s*=?[^>\s]*/gi, '')
     
     // Limit excessive nesting that could cause performance issues
-    .replace(/(<[^>]*>[\s\S]*?){50,}/g, (match) => {
-      // If we find deeply nested content, truncate it
-      return match.substring(0, 10000) + '<!-- Content truncated for security -->'
-    })
+    .slice(0, 500000) // Limit total HTML to 500KB to prevent DoS
     
     // Remove comments that might contain sensitive information
     .replace(/<!--[\s\S]*?-->/g, '')

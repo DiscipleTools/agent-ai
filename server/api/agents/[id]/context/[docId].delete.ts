@@ -8,6 +8,7 @@
 import { connectDB } from '~/server/utils/db'
 import { authMiddleware } from '~/server/utils/auth'
 import Agent from '~/server/models/Agent'
+import { ragService } from '~/server/services/ragService'
 import mongoose from 'mongoose'
 
 export default authMiddleware.agentAccess('write')(async (event, checker, agentId) => {
@@ -56,6 +57,17 @@ export default authMiddleware.agentAccess('write')(async (event, checker, agentI
       filename: deletedDoc.filename,
       url: deletedDoc.url,
       contentLength: deletedDoc.content?.length || 0
+    }
+
+    // Delete RAG chunks for this document before removing from agent
+    try {
+      console.log(`🗑️ Deleting RAG chunks for document ${docId}`)
+      await ragService.deleteDocumentChunks(agentId, docId)
+      console.log(`✅ RAG chunks deleted successfully for document ${docId}`)
+    } catch (ragError: any) {
+      console.error('RAG chunk deletion failed (non-critical):', ragError)
+      // Continue with document deletion even if RAG cleanup fails
+      // This ensures the document is still removed from the agent's context
     }
 
     // Remove the document

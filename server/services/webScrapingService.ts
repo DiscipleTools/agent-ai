@@ -296,35 +296,9 @@ class WebScrapingService {
    */
   private async tryArticleExtractor(url: string, signal?: AbortSignal): Promise<{ content: string; title?: string } | null> {
     try {
-      // Create a custom fetch function that respects our abort signal and validates redirects
-      const customFetch = async (url: string) => {
-        const controller = new AbortController()
-        
-        if (signal) {
-          if (signal.aborted) {
-            throw new Error('Operation aborted')
-          }
-          signal.addEventListener('abort', () => controller.abort())
-        }
-        
-        const response = await this.fetchWithRedirectValidation(url, {
-          signal: controller.signal,
-          headers: {
-            'User-Agent': sanitizeUserAgent(this.defaultOptions.userAgent!),
-            'Accept': 'text/html,application/xhtml+xml',
-            'Accept-Language': 'en-US,en;q=0.9'
-          },
-          credentials: 'omit'
-        })
-        
-        return response
-      }
-      
-      // Use article-extractor (it will use its own fetch internally)
       const article = await extract(url)
       
       if (article && article.content) {
-        // Convert HTML to text
         const textContent = this.htmlToText(article.content)
         
         if (textContent && textContent.length > 50) {
@@ -468,12 +442,8 @@ class WebScrapingService {
         throw new Error('Failed to extract content from URL using article-extractor')
       }
 
-      console.log(`Successfully extracted content using article-extractor for ${normalizedUrl}`)
-      
       // Sanitize content using the enhanced text sanitization
       const sanitizedContent = sanitizeExtractedText(articleResult.content)
-
-      console.log(`Sanitized content: ${sanitizedContent}`)
 
       if (!sanitizedContent || sanitizedContent.length < 10) {
         throw new Error('Insufficient content extracted from URL')
