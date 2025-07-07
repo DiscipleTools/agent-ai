@@ -1,8 +1,37 @@
-import { JSDOM } from 'jsdom'
-import validator from 'validator'
-import sanitizeHtml from 'sanitize-html'
-import urlParse from 'url-parse'
+/**
+ * Web Scraping Service
+ * 
+ * A comprehensive web scraping and crawling service that provides secure, efficient
+ * content extraction from websites. This service includes:
+ * 
+ * - URL validation and security checks (blocked domains, private IPs, content type validation)
+ * - Content extraction using both article-extractor and custom HTML parsing
+ * - Website crawling with configurable depth, page limits, and filtering
+ * - Duplicate content detection and removal
+ * - Robots.txt compliance checking
+ * - Timeout handling and error recovery
+ * - Progress tracking for long-running crawls
+ * - Content sanitization and text cleaning
+ * 
+ * The service prioritizes security by validating all URLs, checking for blocked domains,
+ * and only allowing HTML content. It also includes comprehensive error handling and
+ * CPU-optimized processing to handle large websites efficiently.
+ * 
+ * @example
+ * // Scrape a single URL
+ * const content = await webScrapingService.scrapeUrl('https://example.com')
+ * 
+ * // Crawl an entire website
+ * const website = await webScrapingService.crawlWebsite('https://example.com', {
+ *   maxPages: 20,
+ *   maxDepth: 2
+ * })
+ */
+
 import { extract } from '@extractus/article-extractor'
+import { validateUrl } from '../utils/urlValidator'
+import { sanitizeContent } from '~/utils/sanitize.js'
+import { JSDOM } from 'jsdom'
 
 interface ScrapedContent {
   content: string
@@ -42,18 +71,9 @@ class WebScrapingService {
   private readonly defaultOptions: ScrapingOptions = {
     maxContentLength: 1000000, // 500KB max content (increased from 150KB)
     timeout: 30000, // 30 seconds
-    userAgent: 'Agent-AI-Server/1.0 (+https://github.com/agent-ai-server)',
+    userAgent: 'Agent-AI-Server/1.0 (+https://github.com/DiscipleTools/agent-ai)',
     allowedDomains: [],
-    blockedDomains: [
-      'localhost',
-      '127.0.0.1',
-      '0.0.0.0',
-      '::1',
-      'facebook.com',
-      'twitter.com',
-      'instagram.com',
-      'tiktok.com'
-    ]
+    blockedDomains: [] // Additional blocked domains beyond the defaults in urlValidator
   }
 
   private readonly defaultCrawlOptions: CrawlOptions = {
@@ -84,78 +104,10 @@ class WebScrapingService {
   }
 
   /**
-   * Validate and sanitize URL
+   * Validate and sanitize URL using the shared URL validator
    */
   private validateUrl(url: string): { isValid: boolean; error?: string; normalizedUrl?: string } {
-    try {
-      // Basic URL validation
-      if (!validator.isURL(url, {
-        protocols: ['http', 'https'],
-        require_protocol: true,
-        require_valid_protocol: true,
-        allow_underscores: false,
-        allow_trailing_dot: false,
-        allow_protocol_relative_urls: false
-      })) {
-        return { isValid: false, error: 'Invalid URL format' }
-      }
-
-      const parsedUrl = urlParse(url, true)
-      
-      // Check for blocked domains
-      const hostname = parsedUrl.hostname?.toLowerCase()
-      if (!hostname) {
-        return { isValid: false, error: 'Invalid hostname' }
-      }
-
-      // Check against blocked domains
-      for (const blockedDomain of this.defaultOptions.blockedDomains!) {
-        if (hostname === blockedDomain || hostname.endsWith(`.${blockedDomain}`)) {
-          return { isValid: false, error: `Domain ${hostname} is not allowed` }
-        }
-      }
-
-      // Check for private/local IP addresses
-      if (this.isPrivateIP(hostname)) {
-        return { isValid: false, error: 'Private IP addresses are not allowed' }
-      }
-
-      // Normalize URL - remove fragment and keep it simple to avoid query string issues
-      const normalizedUrl = `${parsedUrl.protocol}//${parsedUrl.host}${parsedUrl.pathname}`
-
-      return { isValid: true, normalizedUrl }
-    } catch (error) {
-      return { isValid: false, error: 'URL validation failed' }
-    }
-  }
-
-  /**
-   * Check if hostname is a private IP address
-   */
-  private isPrivateIP(hostname: string): boolean {
-    // Check for IPv4 private ranges
-    const ipv4Regex = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/
-    const match = hostname.match(ipv4Regex)
-    
-    if (match) {
-      const [, a, b, c, d] = match.map(Number)
-      
-      // Private IPv4 ranges
-      if (a === 10) return true // 10.0.0.0/8
-      if (a === 172 && b >= 16 && b <= 31) return true // 172.16.0.0/12
-      if (a === 192 && b === 168) return true // 192.168.0.0/16
-      if (a === 127) return true // 127.0.0.0/8 (localhost)
-      if (a === 169 && b === 254) return true // 169.254.0.0/16 (link-local)
-    }
-
-    // Check for IPv6 private ranges (simplified)
-    if (hostname.includes(':')) {
-      if (hostname.startsWith('::1') || hostname.startsWith('fc') || hostname.startsWith('fd')) {
-        return true
-      }
-    }
-
-    return false
+    return validateUrl(url, this.defaultOptions.blockedDomains)
   }
 
   /**
@@ -289,405 +241,6 @@ class WebScrapingService {
   }
 
   /**
-   * Simplified HTML text extraction that avoids complex regex
-   */
-  private extractTextFromHtmlSimple(html: string, url: string): { content: string; title?: string } {
-    try {
-      // Early termination for extremely large HTML
-      if (html.length > 2000000) { // 2MB limit for simple processing
-        html = html.substring(0, 2000000)
-      }
-      
-      // Extract title using simple regex
-      const titleMatch = html.match(/<title[^>]*>([^<]*)<\/title>/i)
-      const title = titleMatch ? titleMatch[1].trim() : undefined
-      
-      // Simple approach: remove scripts, styles, and convert to text
-      let cleanHtml = html
-        // Remove scripts and styles completely (simple approach)
-        .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-        .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
-        .replace(/<noscript\b[^<]*(?:(?!<\/noscript>)<[^<]*)*<\/noscript>/gi, '')
-        // Remove common navigation elements
-        .replace(/<nav\b[^>]*>.*?<\/nav>/gi, '')
-        .replace(/<header\b[^>]*>.*?<\/header>/gi, '')
-        .replace(/<footer\b[^>]*>.*?<\/footer>/gi, '')
-      
-      // Simple text extraction - just remove all HTML tags
-      let text = cleanHtml
-        .replace(/<[^>]*>/g, ' ') // Remove all HTML tags
-        .replace(/&nbsp;/g, ' ')
-        .replace(/&amp;/g, '&')
-        .replace(/&lt;/g, '<')
-        .replace(/&gt;/g, '>')
-        .replace(/&quot;/g, '"')
-        .replace(/&#39;/g, "'")
-        .replace(/\s+/g, ' ') // Collapse whitespace
-        .trim()
-      
-      // Simple content filtering - remove very short lines and obvious navigation
-      const lines = text.split('\n').filter(line => {
-        const trimmed = line.trim()
-        return trimmed.length > 20 && !trimmed.toLowerCase().match(/^(home|about|contact|menu|login|search)$/i)
-      })
-      
-      const finalContent = lines.join('\n').trim()
-      
-      return {
-        content: finalContent || text.substring(0, 10000), // Fallback to first 10k chars
-        title
-      }
-    } catch (error) {
-      console.error(`Simple HTML extraction failed for ${url}:`, error)
-      return {
-        content: 'Failed to extract content from HTML',
-        title: undefined
-      }
-    }
-  }
-
-  /**
-   * Extract and clean text content from HTML, focusing on headings and main content
-   */
-  private extractTextFromHtml(html: string, url: string): { content: string; title?: string } {
-    try {
-      // Early termination for extremely large HTML to prevent hanging
-      if (html.length > 5000000) { // 5MB limit
-        html = html.substring(0, 5000000)
-      }
-      
-      // Extract title using regex
-      const titleMatch = html.match(/<title[^>]*>([^<]*)<\/title>/i)
-      const title = titleMatch ? titleMatch[1].trim() : undefined
-      // Remove script, style, and navigation elements with more efficient regex
-      // Use non-greedy matching with length limits to prevent catastrophic backtracking
-      let cleanHtml = html
-        .replace(/<script[^>]*>[\s\S]{0,50000}?<\/script>/gi, '')
-        .replace(/<style[^>]*>[\s\S]{0,50000}?<\/style>/gi, '')
-        .replace(/<noscript[^>]*>[\s\S]{0,10000}?<\/noscript>/gi, '')
-        .replace(/<nav[^>]*>[\s\S]{0,50000}?<\/nav>/gi, '')
-        .replace(/<header[^>]*>[\s\S]{0,50000}?<\/header>/gi, '')
-        .replace(/<footer[^>]*>[\s\S]{0,50000}?<\/footer>/gi, '')
-        // Remove aside elements
-        .replace(/<aside[^>]*>[\s\S]{0,50000}?<\/aside>/gi, '')
-        
-        // More aggressive footer/header removal patterns
-        // Remove any element with id containing "footer" or "header"
-        .replace(/<(\w+)[^>]*\bid="[^"]*footer[^"]*"[^>]*>[\s\S]{0,100000}?<\/\1>/gi, '')
-        .replace(/<(\w+)[^>]*\bid="[^"]*header[^"]*"[^>]*>[\s\S]{0,100000}?<\/\1>/gi, '')
-        
-        // Remove any element with class containing "footer" or "header"
-        .replace(/<(\w+)[^>]*\bclass="[^"]*footer[^"]*"[^>]*>[\s\S]{0,100000}?<\/\1>/gi, '')
-        .replace(/<(\w+)[^>]*\bclass="[^"]*header[^"]*"[^>]*>[\s\S]{0,100000}?<\/\1>/gi, '')
-        
-        // Remove elements with navigation-related classes
-        .replace(/<(\w+)[^>]*\bclass="[^"]*(?:nav|menu|sidebar|breadcrumb|social|share|navbar|topbar)[^"]*"[^>]*>[\s\S]{0,50000}?<\/\1>/gi, '')
-        
-        // Remove elements with navigation-related ids
-        .replace(/<(\w+)[^>]*\bid="[^"]*(?:nav|menu|sidebar|breadcrumb|social|share|navbar|topbar)[^"]*"[^>]*>[\s\S]{0,50000}?<\/\1>/gi, '')
-        
-        // Remove common wrapper elements that often contain navigation
-        .replace(/<div[^>]*\bclass="[^"]*(?:wrapper|container)[^"]*"[^>]*>\s*<div[^>]*\bclass="[^"]*(?:nav|menu|footer|header)[^"]*"[^>]*>[\s\S]{0,100000}?<\/div>\s*<\/div>/gi, '')
-        
-        // Remove elements with role attributes for navigation/banner/contentinfo
-        .replace(/<(\w+)[^>]*\brole="(?:navigation|banner|contentinfo)"[^>]*>[\s\S]{0,50000}?<\/\1>/gi, '')
-        
-        // Remove common footer/header patterns regardless of tag name
-        .replace(/<(\w+)[^>]*(?:id|class)="[^"]*(?:site-footer|site-header|page-footer|page-header|main-footer|main-header)[^"]*"[^>]*>[\s\S]{0,100000}?<\/\1>/gi, '')
-      
-      // Helper function to clean text content
-      const cleanText = (text: string): string => {
-        return text
-          .replace(/<[^>]*>/g, ' ')
-          .replace(/&nbsp;/g, ' ')
-          .replace(/&amp;/g, '&')
-          .replace(/&lt;/g, '<')
-          .replace(/&gt;/g, '>')
-          .replace(/&quot;/g, '"')
-          .replace(/&#39;/g, "'")
-          .replace(/&#x2d;/g, '-')
-          .replace(/\s+/g, ' ')
-          .trim()
-      }
-      
-      // Helper function to filter out navigation-like content
-      const isNavigationContent = (text: string): boolean => {
-        const lowerText = text.toLowerCase()
-        
-        // Common navigation patterns (generic, not site-specific)
-        const navPatterns = [
-          /^(home|about|contact|login|register|sign in|sign up|logout|search)$/i,
-          /^(menu|navigation|nav|breadcrumb)$/i,
-          /^(previous|next|back|forward|more|view all)$/i,
-          /^(categories|tags|archive|recent|popular)$/i,
-          /^(facebook|twitter|instagram|linkedin|youtube|social)$/i,
-          /^(privacy|terms|policy|legal|copyright)$/i,
-          /^(subscribe|newsletter|follow|share|like)$/i,
-          /^(documentation|training|videos|community|forum|blog|news)$/i,
-          /^(help|support|faq|guide|tutorial)$/i
-        ]
-        
-        // Check if text matches navigation patterns
-        for (const pattern of navPatterns) {
-          if (pattern.test(text)) {
-            return true
-          }
-        }
-        
-        // Check for very short navigation-like text with action words
-        if (text.length < 30 && (
-          lowerText.includes('click') ||
-          lowerText.includes('here') ||
-          lowerText.includes('link') ||
-          lowerText.includes('page') ||
-          lowerText.includes('view') ||
-          lowerText.includes('see') ||
-          lowerText.includes('read more') ||
-          lowerText.includes('learn more')
-        )) {
-          return true
-        }
-        
-        // Check for lists of short items (likely navigation)
-        const words = text.split(/\s+/)
-        if (words.length <= 3 && text.length < 50) {
-          return true
-        }
-        
-        // Check for common navigation separators in short text
-        if (text.length < 100 && /[|•\-›»>]/.test(text) && words.length <= 5) {
-          return true
-        }
-        
-        return false
-      }
-      
-      // Extract headings with their content (improved regex to handle nested HTML)
-      const headings: string[] = []
-      const headingRegex = /<(h[1-6])[^>]*>([\s\S]{0,5000}?)<\/h[1-6]>/gi
-      let headingMatch
-      let headingCount = 0
-      while ((headingMatch = headingRegex.exec(cleanHtml)) !== null && headingCount < 100) {
-        const level = headingMatch[1].toUpperCase()
-        const text = cleanText(headingMatch[2])
-        if (text && text.length > 0 && !isNavigationContent(text)) {
-          headings.push(`${level}: ${text}`)
-        }
-        headingCount++
-      }
-      
-      // Extract ALL main content paragraphs (improved regex to handle nested HTML)
-      const paragraphs: string[] = []
-      const paragraphRegex = /<p[^>]*>([\s\S]{0,10000}?)<\/p>/gi
-      let paragraphMatch
-      let paragraphCount = 0
-      while ((paragraphMatch = paragraphRegex.exec(cleanHtml)) !== null && paragraphCount < 500) {
-        const text = cleanText(paragraphMatch[1])
-        
-        // Filter out navigation content and very short paragraphs
-        if (text && text.length > 20 && !isNavigationContent(text)) {
-          paragraphs.push(text)
-        }
-        paragraphCount++
-      }
-      
-      // Extract ALL list items for structured content (improved regex to handle nested HTML)
-      const listItems: string[] = []
-      const listRegex = /<li[^>]*>([\s\S]{0,5000}?)<\/li>/gi
-      let listMatch
-      let listCount = 0
-      while ((listMatch = listRegex.exec(cleanHtml)) !== null && listCount < 200) {
-        const text = cleanText(listMatch[1])
-        
-        // Filter out navigation content and very short items
-        if (text && text.length > 10 && !isNavigationContent(text)) {
-          listItems.push(`• ${text}`)
-        }
-        listCount++
-      }
-      
-      // Also try to extract content from div elements that might contain main content
-      const contentDivs: string[] = []
-      const contentDivRegex = /<div[^>]*class="[^"]*(?:content|entry|post|article|main)[^"]*"[^>]*>([\s\S]{0,20000}?)<\/div>/gi
-      let contentDivMatch
-      let contentDivCount = 0
-      while ((contentDivMatch = contentDivRegex.exec(cleanHtml)) !== null && contentDivCount < 50) {
-        const text = cleanText(contentDivMatch[1])
-        if (text && text.length > 50 && !isNavigationContent(text)) {
-          // Extract paragraphs from content divs
-          const divParagraphs = text.split(/\.\s+/).filter(p => p.trim().length > 20 && !isNavigationContent(p.trim()))
-          contentDivs.push(...divParagraphs.map(p => p.trim() + (p.endsWith('.') ? '' : '.')))
-        }
-        contentDivCount++
-      }
-      
-      // Post-process to remove any remaining navigation content
-      const filterNavigationLines = (content: string): string => {
-        return content
-          .split('\n')
-          .filter(line => {
-            const trimmedLine = line.trim()
-            if (!trimmedLine) return true // Keep empty lines for formatting
-            
-            // Remove lines that are clearly navigation
-            if (trimmedLine.startsWith('•') && isNavigationContent(trimmedLine.substring(1).trim())) {
-              return false
-            }
-            
-            // Generic navigation pattern detection (not site-specific)
-            const lowerLine = trimmedLine.toLowerCase()
-            
-            // Skip lines that are just navigation links (multiple short words separated by bullets/pipes)
-            if (/^[•\|\-\s]*([a-z\s]{1,20}[•\|\-\s]+){3,}[a-z\s]{1,20}[•\|\-\s]*$/i.test(trimmedLine)) {
-              return false
-            }
-            
-            // Skip lines with multiple navigation-like separators
-            if ((trimmedLine.match(/[•\|\-]/g) || []).length >= 3 && trimmedLine.length < 200) {
-              return false
-            }
-            
-            // Skip lines that are mostly common navigation words
-            const commonNavWords = ['home', 'about', 'contact', 'login', 'register', 'search', 'menu', 'news', 'blog', 'help', 'support', 'privacy', 'terms', 'policy']
-            const words = lowerLine.split(/\s+/).filter(word => word.length > 2)
-            if (words.length > 0) {
-              const navWordCount = words.filter(word => commonNavWords.includes(word)).length
-              if (navWordCount / words.length > 0.5 && words.length <= 10) {
-                return false
-              }
-            }
-            
-            // Skip lines that look like breadcrumbs (word > word > word)
-            if (/\w+\s*[>»]\s*\w+\s*[>»]\s*\w+/.test(trimmedLine)) {
-              return false
-            }
-            
-            // Skip repetitive footer/copyright content
-            if (/©\s*\d{4}|copyright|all rights reserved/i.test(trimmedLine)) {
-              return false
-            }
-            
-            // Skip footer menu content patterns
-            if (/^(product|solutions|resources|developers)\s*$/i.test(trimmedLine)) {
-              return false
-            }
-            
-            // Skip lines that contain typical footer menu items
-            if (lowerLine.includes('features') && lowerLine.includes('security') && lowerLine.includes('pricing')) {
-              return false
-            }
-            
-            // Skip lines with multiple footer-like links
-            const footerKeywords = ['features', 'security', 'pricing', 'demo', 'solutions', 'resources', 'developers', 'contact', 'github', 'docs']
-            const footerMatches = footerKeywords.filter(keyword => lowerLine.includes(keyword)).length
-            if (footerMatches >= 3 && trimmedLine.length < 300) {
-              return false
-            }
-            
-            // Skip lines with excessive arrow/navigation symbols
-            if ((trimmedLine.match(/--&gt;|&gt;|»|›/g) || []).length >= 3) {
-              return false
-            }
-            
-            // Skip very short lines that are likely navigation (less than 15 chars)
-            if (trimmedLine.length < 15 && /^[a-z\s\-&;]+$/i.test(trimmedLine)) {
-              return false
-            }
-            
-            // Skip lines that are mostly navigation menu items (many short words)
-            const shortWords = words.filter(word => word.length <= 4)
-            if (words.length > 5 && shortWords.length / words.length > 0.7) {
-              return false
-            }
-            
-            return true
-          })
-          .join('\n')
-      }
-      
-      // Combine extracted content
-      let extractedContent = ''
-      
-      if (headings.length > 0) {
-        extractedContent += headings.join('\n') + '\n\n'
-      }
-      
-      if (paragraphs.length > 0) {
-        // Include ALL paragraphs, not just first 5
-        extractedContent += paragraphs.join('\n\n') + '\n\n'
-      }
-      
-      if (listItems.length > 0) {
-        // Include ALL list items
-        extractedContent += listItems.join('\n') + '\n\n'
-      }
-      
-      if (contentDivs.length > 0 && paragraphs.length < 3) {
-        // If we didn't get many paragraphs, include content from divs
-        extractedContent += contentDivs.slice(0, 10).join('\n\n') + '\n'
-      }
-      
-      // Apply final navigation filtering
-      extractedContent = filterNavigationLines(extractedContent)
-      
-      // Remove common patterns that often appear in footers/headers
-      extractedContent = extractedContent
-        // Remove copyright patterns
-        .replace(/©\s*\d{4}.*?(?:\.|$)/gi, '')
-        .replace(/Copyright\s*©?\s*\d{4}.*?(?:\.|$)/gi, '')
-        .replace(/All rights reserved.*?(?:\.|$)/gi, '')
-        // Remove arrow patterns (often used in navigation)
-        .replace(/--&gt;/g, '')
-        .replace(/&gt;&gt;/g, '')
-        .replace(/»/g, '')
-        // Remove "Search" followed by special characters (common in search boxes)
-        .replace(/Search[×✕✖]/gi, '')
-        // Remove excessive whitespace
-        .replace(/\n{3,}/g, '\n\n')
-        .replace(/\s+/g, ' ')
-        .trim()
-      
-      if (!extractedContent || extractedContent.trim().length < 10) {
-        throw new Error('Insufficient content extracted')
-      }
-      
-      return { content: extractedContent.trim(), title }
-    } catch (error) {
-      throw new Error(`Failed to extract text from HTML: ${error instanceof Error ? error.message : 'Unknown error'}`)
-    }
-  }
-
-  /**
-   * Calculate similarity between two text strings using optimized word overlap
-   * CPU-optimized version with early exits and length limits
-   */
-  private calculateSimilarity(text1: string, text2: string): number {
-    // Early exit for identical texts
-    if (text1 === text2) return 1
-    
-    // Early exit for very different lengths (likely different content)
-    const lengthRatio = Math.min(text1.length, text2.length) / Math.max(text1.length, text2.length)
-    if (lengthRatio < 0.3) return 0
-    
-    // Limit text size for comparison to prevent CPU overload
-    const maxChars = 5000
-    const t1 = text1.length > maxChars ? text1.substring(0, maxChars) : text1
-    const t2 = text2.length > maxChars ? text2.substring(0, maxChars) : text2
-    
-    const words1 = new Set(t1.toLowerCase().split(/\s+/).filter(word => word.length > 3))
-    const words2 = new Set(t2.toLowerCase().split(/\s+/).filter(word => word.length > 3))
-    
-    // Early exit for very different word counts
-    const wordCountRatio = Math.min(words1.size, words2.size) / Math.max(words1.size, words2.size)
-    if (wordCountRatio < 0.2) return 0
-    
-    const intersection = new Set([...words1].filter(word => words2.has(word)))
-    const union = new Set([...words1, ...words2])
-    
-    return union.size > 0 ? intersection.size / union.size : 0
-  }
-
-  /**
    * Remove duplicate URLs from pages (URL-only deduplication for CPU efficiency)
    */
   private deduplicateContent(pages: ScrapedContent[]): ScrapedContent[] {
@@ -704,26 +257,6 @@ class WebScrapingService {
     }
     
     return uniquePages
-  }
-
-  /**
-   * Sanitize extracted content
-   */
-  private sanitizeContent(content: string): string {
-    // Remove any remaining HTML tags
-    const sanitized = sanitizeHtml(content, {
-      allowedTags: [],
-      allowedAttributes: {},
-      textFilter: (text: string) => {
-        // Remove excessive whitespace and normalize
-        return text
-          .replace(/[\r\n\t]+/g, ' ')
-          .replace(/\s{2,}/g, ' ')
-          .trim()
-      }
-    })
-
-    return sanitized
   }
 
   /**
@@ -900,53 +433,17 @@ class WebScrapingService {
         throw new Error('Operation aborted')
       }
 
-      // First, try article-extractor for better content extraction
+      // Use article-extractor for content extraction
       const articleResult = await this.tryArticleExtractor(normalizedUrl, signal)
       
-      if (articleResult && articleResult.content) {
-        console.log(`Successfully extracted content using article-extractor for ${normalizedUrl}`)
-        
-        return {
-          content: articleResult.content,
-          title: articleResult.title,
-          url: normalizedUrl,
-          contentType: 'text/plain',
-          scrapedAt: new Date()
-        }
+      if (!articleResult || !articleResult.content) {
+        throw new Error('Failed to extract content from URL using article-extractor')
       }
 
-      // If article-extractor failed, fall back to custom extraction
-      console.log(`Falling back to custom extraction for ${normalizedUrl}`)
+      console.log(`Successfully extracted content using article-extractor for ${normalizedUrl}`)
       
-      // Fetch content with abort signal
-      const { content: rawContent, contentType } = await this.fetchContent(normalizedUrl, mergedOptions, signal)
-
-      // Check if operation was aborted after fetch
-      if (signal?.aborted) {
-        throw new Error('Operation aborted')
-      }
-
-      let extractedContent: string
-      let title: string | undefined
-
-      // Process HTML content (only HTML content is now allowed)
-      if (contentType.includes('text/html') || contentType.includes('application/xhtml')) {
-        // Use simple HTML processing to avoid hanging on complex pages
-        const extracted = await this.withTimeout(
-          Promise.resolve(this.extractTextFromHtmlSimple(rawContent, normalizedUrl)),
-          10000, // Reduced to 10 seconds for simple processing
-          `Simple HTML processing for ${normalizedUrl}`
-        )
-        
-        extractedContent = extracted.content
-        title = extracted.title
-      } else {
-        // This shouldn't happen due to content-type validation, but handle gracefully
-        throw new Error(`Unexpected content type: ${contentType}`)
-      }
-
       // Sanitize content
-      const sanitizedContent = this.sanitizeContent(extractedContent)
+      const sanitizedContent = sanitizeContent(articleResult.content)
 
       if (!sanitizedContent || sanitizedContent.length < 10) {
         throw new Error('Insufficient content extracted from URL')
@@ -954,19 +451,17 @@ class WebScrapingService {
 
       // Truncate content if it's too large (instead of failing)
       let finalContent = sanitizedContent
-      let wasTruncated = false
       
       if (sanitizedContent.length > mergedOptions.maxContentLength!) {
         finalContent = sanitizedContent.substring(0, mergedOptions.maxContentLength!) + '\n\n[Content truncated due to size limit]'
-        wasTruncated = true
         console.warn(`Content truncated for ${normalizedUrl}: ${sanitizedContent.length} chars -> ${finalContent.length} chars`)
       }
 
       return {
         content: finalContent,
-        title,
+        title: articleResult.title,
         url: normalizedUrl,
-        contentType,
+        contentType: 'text/plain',
         scrapedAt: new Date()
       }
     } catch (error: any) {
@@ -1380,8 +875,6 @@ class WebScrapingService {
           console.log(`TITLE: ${scrapedContent.title || 'No title'}`)
           console.log(`LENGTH: ${scrapedContent.content.length} characters`)
           console.log(`${'='.repeat(80)}`)
-          console.log(scrapedContent.content)
-          console.log(`${'='.repeat(80)}\n`)
           
           scrapedPages.push(scrapedContent)
           totalContentLength += scrapedContent.content.length
