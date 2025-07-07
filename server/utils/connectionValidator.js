@@ -1,3 +1,18 @@
+/**
+ * MongoDB Connection String Validator
+ * 
+ * Validates MongoDB connection strings for proper format, structure, and configuration.
+ * Provides comprehensive validation including:
+ * - Basic URI structure and protocol validation
+ * - Hostname, port, and database name validation
+ * - Connection parameters and timeout settings
+ * - Environment-specific validation (development vs production)
+ * - Authentication format validation
+ * - Performance and configuration recommendations
+ * 
+ * Returns detailed validation results with errors and warnings to help
+ * diagnose connection string issues during setup and deployment.
+ */
 import { URL } from 'url'
 
 /**

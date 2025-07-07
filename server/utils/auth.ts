@@ -1,14 +1,40 @@
+/**
+ * Authentication and Authorization Utilities
+ * 
+ * This module provides centralized authentication and permission management for the Agent AI system.
+ * It handles JWT token verification, user authentication, role-based access control, and resource-specific
+ * permissions (agents, context documents, users, settings, RAG operations).
+ * 
+ * Key Features:
+ * - JWT token verification with proper validation
+ * - Role-based access control (admin, user)
+ * - Resource-specific permissions with agent-level access control
+ * - Permission checker utilities for fine-grained access control
+ * - Middleware composers for common authentication patterns
+ * - Input sanitization and validation for security
+ */
+
 import jwt from 'jsonwebtoken'
 import User from '~/server/models/User'
 import mongoose from 'mongoose'
+import { sanitizeToken, sanitizeObjectId, sanitizeErrorMessage } from '~/utils/sanitize.js'
 
 export async function requireAuth(event: any) {
-  const token = getCookie(event, 'access-token') || getHeader(event, 'authorization')?.replace('Bearer ', '')
+  const rawToken = getCookie(event, 'access-token') || getHeader(event, 'authorization')?.replace('Bearer ', '')
   
-  if (!token) {
+  if (!rawToken) {
     throw createError({
       statusCode: 401,
       statusMessage: 'Access token required'
+    })
+  }
+
+  // Sanitize token to prevent injection attacks
+  const token = sanitizeToken(rawToken)
+  if (!token) {
+    throw createError({
+      statusCode: 401,
+      statusMessage: 'Invalid token format'
     })
   }
 
@@ -32,7 +58,16 @@ export async function requireAuth(event: any) {
       })
     }
 
-    const user = await User.findById(decoded.userId).select('-password -refreshTokens')
+    // Sanitize userId from token payload
+    const sanitizedUserId = sanitizeObjectId(decoded.userId)
+    if (!sanitizedUserId) {
+      throw createError({
+        statusCode: 401,
+        statusMessage: 'Invalid token payload'
+      })
+    }
+
+    const user = await User.findById(sanitizedUserId).select('-password -refreshTokens')
 
     if (!user || !user.isActive) {
       throw createError({
@@ -45,7 +80,11 @@ export async function requireAuth(event: any) {
     event.context.user = user
     return user
   } catch (error: any) {
-    console.error('Token verification error:', error.message)
+    // Sanitize error message to prevent information leakage
+    const sanitizedError = sanitizeErrorMessage(error)
+    console.error('Token verification error:', sanitizedError)
+    
+    // Don't leak specific error details to client
     throw createError({
       statusCode: 401,
       statusMessage: 'Invalid token'
@@ -142,8 +181,12 @@ export function createPermissionChecker(user: any): PermissionChecker {
       if (user.role === 'admin') return true
       if (!user.agentAccess || !agentId) return false
       
+      // Sanitize the provided agentId for secure comparison
+      const sanitizedAgentId = sanitizeObjectId(agentId)
+      if (!sanitizedAgentId) return false
+      
       return user.agentAccess.some((id: mongoose.Types.ObjectId) => 
-        id.toString() === agentId
+        id.toString() === sanitizedAgentId
       )
     },
 
@@ -205,11 +248,48 @@ export async function requirePermission(
   // Ensure user is authenticated
   const user = await requireAuth(event)
   
+  // Sanitize context parameters
+  const sanitizedContext: PermissionContext = {}
+  if (context.agentId) {
+    sanitizedContext.agentId = sanitizeObjectId(context.agentId)
+    if (!sanitizedContext.agentId) {
+      throw createError({
+        statusCode: 400,
+        statusMessage: 'Invalid Agent ID in context'
+      })
+    }
+  }
+  if (context.userId) {
+    sanitizedContext.userId = sanitizeObjectId(context.userId)
+    if (!sanitizedContext.userId) {
+      throw createError({
+        statusCode: 400,
+        statusMessage: 'Invalid User ID in context'
+      })
+    }
+  }
+  if (context.resourceOwnerId) {
+    sanitizedContext.resourceOwnerId = sanitizeObjectId(context.resourceOwnerId)
+    if (!sanitizedContext.resourceOwnerId) {
+      throw createError({
+        statusCode: 400,
+        statusMessage: 'Invalid Resource Owner ID in context'
+      })
+    }
+  }
+  
+  // Copy other context properties
+  Object.keys(context).forEach(key => {
+    if (!['agentId', 'userId', 'resourceOwnerId'].includes(key)) {
+      sanitizedContext[key] = context[key]
+    }
+  })
+  
   // Create permission checker
   const checker = createPermissionChecker(user)
   
   // Check permission
-  if (!checker.canAccessResource(permission, context)) {
+  if (!checker.canAccessResource(permission, sanitizedContext)) {
     throw createError({
       statusCode: 403,
       statusMessage: 'Access denied'
@@ -235,11 +315,20 @@ export async function requireAgentAccess(
     })
   }
 
+  // Sanitize agent ID to prevent injection attacks
+  const sanitizedAgentId = sanitizeObjectId(agentId)
+  if (!sanitizedAgentId) {
+    throw createError({
+      statusCode: 400,
+      statusMessage: 'Invalid Agent ID format'
+    })
+  }
+
   const permission = operation === 'read' ? PERMISSIONS.AGENT.READ :
                     operation === 'write' ? PERMISSIONS.AGENT.WRITE :
                     PERMISSIONS.AGENT.DELETE
 
-  return await requirePermission(event, permission, { agentId })
+  return await requirePermission(event, permission, { agentId: sanitizedAgentId })
 }
 
 /**
@@ -255,26 +344,19 @@ export async function requireAuthWithChecker(event: any): Promise<PermissionChec
  * Helper function to validate and extract agent ID from route params
  */
 export function getRequiredAgentId(event: any): string {
-  const agentId = getRouterParam(event, 'id')
+  const rawAgentId = getRouterParam(event, 'id')
   
-  if (!agentId) {
+  if (!rawAgentId) {
     throw createError({
       statusCode: 400,
       statusMessage: 'Agent ID is required'
     })
   }
 
-  // Sanitize the agentId by trimming whitespace and removing any potential injection characters
-  const sanitizedAgentId = agentId.trim().replace(/[^a-fA-F0-9]/g, '')
+  // Use sanitization utility for consistent validation
+  const sanitizedAgentId = sanitizeObjectId(rawAgentId)
   
-  if (!sanitizedAgentId || sanitizedAgentId.length !== 24) {
-    throw createError({
-      statusCode: 400,
-      statusMessage: 'Invalid Agent ID format'
-    })
-  }
-
-  if (!mongoose.Types.ObjectId.isValid(sanitizedAgentId)) {
+  if (!sanitizedAgentId) {
     throw createError({
       statusCode: 400,
       statusMessage: 'Invalid Agent ID format'
