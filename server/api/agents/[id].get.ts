@@ -48,10 +48,7 @@ export default authMiddleware.agentAccess('read')(async (event, checker, agentId
           contentLength: doc.content?.length || 0,
           // Remove full content from response - only provide preview for security
           contentPreview: sanitizeContent(doc.content?.substring(0, 200) + (doc.content?.length > 200 ? '...' : '')),
-          metadata: sanitizeObject(doc.metadata, { 
-            allowedKeys: ['title', 'description', 'author', 'tags', 'fileSize', 'mimeType'],
-            sanitizeValues: true 
-          }),
+          metadata: doc.metadata,
           rag: {
             inRAG: ragStatus.inRAG,
             chunksCount: ragStatus.chunksCount

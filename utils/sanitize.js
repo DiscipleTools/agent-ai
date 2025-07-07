@@ -520,3 +520,183 @@ export function sanitizeForHtml(text) {
   };
   return text.replace(/[&<>"']/g, (m) => map[m]);
 }
+
+/**
+ * Sanitize HTML content extracted from web scraping to prevent XSS and injection attacks
+ * This is specifically for HTML content that will be processed by JSDOM or similar parsers
+ * @param {string|any} html - The HTML content to sanitize
+ * @returns {string} - Sanitized HTML content safe for JSDOM processing
+ */
+export const sanitizeScrapedHtml = (html) => {
+  if (!html || typeof html !== 'string') return ''
+  
+  return html
+    // Remove dangerous script-related content
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+    .replace(/<noscript[^>]*>[\s\S]*?<\/noscript>/gi, '')
+    
+    // Remove potentially dangerous tags
+    .replace(/<iframe[^>]*>[\s\S]*?<\/iframe>/gi, '')
+    .replace(/<frame[^>]*>[\s\S]*?<\/frame>/gi, '')
+    .replace(/<frameset[^>]*>[\s\S]*?<\/frameset>/gi, '')
+    .replace(/<object[^>]*>[\s\S]*?<\/object>/gi, '')
+    .replace(/<embed[^>]*[^>]*>/gi, '')
+    .replace(/<applet[^>]*>[\s\S]*?<\/applet>/gi, '')
+    .replace(/<form[^>]*>[\s\S]*?<\/form>/gi, '')
+    .replace(/<input[^>]*>/gi, '')
+    .replace(/<button[^>]*>[\s\S]*?<\/button>/gi, '')
+    .replace(/<textarea[^>]*>[\s\S]*?<\/textarea>/gi, '')
+    .replace(/<select[^>]*>[\s\S]*?<\/select>/gi, '')
+    
+    // Remove meta and link tags that could cause issues
+    .replace(/<meta[^>]*>/gi, '')
+    .replace(/<link[^>]*>/gi, '')
+    .replace(/<base[^>]*>/gi, '')
+    
+    // Remove style tags but preserve basic formatting
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+    
+    // Remove dangerous event handlers and javascript: protocols
+    .replace(/\s*on\w+\s*=\s*["'][^"']*["']/gi, '')
+    .replace(/\s*on\w+\s*=\s*[^>\s]+/gi, '')
+    .replace(/javascript\s*:/gi, '')
+    .replace(/vbscript\s*:/gi, '')
+    .replace(/data\s*:/gi, '')
+    
+    // Remove dangerous attributes
+    .replace(/\s*contenteditable\s*=\s*["']?[^"'>\s]*["']?/gi, '')
+    .replace(/\s*autofocus\s*=?[^>\s]*/gi, '')
+    
+    // Limit excessive nesting that could cause performance issues
+    .replace(/(<[^>]*>[\s\S]*?){50,}/g, (match) => {
+      // If we find deeply nested content, truncate it
+      return match.substring(0, 10000) + '<!-- Content truncated for security -->'
+    })
+    
+    // Remove comments that might contain sensitive information
+    .replace(/<!--[\s\S]*?-->/g, '')
+    
+    .trim()
+}
+
+/**
+ * Sanitize URL query parameters to prevent injection attacks
+ * @param {string|any} queryString - The query string to sanitize
+ * @returns {string} - Sanitized query string
+ */
+export const sanitizeUrlQuery = (queryString) => {
+  if (!queryString || typeof queryString !== 'string') return ''
+  
+  try {
+    const params = new URLSearchParams(queryString)
+    const sanitizedParams = new URLSearchParams()
+    
+    for (const [key, value] of params) {
+      // Sanitize parameter names and values
+      const cleanKey = key
+        .replace(/[<>"'&]/g, '') // Remove dangerous characters
+        .replace(/[^\w\-_.]/g, '') // Only allow word characters, hyphens, underscores, dots
+        .substring(0, 100) // Limit length
+      
+      const cleanValue = value
+        .replace(/[<>"']/g, '') // Remove dangerous characters
+        .replace(/javascript:/gi, '') // Remove javascript protocol
+        .replace(/data:/gi, '') // Remove data protocol
+        .substring(0, 500) // Limit length
+      
+      if (cleanKey && cleanValue) {
+        sanitizedParams.append(cleanKey, cleanValue)
+      }
+    }
+    
+    return sanitizedParams.toString()
+  } catch (error) {
+    return ''
+  }
+}
+
+/**
+ * Sanitize HTTP headers to prevent header injection attacks
+ * @param {Object|any} headers - The headers object to sanitize
+ * @returns {Object} - Sanitized headers object
+ */
+export const sanitizeHttpHeaders = (headers) => {
+  if (!headers || typeof headers !== 'object') return {}
+  
+  const sanitizedHeaders = {}
+  const allowedHeaders = [
+    'accept', 'accept-language', 'accept-encoding', 'user-agent',
+    'cache-control', 'content-type', 'content-length', 'referer',
+    'dnt', 'connection', 'upgrade-insecure-requests'
+  ]
+  
+  for (const [key, value] of Object.entries(headers)) {
+    const lowerKey = key.toLowerCase()
+    
+    // Only allow known safe headers
+    if (allowedHeaders.includes(lowerKey)) {
+      const sanitizedValue = String(value)
+        .replace(/[\r\n]/g, '') // Remove line breaks (header injection)
+        .replace(/[^\x20-\x7E]/g, '') // Remove non-printable characters
+        .substring(0, 500) // Limit length
+      
+      if (sanitizedValue) {
+        sanitizedHeaders[key] = sanitizedValue
+      }
+    }
+  }
+  
+  return sanitizedHeaders
+}
+
+/**
+ * Sanitize extracted text content to remove potential security issues
+ * @param {string|any} text - The text content to sanitize
+ * @returns {string} - Sanitized text content
+ */
+export const sanitizeExtractedText = (text) => {
+  if (!text || typeof text !== 'string') return ''
+  
+  return text
+    // Remove any remaining HTML tags
+    .replace(/<[^>]*>/g, '')
+    
+    // Remove potential script content that might have been missed
+    .replace(/javascript\s*:/gi, '')
+    .replace(/vbscript\s*:/gi, '')
+    .replace(/data\s*:/gi, '')
+    
+    // Remove excessive control characters but preserve basic formatting
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
+    
+    // Normalize whitespace and line breaks
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
+    .replace(/\n{4,}/g, '\n\n\n') // Limit excessive line breaks
+    .replace(/[ \t]{4,}/g, '   ') // Limit excessive spaces/tabs
+    
+    // Remove very long lines that might indicate malicious content
+    .split('\n')
+    .map(line => line.length > 10000 ? line.substring(0, 10000) + '...' : line)
+    .join('\n')
+    
+    .trim()
+}
+
+/**
+ * Validate and sanitize User-Agent strings to prevent header injection
+ * @param {string|any} userAgent - The User-Agent string to sanitize
+ * @returns {string} - Sanitized User-Agent string
+ */
+export const sanitizeUserAgent = (userAgent) => {
+  if (!userAgent || typeof userAgent !== 'string') {
+    return 'Agent-AI-Server/1.0'
+  }
+  
+  return userAgent
+    .replace(/[\r\n]/g, '') // Remove line breaks
+    .replace(/[^\x20-\x7E]/g, '') // Remove non-printable characters
+    .replace(/[<>"']/g, '') // Remove dangerous characters
+    .substring(0, 200) // Limit length
+    .trim() || 'Agent-AI-Server/1.0' // Fallback if empty
+}

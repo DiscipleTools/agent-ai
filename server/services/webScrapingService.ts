@@ -22,7 +22,7 @@
  * const content = await webScrapingService.scrapeUrl('https://example.com')
  * 
  * // Crawl an entire website
- * const website = await webScrapingService.crawlWebsite('https://example.com', {
+ * const website = await webScrapingService.crawlWebsiteWithProgress('https://example.com', {
  *   maxPages: 20,
  *   maxDepth: 2
  * })
@@ -30,7 +30,12 @@
 
 import { extract } from '@extractus/article-extractor'
 import { validateUrl } from '../utils/urlValidator'
-import { sanitizeContent } from '~/utils/sanitize.js'
+import { 
+  sanitizeContent, 
+  sanitizeScrapedHtml, 
+  sanitizeExtractedText, 
+  sanitizeUserAgent 
+} from '~/utils/sanitize.js'
 import { JSDOM } from 'jsdom'
 
 interface ScrapedContent {
@@ -89,6 +94,8 @@ class WebScrapingService {
       '/checkout',
       '/account',
       '/profile',
+      '/api',
+      '/webhook',
       '.pdf',
       '.jpg',
       '.jpeg',
@@ -98,7 +105,10 @@ class WebScrapingService {
       '.css',
       '.js',
       '.xml',
-      '.json'
+      '.json',
+      '.zip',
+      '.tar',
+      '.gz'
     ],
     respectRobotsTxt: true
   }
@@ -181,7 +191,7 @@ class WebScrapingService {
       const response = await this.fetchWithRedirectValidation(url, {
         method: 'GET',
         headers: {
-          'User-Agent': options.userAgent!,
+          'User-Agent': sanitizeUserAgent(options.userAgent!),
           'Accept': 'text/html,application/xhtml+xml',
           'Accept-Language': 'en-US,en;q=0.9',
           'Accept-Encoding': 'gzip, deflate',
@@ -300,7 +310,7 @@ class WebScrapingService {
         const response = await this.fetchWithRedirectValidation(url, {
           signal: controller.signal,
           headers: {
-            'User-Agent': this.defaultOptions.userAgent!,
+            'User-Agent': sanitizeUserAgent(this.defaultOptions.userAgent!),
             'Accept': 'text/html,application/xhtml+xml',
             'Accept-Language': 'en-US,en;q=0.9'
           },
@@ -336,11 +346,26 @@ class WebScrapingService {
    * Convert HTML to plain text (helper method)
    */
   private htmlToText(html: string): string {
-    // Create a DOM from the HTML
-    const dom = new JSDOM(html)
+    // Sanitize HTML content before processing to prevent security issues
+    const sanitizedHtml = sanitizeScrapedHtml(html)
+    
+    // Create a DOM from the sanitized HTML with security options
+    const dom = new JSDOM(sanitizedHtml, {
+      // Security configuration for JSDOM - disable scripts entirely
+      runScripts: 'outside-only',
+      resources: 'usable',
+      pretendToBeVisual: false,
+      storageQuota: 10000000 // 10MB limit
+    })
     const document = dom.window.document
     
-    // Remove script and style elements
+    // Additional security: limit DOM complexity to prevent DoS
+    const allElements = document.querySelectorAll('*')
+    if (allElements.length > 10000) {
+      throw new Error('HTML content too complex for security processing (>10,000 elements)')
+    }
+    
+    // Remove script and style elements (redundant after sanitization but defense in depth)
     const scripts = document.querySelectorAll('script, style, noscript')
     scripts.forEach(el => el.remove())
     
@@ -394,7 +419,7 @@ class WebScrapingService {
     }
     
     // Clean up the text
-    return text
+    const cleanedText = text
       // Decode HTML entities
       .replace(/&amp;/g, '&')
       .replace(/&lt;/g, '<')
@@ -411,6 +436,9 @@ class WebScrapingService {
       .replace(/^\n+/, '')            // Remove leading newlines
       .replace(/\n+$/, '')            // Remove trailing newlines
       .trim()
+    
+    // Final security sanitization of the extracted text
+    return sanitizeExtractedText(cleanedText)
   }
 
   /**
@@ -442,8 +470,10 @@ class WebScrapingService {
 
       console.log(`Successfully extracted content using article-extractor for ${normalizedUrl}`)
       
-      // Sanitize content
-      const sanitizedContent = sanitizeContent(articleResult.content)
+      // Sanitize content using the enhanced text sanitization
+      const sanitizedContent = sanitizeExtractedText(articleResult.content)
+
+      console.log(`Sanitized content: ${sanitizedContent}`)
 
       if (!sanitizedContent || sanitizedContent.length < 10) {
         throw new Error('Insufficient content extracted from URL')
@@ -486,14 +516,14 @@ class WebScrapingService {
       const controller = new AbortController()
       const timeoutId = setTimeout(() => controller.abort(), 5000) // 5 second timeout for test
 
-      const response = await this.fetchWithRedirectValidation(normalizedUrl, {
-        method: 'HEAD', // Only get headers
-        headers: {
-          'User-Agent': this.defaultOptions.userAgent!
-        },
-        signal: controller.signal,
-        credentials: 'omit'
-      })
+              const response = await this.fetchWithRedirectValidation(normalizedUrl, {
+          method: 'HEAD', // Only get headers
+          headers: {
+            'User-Agent': sanitizeUserAgent(this.defaultOptions.userAgent!)
+          },
+          signal: controller.signal,
+          credentials: 'omit'
+        })
 
       clearTimeout(timeoutId)
 
@@ -537,7 +567,14 @@ class WebScrapingService {
             const absoluteUrl = new URL(href, baseUrl)
             // Remove fragment (hash) to prevent treating same page with different anchors as separate pages
             absoluteUrl.hash = ''
-            links.push(absoluteUrl.toString())
+            
+            const urlString = absoluteUrl.toString()
+            
+            // Additional security validation for extracted links
+            const validation = this.validateUrl(urlString)
+            if (validation.isValid && validation.normalizedUrl) {
+              links.push(validation.normalizedUrl)
+            }
           } catch (error) {
             // Skip invalid URLs
             continue
@@ -650,154 +687,6 @@ class WebScrapingService {
     } catch (error) {
       console.warn('Failed to check robots.txt:', error)
       return true // If we can't check, assume it's allowed
-    }
-  }
-
-  /**
-   * Crawl a website starting from a base URL
-   */
-  async crawlWebsite(baseUrl: string, options: Partial<CrawlOptions> = {}): Promise<WebsiteContent> {
-    const mergedOptions = { ...this.defaultCrawlOptions, ...options }
-    
-    // Validate base URL
-    const validation = this.validateUrl(baseUrl)
-    if (!validation.isValid) {
-      throw new Error(`Base URL validation failed: ${validation.error}`)
-    }
-
-    const normalizedBaseUrl = validation.normalizedUrl!
-    
-    // Check robots.txt
-    const robotsAllowed = await this.checkRobotsTxt(normalizedBaseUrl)
-    if (!robotsAllowed) {
-      throw new Error('Crawling is disallowed by robots.txt')
-    }
-
-    const visitedUrls = new Set<string>()
-    const urlsToVisit: Array<{ url: string; depth: number }> = [{ url: normalizedBaseUrl, depth: 0 }]
-    const scrapedPages: ScrapedContent[] = []
-    let totalContentLength = 0
-
-    const basePath = new URL(normalizedBaseUrl).pathname
-
-    while (urlsToVisit.length > 0 && scrapedPages.length < mergedOptions.maxPages!) {
-      const { url, depth } = urlsToVisit.shift()!
-      
-      if (visitedUrls.has(url) || depth > mergedOptions.maxDepth!) {
-        continue
-      }
-
-      visitedUrls.add(url)
-      
-      try {
-        console.log(`Crawling page ${scrapedPages.length + 1}/${mergedOptions.maxPages}: ${url} (depth: ${depth})`)
-        const startTime = Date.now()
-        
-        // Scrape the current page with timeout
-        try {
-          const scrapedContent = await this.withTimeout(
-            this.scrapeUrl(url),
-            45000,
-            `Page scrape for ${url}`
-          )
-          
-          console.log(`  ✓ Page scraped in ${Date.now() - startTime}ms - ${scrapedContent.content.length} characters`)
-          console.log(`  📄 Title: ${scrapedContent.title || 'No title'}`)
-          
-          // Print full content scraped from this page
-          console.log(`\n${'='.repeat(80)}`)
-          console.log(`FULL CONTENT SCRAPED FROM: ${url}`)
-          console.log(`TITLE: ${scrapedContent.title || 'No title'}`)
-          console.log(`LENGTH: ${scrapedContent.content.length} characters`)
-          console.log(`${'='.repeat(80)}`)
-          console.log(scrapedContent.content)
-          console.log(`${'='.repeat(80)}\n`)
-          
-          scrapedPages.push(scrapedContent)
-          totalContentLength += scrapedContent.content.length
-        } catch (error: any) {
-          if (error.message.includes('timeout')) {
-            console.warn(`⚠️  Page timeout: ${error.message}`)
-            throw new Error(`Page crawl timeout after 45 seconds for ${url}`)
-          }
-          throw error
-        }
-
-        // Extract links for next level if we haven't reached max depth
-        if (depth < mergedOptions.maxDepth!) {
-          try {
-            const linkStartTime = Date.now()
-            
-            try {
-              const { content } = await this.withTimeout(
-                this.fetchContent(url, this.defaultOptions),
-                30000,
-                `Link extraction for ${url}`
-              )
-              console.log(`  ✓ Links extracted in ${Date.now() - linkStartTime}ms`)
-              
-              const links = this.extractLinks(content, url)
-              const filteredLinks = this.filterUrls(links, normalizedBaseUrl, mergedOptions)
-              console.log(`  → Found ${filteredLinks.length} new links to crawl (${links.length} total found)`)
-              
-              // Add new URLs to visit
-              let newLinksAdded = 0
-              for (const link of filteredLinks) {
-                if (!visitedUrls.has(link) && !urlsToVisit.some(item => item.url === link)) {
-                  urlsToVisit.push({ url: link, depth: depth + 1 })
-                  newLinksAdded++
-                }
-              }
-              console.log(`  ➕ Added ${newLinksAdded} new URLs to crawl queue`)
-            } catch (linkError: any) {
-              if (linkError.message.includes('timeout')) {
-                console.warn(`⚠️  Link extraction timeout: ${linkError.message}`)
-              } else {
-                console.warn(`⚠️  Failed to extract links from ${url}:`, linkError.message)
-              }
-            }
-          } catch (linkError) {
-            console.warn(`⚠️  Failed to extract links from ${url}:`, linkError)
-            // Continue without links if extraction fails
-          }
-        }
-
-        // Add delay between requests to be respectful and reduce CPU load
-        await new Promise(resolve => setTimeout(resolve, 1000))
-        
-      } catch (error: any) {
-        console.warn(`❌ Failed to scrape ${url}: ${error.message}`)
-        // Continue with other pages even if one fails
-      }
-      
-      // Progress summary
-      console.log(`📊 Progress: ${scrapedPages.length}/${mergedOptions.maxPages} pages scraped, ${urlsToVisit.length} URLs remaining in queue`)
-    }
-
-    if (scrapedPages.length === 0) {
-      throw new Error('No pages could be scraped from the website')
-    }
-
-    console.log(`\nStarting URL deduplication for ${scrapedPages.length} pages...`)
-    
-    // Remove duplicate/similar content between pages
-    const uniquePages = this.deduplicateContent(scrapedPages)
-    const finalContentLength = uniquePages.reduce((sum, page) => sum + page.content.length, 0)
-    
-    console.log(`URL deduplication complete: ${scrapedPages.length} pages → ${uniquePages.length} unique pages (${scrapedPages.length - uniquePages.length} duplicate URLs removed)`)
-
-    // Generate summary
-    const summary = this.generateWebsiteSummary(uniquePages, normalizedBaseUrl)
-
-    console.log(`Website crawl completed: ${uniquePages.length} unique pages (${scrapedPages.length} total), ${finalContentLength} total characters`)
-
-    return {
-      baseUrl: normalizedBaseUrl,
-      pages: uniquePages,
-      totalPages: uniquePages.length,
-      totalContentLength: finalContentLength,
-      scrapedAt: new Date(),
-      summary
     }
   }
 
