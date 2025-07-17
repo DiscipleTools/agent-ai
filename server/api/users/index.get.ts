@@ -13,10 +13,12 @@ export default authMiddleware.admin(async (event, checker) => {
     // Connect to database
     await connectDB()
 
-    // Get active users only (keeping isActive filtering)
-    const users = await User.find({ isActive: true })
+    // Get all users (both active and inactive)
+    const users = await User.find({})
       .sort({ createdAt: -1 })
       .select('-password -refreshTokens')
+      .populate('invitedBy', 'name email')
+      .populate('agentAccess', 'name')
 
     return {
       success: true,

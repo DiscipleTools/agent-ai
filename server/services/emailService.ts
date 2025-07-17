@@ -152,7 +152,7 @@ class EmailService {
           <p>You've been invited to join {{appName}} by {{invitedByName}}.</p>
           <p>To complete your account setup, please click the link below:</p>
           <p style="margin: 20px 0;">
-            <a href="{{setupUrl}}" style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px;">
+            <a href="{{setupUrl}}" style="background-color: #2563eb; color: white !important; padding: 12px 24px; text-decoration: none; border-radius: 4px;">
               Complete Account Setup
             </a>
           </p>

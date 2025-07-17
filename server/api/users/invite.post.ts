@@ -26,7 +26,7 @@ export default authMiddleware.admin(async (event, checker) => {
   const sanitizedName = sanitizeText(name)
 
   // Validate email format
-  const emailRegex = /^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/
+  const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/
   if (!emailRegex.test(sanitizedEmail)) {
     throw createError({
       statusCode: 400,
