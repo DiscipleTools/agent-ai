@@ -40,6 +40,8 @@ RUN useradd --system --uid 1001 nuxtjs
 # Copy the build output
 COPY --from=builder --chown=nuxtjs:nodejs /app/.output /app/.output
 COPY --from=builder --chown=nuxtjs:nodejs /app/package.json /app/package.json
+# Copy email templates
+COPY --from=builder --chown=nuxtjs:nodejs /app/server/templates /app/server/templates
 
 USER nuxtjs
 
