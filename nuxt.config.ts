@@ -27,6 +27,7 @@ export default defineNuxtConfig({
   runtimeConfig: {
     // Private keys (only available on server-side)
     mongodbUri: process.env.MONGODB_URI,
+    NODE_ENV: process.env.NODE_ENV,
     jwtSecret: process.env.JWT_SECRET,
     jwtRefreshSecret: process.env.JWT_REFRESH_SECRET,
     csrfSecret: process.env.CSRF_SECRET,

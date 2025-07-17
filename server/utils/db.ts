@@ -16,7 +16,7 @@ export async function connectDB(): Promise<void> {
   try {
     const config = useRuntimeConfig()
     const mongoUri = config.mongodbUri || 'mongodb://localhost:27017/agent-ai-server'
-    const environment = process.env.NODE_ENV || 'development'
+    const environment = config.NODE_ENV || process.env.NODE_ENV || 'development'
     
     // Validate connection string before attempting connection
     console.log('🔍 Validating MongoDB connection string...')
