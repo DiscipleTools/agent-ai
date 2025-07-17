@@ -1,3 +1,11 @@
+/**
+ * Reset Admin Password Script
+ * 
+ * Examples:
+ *   node scripts/reset-admin-password.js                    # Generate random password
+ *   node scripts/reset-admin-password.js MyNewPassword123!   # Use specific password
+ */
+
 import mongoose from 'mongoose'
 import bcrypt from 'bcryptjs'
 import dotenv from 'dotenv'

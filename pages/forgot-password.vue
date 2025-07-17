@@ -3,16 +3,20 @@
     <div class="max-w-md w-full space-y-8">
       <div>
         <h2 class="mt-6 text-center text-3xl font-extrabold text-gray-900 dark:text-white">
-          Sign in to your account
+          Forgot your password?
         </h2>
         <p class="mt-2 text-center text-sm text-gray-600 dark:text-gray-400">
-          Agent AI Server Dashboard
+          Enter your email address and we'll send you a link to reset your password.
         </p>
       </div>
       
       <Form @submit="onSubmit" class="mt-8 space-y-6">
         <div v-if="error" class="alert-error">
           {{ error }}
+        </div>
+        
+        <div v-if="success" class="alert-success">
+          {{ success }}
         </div>
         
         <div class="space-y-4">
@@ -33,30 +37,7 @@
                 class="input-field mt-1"
                 :class="{ 'border-red-500': errorMessage }"
                 placeholder="Enter your email"
-              />
-              <p v-if="errorMessage" class="text-red-600 text-sm mt-1">
-                {{ errorMessage }}
-              </p>
-            </Field>
-          </div>
-          
-          <div>
-            <label for="password" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Password
-            </label>
-            <Field
-              v-slot="{ field, errorMessage }"
-              name="password"
-              rules="required|min:8"
-            >
-              <input
-                v-bind="field"
-                id="password"
-                type="password"
-                autocomplete="current-password"
-                class="input-field mt-1"
-                :class="{ 'border-red-500': errorMessage }"
-                placeholder="Enter your password"
+                :disabled="loading"
               />
               <p v-if="errorMessage" class="text-red-600 text-sm mt-1">
                 {{ errorMessage }}
@@ -68,22 +49,22 @@
         <div>
           <button
             type="submit"
-            :disabled="authStore.loading"
+            :disabled="loading"
             class="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <span v-if="authStore.loading" class="absolute left-0 inset-y-0 flex items-center pl-3">
+            <span v-if="loading" class="absolute left-0 inset-y-0 flex items-center pl-3">
               <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
             </span>
-            {{ authStore.loading ? 'Signing in...' : 'Sign in' }}
+            {{ loading ? 'Sending...' : 'Send reset link' }}
           </button>
         </div>
         
         <div class="text-center">
           <NuxtLink 
-            to="/forgot-password" 
+            to="/login" 
             class="text-sm text-primary-600 hover:text-primary-500 dark:text-primary-400 dark:hover:text-primary-300"
           >
-            Forgot your password?
+            Back to sign in
           </NuxtLink>
         </div>
       </Form>
@@ -99,26 +80,30 @@ definePageMeta({
   layout: 'default'
 })
 
-const authStore = useAuthStore()
-const error = ref('')
+const { $api } = useApi()
 
-// Redirect if already authenticated
-onMounted(() => {
-  if (authStore.isAuthenticated) {
-    navigateTo('/agents')
-  }
-})
+const loading = ref(false)
+const error = ref('')
+const success = ref('')
 
 const onSubmit = async (values) => {
   error.value = ''
+  success.value = ''
+  loading.value = true
+  
   try {
-    const sanitizedCredentials = {
-      email: sanitizeEmail(values.email),
-      password: values.password // Don't sanitize passwords - just validate
-    }
-    await authStore.login(sanitizedCredentials)
+    const sanitizedEmail = sanitizeEmail(values.email)
+    
+    const response = await $api('/api/auth/forgot-password', {
+      method: 'POST',
+      body: { email: sanitizedEmail }
+    })
+    
+    success.value = response.message || 'Password reset link sent successfully!'
   } catch (err) {
     error.value = sanitizeErrorMessage(err)
+  } finally {
+    loading.value = false
   }
 }
 </script> 

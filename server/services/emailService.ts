@@ -127,8 +127,6 @@ class EmailService {
 
     } catch (error) {
       console.error('Failed to load email templates:', error)
-      // Create fallback templates
-      this.createFallbackTemplates()
     }
   }
 
@@ -139,82 +137,6 @@ class EmailService {
       console.warn(`Template file not found: ${filePath}`)
       return ''
     }
-  }
-
-  private createFallbackTemplates(): void {
-    // Fallback invitation template
-    this.templates.set('invitation', {
-      subject: 'Welcome to {{appName}} - Complete Your Account Setup',
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h1 style="color: #2563eb;">Welcome to {{appName}}!</h1>
-          <p>Hello {{userName}},</p>
-          <p>You've been invited to join {{appName}} by {{invitedByName}}.</p>
-          <p>To complete your account setup, please click the link below:</p>
-          <p style="margin: 20px 0;">
-            <a href="{{setupUrl}}" style="background-color: #2563eb; color: white !important; padding: 12px 24px; text-decoration: none; border-radius: 4px;">
-              Complete Account Setup
-            </a>
-          </p>
-          <p>This link will expire in 7 days.</p>
-          <p>If you didn't expect this invitation, you can safely ignore this email.</p>
-          <p>Best regards,<br>The {{appName}} Team</p>
-        </div>
-      `,
-      text: `
-Welcome to {{appName}}!
-
-Hello {{userName}},
-
-You've been invited to join {{appName}} by {{invitedByName}}.
-
-To complete your account setup, please visit: {{setupUrl}}
-
-This link will expire in 7 days.
-
-If you didn't expect this invitation, you can safely ignore this email.
-
-Best regards,
-The {{appName}} Team
-      `
-    })
-
-    // Fallback password reset template
-    this.templates.set('password-reset', {
-      subject: 'Reset Your {{appName}} Password',
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h1 style="color: #2563eb;">Password Reset Request</h1>
-          <p>Hello {{userName}},</p>
-          <p>You requested a password reset for your {{appName}} account.</p>
-          <p>To reset your password, please click the link below:</p>
-          <p style="margin: 20px 0;">
-            <a href="{{resetUrl}}" style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px;">
-              Reset Password
-            </a>
-          </p>
-          <p>This link will expire in 24 hours.</p>
-          <p>If you didn't request this password reset, you can safely ignore this email.</p>
-          <p>Best regards,<br>The {{appName}} Team</p>
-        </div>
-      `,
-      text: `
-Password Reset Request
-
-Hello {{userName}},
-
-You requested a password reset for your {{appName}} account.
-
-To reset your password, please visit: {{resetUrl}}
-
-This link will expire in 24 hours.
-
-If you didn't request this password reset, you can safely ignore this email.
-
-Best regards,
-The {{appName}} Team
-      `
-    })
   }
 
   private compileTemplate(template: string, data: Record<string, any>): string {
