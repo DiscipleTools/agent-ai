@@ -18,6 +18,8 @@ services:
       - LOG_LEVEL=${LOG_LEVEL:-info}
       - CHATWOOT_URL=${CHATWOOT_URL:-}
       - CHATWOOT_API_TOKEN=${CHATWOOT_API_TOKEN:-}
+      - FRONTEND_URL=${FRONTEND_URL:-}
+      - DOMAIN_NAME=${DOMAIN_NAME:-}
       - NODE_OPTIONS=--max-old-space-size=3072
     depends_on:
       - mongodb
