@@ -61,7 +61,9 @@ export default defineEventHandler(async (event) => {
         const body = await readBody(event)
         csrfToken = body?.csrfToken || body?._token
       } catch (error) {
-        // Body reading failed or not present
+        // Body reading failed or not present - this is normal for multipart form data
+        // For multipart forms, we rely on the header method only
+        console.log('CSRF middleware: Could not read body (likely multipart form data)')
       }
     }
 

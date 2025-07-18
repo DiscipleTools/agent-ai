@@ -47,10 +47,12 @@ export default authMiddleware.agentAccess('write')(async (event, checker, agentI
       'application/msword',
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       'text/csv',
-      'application/csv'
+      'application/csv',
+      'text/markdown',
+      'text/x-markdown'
     ]
     
-    const allowedExtensions = ['.pdf', '.txt', '.doc', '.docx', '.csv']
+    const allowedExtensions = ['.pdf', '.txt', '.doc', '.docx', '.csv', '.md']
 
     // Parse the multipart form data
     const form = formidable({

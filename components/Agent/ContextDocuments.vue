@@ -258,7 +258,7 @@
           type="file"
           class="sr-only"
           @change="handleFileUpload"
-          accept=".pdf,.txt,.doc,.docx,application/pdf,text/plain,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+          accept=".pdf,.txt,.doc,.docx,.md,application/pdf,text/plain,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/markdown,text/x-markdown"
           :disabled="fileUploading"
         />
         
@@ -276,7 +276,7 @@
         <!-- File type help text -->
         <div v-if="!fileUploading" class="mt-4">
           <p class="text-xs text-gray-500 text-center">
-            Supported file types: PDF, TXT, DOC, DOCX (max 10MB)
+            Supported file types: PDF, TXT, DOC, DOCX, MD (max 10MB)
           </p>
         </div>
       </div>
@@ -375,8 +375,8 @@ const handleFileUpload = async (event) => {
   }
   
   // Validate file type
-  const allowedTypes = ['application/pdf', 'text/plain', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']
-  const allowedExtensions = ['.pdf', '.txt', '.doc', '.docx']
+  const allowedTypes = ['application/pdf', 'text/plain', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/markdown', 'text/x-markdown']
+  const allowedExtensions = ['.pdf', '.txt', '.doc', '.docx', '.md']
   const fileExtension = sanitizedFilename.toLowerCase().substring(sanitizedFilename.lastIndexOf('.'))
   
   if (!allowedTypes.includes(file.type) && !allowedExtensions.includes(fileExtension)) {

@@ -308,12 +308,27 @@ export const useAgentsStore = defineStore('agents', () => {
     const formData = new FormData()
     formData.append('file', file)
     
-    // Add CSRF token to form data
-    await addCsrfToForm(formData)
-    
     try {
-      const response = await csrfRequest(`/api/agents/${agentId}/context/upload`, {
+      // Get CSRF token for the request
+      const token = await getCsrfToken()
+      if (!token) {
+        throw new Error('Could not obtain CSRF token')
+      }
+
+      // Get authentication headers
+      const accessToken = useCookie('access-token')
+      const headers = {
+        'X-CSRF-Token': token
+      }
+      
+      if (accessToken.value) {
+        headers.Authorization = `Bearer ${accessToken.value}`
+      }
+      
+      // Use $api directly with proper headers for multipart form data
+      const response = await $api(`/api/agents/${agentId}/context/upload`, {
         method: 'POST',
+        headers,
         body: formData
       })
       

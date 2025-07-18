@@ -8,6 +8,7 @@
 
 import fs from 'fs'
 import path from 'path'
+import os from 'os'
 import mammoth from 'mammoth'
 import { sanitizeFilename, sanitizeContent, sanitizeText } from '~/utils/sanitize.js'
 
@@ -28,12 +29,14 @@ interface FileValidationResult {
 }
 
 class FileProcessingService {
-  private readonly allowedExtensions = ['.pdf', '.txt', '.doc', '.docx']
+  private readonly allowedExtensions = ['.pdf', '.txt', '.doc', '.docx', '.md']
   private readonly allowedMimeTypes = [
     'application/pdf',
     'text/plain',
     'application/msword',
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'text/markdown',
+    'text/x-markdown'
   ]
   private readonly maxFileSize = 10 * 1024 * 1024 // 10MB
 
@@ -96,7 +99,11 @@ class FileProcessingService {
 
     // Validate file path to prevent path traversal
     const resolvedPath = path.resolve(filePath)
-    if (!resolvedPath.includes('/tmp/') && !resolvedPath.includes('\\temp\\')) {
+    const tmpDir = os.tmpdir()
+    
+    // Check if the resolved path is within the system's temporary directory
+    if (!resolvedPath.startsWith(tmpDir)) {
+      console.warn(`File path validation failed: ${resolvedPath} is not within temp dir: ${tmpDir}`)
       throw new Error('Invalid file path')
     }
 
@@ -126,6 +133,7 @@ class FileProcessingService {
           extractedContent = await this.extractWordText(fileBuffer)
           break
         case '.txt':
+        case '.md':
           extractedContent = await this.extractPlainText(fileBuffer)
           break
         default:
@@ -254,7 +262,8 @@ class FileProcessingService {
       '.pdf': 'application/pdf',
       '.txt': 'text/plain',
       '.doc': 'application/msword',
-      '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      '.md': 'text/markdown'
     }
     return mimeTypes[extension] || 'application/octet-stream'
   }
