@@ -683,11 +683,11 @@ class WebScrapingService {
 
     const normalizedBaseUrl = validation.normalizedUrl!
     
-    // Check robots.txt
-    const robotsAllowed = await this.checkRobotsTxt(normalizedBaseUrl)
-    if (!robotsAllowed) {
-      throw new Error('Crawling is disallowed by robots.txt')
-    }
+    // // Check robots.txt
+    // const robotsAllowed = await this.checkRobotsTxt(normalizedBaseUrl)
+    // if (!robotsAllowed) {
+    //   throw new Error('Crawling is disallowed by robots.txt')
+    // }
 
     const visitedUrls = new Set<string>()
     const urlsToVisit: Array<{ url: string; depth: number }> = [{ url: normalizedBaseUrl, depth: 0 }]
@@ -861,15 +861,15 @@ class WebScrapingService {
         return { accessible: false, error: urlTest.error }
       }
 
-      // Check robots.txt
-      const robotsAllowed = await this.checkRobotsTxt(baseUrl)
-      if (!robotsAllowed) {
-        return { 
-          accessible: false, 
-          error: 'Crawling is disallowed by robots.txt',
-          robotsAllowed: false
-        }
-      }
+      // // Check robots.txt
+      // const robotsAllowed = await this.checkRobotsTxt(baseUrl)
+      // if (!robotsAllowed) {
+      //   return { 
+      //     accessible: false, 
+      //     error: 'Crawling is disallowed by robots.txt',
+      //     robotsAllowed: false
+      //   }
+      // }
 
       // Try to get a sample of links to estimate crawlable pages
       try {
