@@ -1,0 +1,90 @@
+version: '3.8'
+
+services:
+  # Agent AI Application
+  app:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    container_name: agent-ai-app
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - MONGODB_URI=mongodb://admin:AgentAISecurePassword123@mongodb:27017/agent-ai-server?authSource=admin
+      - QDRANT_URL=http://qdrant:6333
+      - JWT_SECRET=3DyhD5/MXZmh5QWsiQADZ3wxrHtonRa73L5F4N4QOYg=
+      - JWT_REFRESH_SECRET=8tCiLa0bvYEsjr/hbktbPHYNnSyxUxniETJ5+NyvkOY=
+      - JWT_EXPIRE=24h
+      - JWT_REFRESH_EXPIRE=7d
+      - CSRF_SECRET=GJDI+2W/NgeQ5X1/nAfPnqBpngzaWPAclyxiE7ikx80=
+      - APP_NAME=Agent AI Server
+      - LOG_LEVEL=info
+      - CHATWOOT_URL=http://host.docker.internal:5600
+      - FRONTEND_URL=http://localhost:5600/agents
+      - NODE_OPTIONS=--max-old-space-size=3072
+    depends_on:
+      - mongodb
+      - qdrant
+    ports:
+      - '127.0.0.1:5510:3000'
+    volumes:
+      - agent_storage:/app/storage
+    networks:
+      - agent-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # MongoDB Database
+  mongodb:
+    image: mongo:7.0
+    container_name: agent-ai-mongodb
+    restart: unless-stopped
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=admin
+      - MONGO_INITDB_ROOT_PASSWORD=AgentAISecurePassword123
+      - MONGO_INITDB_DATABASE=agent-ai-server
+    volumes:
+      - mongodb_data:/data/db
+      - ./docker/mongodb/init:/docker-entrypoint-initdb.d:ro
+    ports:
+      - '127.0.0.1:27018:27017'
+    networks:
+      - agent-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Qdrant Vector Database
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: agent-ai-qdrant
+    volumes:
+      - qdrant_data:/qdrant/storage
+    environment:
+      - QDRANT__SERVICE__HTTP_PORT=6333
+      - QDRANT__SERVICE__GRPC_PORT=6334
+      - QDRANT__LOG_LEVEL=INFO
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:6334:6333'
+    networks:
+      - agent-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:6333/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  agent-network:
+    driver: bridge
+
+volumes:
+  agent_storage:
+  mongodb_data:
+  qdrant_data:

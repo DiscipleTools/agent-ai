@@ -14,7 +14,7 @@ export default defineNuxtConfig({
   css: ['~/assets/css/main.css'],
 
   devServer: {
-    port: 3000,
+    port: 3001,
     host: 'localhost'
   },
 
@@ -37,12 +37,13 @@ export default defineNuxtConfig({
     
     // Public keys (exposed to client-side)
     public: {
-      apiBase: '/api',
+      apiBase: '/agents/api',
       appName: process.env.APP_NAME || 'Agent AI Server'
     }
   },
 
   app: {
+    baseURL: '/agents/',
     head: {
       title: 'Agent AI Server',
       meta: [

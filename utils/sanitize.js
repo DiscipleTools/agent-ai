@@ -66,14 +66,15 @@ export const sanitizeUrl = (input) => {
   try {
     const url = new URL(cleaned)
     
-    // Block localhost and private IP ranges
+    // Block localhost and private IP ranges (but allow Docker internal communication)
     const hostname = url.hostname.toLowerCase()
-    if (hostname === 'localhost' || 
+    if ((hostname === 'localhost' || 
         hostname === '127.0.0.1' || 
         hostname === '0.0.0.0' ||
         hostname.match(/^10\./) ||
         hostname.match(/^172\.(1[6-9]|2[0-9]|3[01])\./) ||
-        hostname.match(/^192\.168\./)) {
+        hostname.match(/^192\.168\./)) &&
+        hostname !== 'host.docker.internal') {
       return ''
     }
     
