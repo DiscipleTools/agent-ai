@@ -94,8 +94,7 @@ const agentSchema = new mongoose.Schema({
     channelType: String
   }],
   createdBy: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
+    type: mongoose.Schema.Types.Mixed, // Support both ObjectId and simple IDs for Chatwoot users
     required: true
   },
   isActive: {

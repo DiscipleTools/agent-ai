@@ -47,16 +47,17 @@ export const useAuthStore = defineStore('auth', () => {
 
   const logout = async () => {
     try {
-      await $api('/api/auth/logout', {
-        method: 'POST'
-      })
+      // For Chatwoot authentication, we don't need to call Agent AI logout API
+      // The logout should happen in Chatwoot itself
+      console.log('Logout: redirecting to Chatwoot')
     } catch (error) {
       console.error('Logout error:', error)
     } finally {
       // Clear user data and CSRF cache
       user.value = null
       clearCSRFCache()
-      await router.push('/login')
+      // Redirect to main Chatwoot app instead of Agent AI login
+      window.location.href = '/'
     }
   }
 
@@ -66,21 +67,16 @@ export const useAuthStore = defineStore('auth', () => {
       user.value = data
     } catch (error) {
       console.error('Failed to fetch user:', error)
-      await logout()
+      // Don't auto-logout on fetch failure - let middleware handle it
+      throw error
     }
   }
 
   const refreshTokens = async () => {
-    try {
-      // Use direct $fetch to avoid circular dependency with useApi
-      const { data } = await $fetch('/api/auth/refresh', {
-        method: 'POST'
-      })
-      return data.accessToken
-    } catch (error) {
-      await logout()
-      throw error
-    }
+    // No longer needed with Chatwoot authentication
+    // Chatwoot handles its own session management
+    console.log('Token refresh not needed with Chatwoot authentication')
+    return null
   }
 
   const updateProfile = async (profileData) => {

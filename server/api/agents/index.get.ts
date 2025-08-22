@@ -7,10 +7,10 @@
  */
 
 import { connectDB } from '~/server/utils/db'
-import { authMiddleware } from '~/server/utils/auth'
+import { chatwootAuthMiddleware } from '~/server/utils/auth'
 import Agent from '~/server/models/Agent'
 
-export default authMiddleware.auth(async (event, checker) => {
+export default chatwootAuthMiddleware.auth(async (event, checker) => {
   try {
     // Connect to database
     await connectDB()

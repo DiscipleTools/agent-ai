@@ -1,9 +1,8 @@
-import { authMiddleware } from '~/server/utils/auth'
+import { chatwootAuthMiddleware } from '~/server/utils/auth'
 import csrfService from '~/server/services/csrfService'
 
-export default authMiddleware.auth(async (event, checker) => {
+export default chatwootAuthMiddleware.auth(async (event, checker) => {
   try {
-
     // Generate CSRF token for the authenticated user
     const csrfToken = csrfService.generateFromRequest(event)
 

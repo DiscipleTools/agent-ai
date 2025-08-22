@@ -17,7 +17,7 @@
  * - Temporary file cleanup on errors
  */
 import { connectDB } from '~/server/utils/db'
-import { authMiddleware } from '~/server/utils/auth'
+import { chatwootAuthMiddleware } from '~/server/utils/auth'
 import Agent from '~/server/models/Agent'
 import { fileProcessingService } from '~/server/services/fileProcessingService'
 import { ragService } from '~/server/services/ragService'
@@ -26,7 +26,7 @@ import fs from 'fs'
 import path from 'path'
 import os from 'os'
 
-export default authMiddleware.agentAccess('write')(async (event, checker, agentId) => {
+export default chatwootAuthMiddleware.agentAccess('write')(async (event, checker, agentId) => {
   try {
     // Connect to database
     await connectDB()

@@ -17,7 +17,137 @@
 import jwt from 'jsonwebtoken'
 import User from '~/server/models/User'
 import mongoose from 'mongoose'
-import { sanitizeToken, sanitizeObjectId, sanitizeErrorMessage } from '~/utils/sanitize.js'
+import axios from 'axios'
+import { sanitizeToken, sanitizeObjectId, sanitizeErrorMessage, sanitizeText, sanitizeEmail, sanitizeUrl } from '~/utils/sanitize.js'
+
+// Chatwoot authentication function
+export async function requireChatwootAuth(event: any) {
+  // Parse the Chatwoot session cookie
+  const sessionCookie = getCookie(event, 'cw_d_session_info')
+  
+  if (!sessionCookie) {
+    throw createError({
+      statusCode: 401,
+      statusMessage: 'No Chatwoot session found. Please log into Chatwoot first.'
+    })
+  }
+
+  let sessionData
+  try {
+    // Handle different cookie formats
+    if (typeof sessionCookie === 'object') {
+      sessionData = sessionCookie
+    } else if (typeof sessionCookie === 'string') {
+      try {
+        const decodedCookie = decodeURIComponent(sessionCookie)
+        sessionData = JSON.parse(decodedCookie)
+      } catch (parseError) {
+        sessionData = sessionCookie
+      }
+    } else {
+      throw new Error('Unexpected cookie format')
+    }
+  } catch (e) {
+    console.error('Error parsing session cookie:', e)
+    throw createError({
+      statusCode: 400,
+      statusMessage: 'Invalid Chatwoot session cookie format'
+    })
+  }
+
+  // Extract required authentication headers
+  const { 'access-token': accessToken, client, uid, expiry } = sessionData
+  
+  if (!accessToken || !client || !uid) {
+    throw createError({
+      statusCode: 400,
+      statusMessage: 'Incomplete Chatwoot session data'
+    })
+  }
+
+  // Get Chatwoot URL from environment (fallback to localhost)
+  const chatwootInstanceUrl = process.env.CHATWOOT_URL || 'http://localhost:5600'
+  const sanitizedChatwootUrl = sanitizeUrl(chatwootInstanceUrl)
+  
+  if (!sanitizedChatwootUrl) {
+    throw createError({
+      statusCode: 500,
+      statusMessage: 'Invalid Chatwoot URL configuration'
+    })
+  }
+
+  try {
+    // Make request to Chatwoot API to validate session
+    const profileUrl = `${sanitizedChatwootUrl.replace(/\/$/, '')}/api/v1/profile`
+    
+    const response = await axios.get(profileUrl, {
+      headers: {
+        accept: 'application/json, text/plain, */*',
+        'content-type': 'application/json',
+        'access-token': accessToken,
+        client,
+        uid,
+        expiry,
+      },
+      validateStatus: (s) => s >= 200 && s < 500,
+    })
+
+    if (response.status !== 200) {
+      console.error('Chatwoot profile API error:', response.status, response.data)
+      throw createError({
+        statusCode: 401,
+        statusMessage: 'Invalid Chatwoot session'
+      })
+    }
+
+    const profileData = response.data
+
+    // Transform Chatwoot profile to Agent AI user format
+    const userData = {
+      _id: profileData.id,
+      id: profileData.id,
+      name: sanitizeText(profileData.name || ''),
+      email: sanitizeEmail(profileData.email || ''),
+      role: 'admin', // For now, all Chatwoot users are admins in Agent AI
+      avatar_url: sanitizeUrl(profileData.avatar_url) || null,
+      isActive: profileData.confirmed || true,
+      agentAccess: [], // All agents for admin users
+      chatwoot: {
+        availability_status: sanitizeText(profileData.availability_status || ''),
+        auto_offline: profileData.auto_offline,
+        confirmed: profileData.confirmed,
+        accounts: (profileData.accounts || []).map((account: any) => ({
+          id: account.id,
+          name: sanitizeText(account.name || ''),
+          role: sanitizeText(account.role || ''),
+          status: sanitizeText(account.status || ''),
+        }))
+      }
+    }
+
+    // Attach user to event context
+    event.context.user = userData
+    return userData
+  } catch (error: any) {
+    // Handle axios errors
+    if (error.response) {
+      throw createError({
+        statusCode: 401,
+        statusMessage: 'Chatwoot authentication failed'
+      })
+    }
+    
+    // Re-throw createError instances
+    if (error.statusCode) {
+      throw error
+    }
+    
+    throw createError({
+      statusCode: 401,
+      statusMessage: error.message || 'Authentication failed'
+    })
+  }
+}
 
 export async function requireAuth(event: any) {
   const rawToken = getCookie(event, 'access-token') || getHeader(event, 'authorization')?.replace('Bearer ', '')
@@ -400,6 +530,66 @@ export const authMiddleware = {
       return defineEventHandler(async (event) => {
         const agentId = getRequiredAgentId(event)
         const checker = await requireAgentAccess(event, agentId, operation)
+        return handler(event, checker, agentId)
+      })
+    }
+  }
+}
+
+// Chatwoot-specific authentication middleware
+export const chatwootAuthMiddleware = {
+  /**
+   * Require Chatwoot authentication only
+   */
+  auth: (handler: (event: any, checker: PermissionChecker) => Promise<any>) => {
+    return defineEventHandler(async (event) => {
+      const user = await requireChatwootAuth(event)
+      const checker = createPermissionChecker(user)
+      return handler(event, checker)
+    })
+  },
+
+  /**
+   * Require Chatwoot authentication with admin role
+   */
+  admin: (handler: (event: any, checker: PermissionChecker) => Promise<any>) => {
+    return defineEventHandler(async (event) => {
+      const user = await requireChatwootAuth(event)
+      if (user.role !== 'admin') {
+        throw createError({
+          statusCode: 403,
+          statusMessage: 'Admin access required'
+        })
+      }
+      const checker = createPermissionChecker(user)
+      return handler(event, checker)
+    })
+  },
+
+  /**
+   * Require Chatwoot authentication with agent access
+   */
+  agentAccess: (operation: 'read' | 'write' | 'delete' = 'read') => {
+    return (handler: (event: any, checker: PermissionChecker, agentId: string) => Promise<any>) => {
+      return defineEventHandler(async (event) => {
+        const user = await requireChatwootAuth(event)
+        const agentId = getRequiredAgentId(event)
+        
+        // Create permission checker
+        const checker = createPermissionChecker(user)
+        
+        // Check agent access permission
+        const permission = operation === 'read' ? PERMISSIONS.AGENT.READ :
+                          operation === 'write' ? PERMISSIONS.AGENT.WRITE :
+                          PERMISSIONS.AGENT.DELETE
+
+        if (!checker.canAccessResource(permission, { agentId })) {
+          throw createError({
+            statusCode: 403,
+            statusMessage: 'Access denied'
+          })
+        }
+        
         return handler(event, checker, agentId)
       })
     }

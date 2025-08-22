@@ -17,12 +17,12 @@
  */
 
 import { connectDB } from '~/server/utils/db'
-import { authMiddleware } from '~/server/utils/auth'
+import { chatwootAuthMiddleware } from '~/server/utils/auth'
 import Agent from '~/server/models/Agent'
 import { ragService } from '~/server/services/ragService'
 import { sanitizeSearchQuery, sanitizeNumber, validators } from '~/utils/sanitize'
 
-export default authMiddleware.agentAccess('read')(async (event, checker, agentId) => {
+export default chatwootAuthMiddleware.agentAccess('read')(async (event, checker, agentId) => {
   try {
     // Connect to database
     await connectDB()

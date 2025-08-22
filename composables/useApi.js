@@ -3,20 +3,17 @@ export const useApi = () => {
 
   const authenticatedFetch = $fetch.create({
     async onRequest({ request, options }) {
-      // Add authentication header if token exists
-      const accessToken = useCookie('access-token')
-      if (accessToken.value) {
-        options.headers = {
-          ...options.headers,
-          Authorization: `Bearer ${accessToken.value}`
-        }
-      }
-
+      // For Chatwoot authentication, we don't need to add Authorization headers
+      // The authentication happens via Chatwoot session cookies which are automatically sent
+      
       // Add CSRF token for state-changing methods
       const method = options.method?.toUpperCase() || 'GET'
       const needsCSRF = ['POST', 'PUT', 'DELETE', 'PATCH'].includes(method)
       
-      if (needsCSRF && accessToken.value) {
+      // Check if we have a Chatwoot session for CSRF token requests
+      const chatwootSession = useCookie('cw_d_session_info')
+      
+      if (needsCSRF && chatwootSession.value) {
         // Skip CSRF for certain endpoints
         const skipCSRFPaths = [
           '/api/auth/login',
@@ -53,11 +50,7 @@ export const useApi = () => {
             try {
               // Get cached token or fetch new one
               if (!csrfTokenCache.value) {
-                const response = await $fetch('/api/auth/csrf-token', {
-                  headers: {
-                    Authorization: `Bearer ${accessToken.value}`
-                  }
-                })
+                const response = await $fetch('/api/auth/csrf-token')
                 csrfTokenCache.value = response.data?.csrfToken || response.csrfToken
               }
 
@@ -77,17 +70,13 @@ export const useApi = () => {
     },
 
     onResponseError({ response }) {
-      // Handle 401 errors by redirecting to login
+      // Handle 401 errors by redirecting to Chatwoot login
       if (response.status === 401) {
-        // Clear tokens and CSRF cache
-        const accessToken = useCookie('access-token')
-        const refreshToken = useCookie('refresh-token')
-        accessToken.value = null
-        refreshToken.value = null
+        // Clear CSRF cache
         csrfTokenCache.value = null
         
-        // Redirect to login
-        navigateTo('/login')
+        // Redirect to main Chatwoot app for authentication
+        window.location.href = '/'
       }
 
       // Handle CSRF token expiration

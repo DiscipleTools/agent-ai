@@ -10,7 +10,7 @@
  */
 
 import { connectDB } from '~/server/utils/db'
-import { authMiddleware } from '~/server/utils/auth'
+import { chatwootAuthMiddleware } from '~/server/utils/auth'
 import Agent from '~/server/models/Agent'
 import User from '~/server/models/User'
 import { sanitizeText, sanitizeContent, sanitizeNumber, sanitizeObjectId } from '~/utils/sanitize'
@@ -38,7 +38,7 @@ interface AgentRequestBody {
   }>
 }
 
-export default authMiddleware.auth(async (event, checker) => {
+export default chatwootAuthMiddleware.auth(async (event, checker) => {
   try {
     // Connect to database
     await connectDB()
@@ -204,15 +204,10 @@ export default authMiddleware.auth(async (event, checker) => {
     const agent = new Agent(agentData)
     await agent.save()
 
-    // Grant the creating user access to the new agent
-    await User.findByIdAndUpdate(
-      user._id,
-      { $addToSet: { agentAccess: agent._id } },
-      { new: true }
-    )
+    // Note: With Chatwoot authentication, user management is handled by Chatwoot
+    // No need to update Agent AI User model since we're using Chatwoot users
 
-    // Populate createdBy field for response
-    await agent.populate('createdBy', 'name email')
+    // Note: createdBy is now a simple ID (not ObjectId) so no population needed
 
     return {
       success: true,
