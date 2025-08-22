@@ -80,6 +80,19 @@ const agentSchema = new mongoose.Schema({
       trim: true
     }
   },
+  inboxes: [{
+    accountId: {
+      type: Number,
+      required: true
+    },
+    inboxId: {
+      type: Number,
+      required: true
+    },
+    accountName: String,
+    inboxName: String,
+    channelType: String
+  }],
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',

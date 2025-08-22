@@ -100,11 +100,30 @@ const form = reactive({
     connectionId: props.agent?.settings?.connectionId || '',
     modelId: props.agent?.settings?.modelId || '',
     chatwootApiKey: props.agent?.settings?.chatwootApiKey || ''
-  }
+  },
+  inboxes: props.agent?.inboxes || []
 })
 
 const errors = reactive({})
 const isSubmitting = ref(false)
+
+// Check for inbox query parameters when creating a new agent
+const route = useRoute()
+if (!props.agent && route.query.inboxId) {
+  // Populate inbox assignment from query parameters
+  const inboxData = {
+    accountId: sanitizeNumber(route.query.accountId),
+    inboxId: sanitizeNumber(route.query.inboxId),
+    accountName: sanitizeText(route.query.accountName),
+    inboxName: sanitizeText(route.query.inboxName),
+    channelType: sanitizeText(route.query.channelType)
+  }
+  
+  // Only add if all required fields are present
+  if (inboxData.accountId && inboxData.inboxId) {
+    form.inboxes.push(inboxData)
+  }
+}
 
 // Context documents state
 const contextDocuments = ref([])
@@ -156,6 +175,7 @@ watch(() => props.agent, (newAgent) => {
       modelId: newAgent.settings?.modelId || '',
       chatwootApiKey: newAgent.settings?.chatwootApiKey || ''
     }
+    form.inboxes = newAgent.inboxes || []
     
     // Load context documents from agent prop if editing
     if (newAgent._id && newAgent.contextDocuments) {
@@ -238,7 +258,8 @@ const handleSubmit = async () => {
           modelId: 'text',
           chatwootApiKey: 'text'
         })
-      }
+      },
+      inboxes: form.inboxes || []
     }
     
     // Clean up null/empty values

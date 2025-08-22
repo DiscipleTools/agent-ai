@@ -29,6 +29,13 @@ interface AgentRequestBody {
   description?: string
   prompt?: string
   settings?: AgentSettings
+  inboxes?: Array<{
+    accountId: number
+    inboxId: number
+    accountName?: string
+    inboxName?: string
+    channelType?: string
+  }>
 }
 
 export default authMiddleware.auth(async (event, checker) => {
@@ -46,7 +53,8 @@ export default authMiddleware.auth(async (event, checker) => {
     const sanitizedBody = {
       name: sanitizeText(body.name),
       description: sanitizeContent(body.description),
-      prompt: sanitizeContent(body.prompt)
+      prompt: sanitizeContent(body.prompt),
+      inboxes: body.inboxes || []
     }
 
     // Enhanced validation with sanitized inputs
@@ -71,6 +79,35 @@ export default authMiddleware.auth(async (event, checker) => {
     // Validate description
     if (sanitizedBody.description && sanitizedBody.description.length > 500) {
       errors.push('Description cannot exceed 500 characters')
+    }
+
+    // Validate and sanitize inbox assignments
+    const sanitizedInboxes = []
+    if (sanitizedBody.inboxes && Array.isArray(sanitizedBody.inboxes)) {
+      for (let i = 0; i < sanitizedBody.inboxes.length; i++) {
+        const inbox = sanitizedBody.inboxes[i]
+        
+        if (!inbox || typeof inbox !== 'object') {
+          errors.push(`Invalid inbox assignment at index ${i}`)
+          continue
+        }
+
+        const sanitizedInbox = {
+          accountId: sanitizeNumber(inbox.accountId),
+          inboxId: sanitizeNumber(inbox.inboxId),
+          accountName: sanitizeText(inbox.accountName) || '',
+          inboxName: sanitizeText(inbox.inboxName) || '',
+          channelType: sanitizeText(inbox.channelType) || ''
+        }
+
+        // Validate required fields
+        if (!sanitizedInbox.accountId || !sanitizedInbox.inboxId) {
+          errors.push(`Inbox assignment at index ${i} missing required accountId or inboxId`)
+          continue
+        }
+
+        sanitizedInboxes.push(sanitizedInbox)
+      }
     }
 
     // Validate settings with additional sanitization
@@ -158,6 +195,7 @@ export default authMiddleware.auth(async (event, checker) => {
         modelId: sanitizedSettings.modelId || null,
         chatwootApiKey: sanitizedSettings.chatwootApiKey || null
       },
+      inboxes: sanitizedInboxes,
       createdBy: user._id,
       isActive: true
     }

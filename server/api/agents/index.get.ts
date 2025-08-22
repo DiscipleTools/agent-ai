@@ -27,7 +27,7 @@ export default authMiddleware.auth(async (event, checker) => {
 
     // Fetch agents with only necessary fields for listing
     const agents = await Agent.find(query)
-      .select('name description isActive createdAt createdBy')
+      .select('name description isActive createdAt createdBy inboxes')
       .populate('createdBy', 'name')
       .sort({ createdAt: -1 })
 
