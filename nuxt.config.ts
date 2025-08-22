@@ -37,7 +37,7 @@ export default defineNuxtConfig({
     
     // Public keys (exposed to client-side)
     public: {
-      apiBase: '/agents/api',
+      apiBase: '/api',
       appName: process.env.APP_NAME || 'Agent AI Server'
     }
   },

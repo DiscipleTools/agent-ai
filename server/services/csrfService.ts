@@ -21,10 +21,11 @@ class CSRFService {
   private readonly tokenExpiry: string = '1h' // CSRF tokens expire in 1 hour
 
   constructor() {
-    const envSecret = process.env.CSRF_SECRET || process.env.JWT_SECRET
+    // Use JWT_SECRET to ensure compatibility with JWT tokens
+    const envSecret = process.env.JWT_SECRET
     
     if (!envSecret) {
-      throw new Error('CSRF_SECRET or JWT_SECRET must be configured for CSRF protection')
+      throw new Error('JWT_SECRET must be configured for CSRF protection')
     }
     
     this.secret = envSecret

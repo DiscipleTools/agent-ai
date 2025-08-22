@@ -75,25 +75,6 @@ const props = defineProps({
     default: () => ({})
   }
 })
-
-// Watch for sanitization
-watch(() => props.form.name, (newValue) => {
-  if (newValue !== sanitizeText(newValue)) {
-    props.form.name = sanitizeText(newValue)
-  }
-})
-
-watch(() => props.form.description, (newValue) => {
-  if (newValue !== sanitizeText(newValue)) {
-    props.form.description = sanitizeText(newValue)
-  }
-})
-
-watch(() => props.form.prompt, (newValue) => {
-  if (newValue !== sanitizeContent(newValue)) {
-    props.form.prompt = sanitizeContent(newValue)
-  }
-})
 </script>
 
  

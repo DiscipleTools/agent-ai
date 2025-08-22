@@ -88,18 +88,18 @@ const agentsStore = useAgentsStore()
 const toast = useToast()
 const { csrfRequest, addCsrfToForm } = useCsrf()
 
-// Form state
+// Form state - don't sanitize on initialization to allow proper editing
 const form = reactive({
-  name: sanitizeText(props.agent?.name || ''),
-  description: sanitizeText(props.agent?.description || ''),
-  prompt: sanitizeContent(props.agent?.prompt || ''),
+  name: props.agent?.name || '',
+  description: props.agent?.description || '',
+  prompt: props.agent?.prompt || '',
   settings: {
     temperature: sanitizeNumber(props.agent?.settings?.temperature || 0.3),
     maxTokens: sanitizeNumber(props.agent?.settings?.maxTokens || 500),
     responseDelay: sanitizeNumber(props.agent?.settings?.responseDelay || 0),
-    connectionId: sanitizeText(props.agent?.settings?.connectionId || ''),
-    modelId: sanitizeText(props.agent?.settings?.modelId || ''),
-    chatwootApiKey: sanitizeText(props.agent?.settings?.chatwootApiKey || '')
+    connectionId: props.agent?.settings?.connectionId || '',
+    modelId: props.agent?.settings?.modelId || '',
+    chatwootApiKey: props.agent?.settings?.chatwootApiKey || ''
   }
 })
 
@@ -142,19 +142,19 @@ const reloadAgentData = async () => {
   }
 }
 
-// Watch for prop changes (when editing)
+// Watch for prop changes (when editing) - don't sanitize on prop updates
 watch(() => props.agent, (newAgent) => {
   if (newAgent) {
-    form.name = sanitizeText(newAgent.name || '')
-    form.description = sanitizeText(newAgent.description || '')
-    form.prompt = sanitizeContent(newAgent.prompt || '')
+    form.name = newAgent.name || ''
+    form.description = newAgent.description || ''
+    form.prompt = newAgent.prompt || ''
     form.settings = {
       temperature: sanitizeNumber(newAgent.settings?.temperature || 0.3),
       maxTokens: sanitizeNumber(newAgent.settings?.maxTokens || 500),
       responseDelay: sanitizeNumber(newAgent.settings?.responseDelay || 0),
-      connectionId: sanitizeText(newAgent.settings?.connectionId || ''),
-      modelId: sanitizeText(newAgent.settings?.modelId || ''),
-      chatwootApiKey: sanitizeText(newAgent.settings?.chatwootApiKey || '')
+      connectionId: newAgent.settings?.connectionId || '',
+      modelId: newAgent.settings?.modelId || '',
+      chatwootApiKey: newAgent.settings?.chatwootApiKey || ''
     }
     
     // Load context documents from agent prop if editing
@@ -248,11 +248,16 @@ const handleSubmit = async () => {
 
     emit('submit', agentData)
   } catch (error) {
-    // Handle CSRF errors specifically
-    if (error.statusCode === 403 && error.statusMessage?.includes('CSRF')) {
+    console.error('Form submission error:', error)
+    
+    // Handle different types of errors with specific messages
+    if (error.statusCode === 401) {
+      toast('Authentication required. Please log in again.', { type: 'error' })
+    } else if (error.statusCode === 403 && error.statusMessage?.includes('CSRF')) {
       toast('Security token expired. Please refresh the page.', { type: 'error' })
+    } else if (error.message === 'Could not obtain CSRF token') {
+      toast('Authentication issue. Please try logging out and logging back in.', { type: 'error' })
     } else {
-      console.error('Form submission error:', error)
       toast(error.message || 'Failed to submit form', { type: 'error' })
     }
   } finally {
