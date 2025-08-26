@@ -58,14 +58,6 @@
                 </p>
               </div>
             </div>
-            <button
-              @click="authStore.logout"
-              class="ml-2 flex items-center px-3 py-2 text-sm font-medium text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900 rounded-md transition-colors"
-              title="Logout"
-            >
-              <ArrowRightOnRectangleIcon class="w-4 h-4 mr-1" />
-              Logout
-            </button>
           </div>
         </div>
       </div>
@@ -124,26 +116,6 @@
                   </p>
                 </div>
               </div>
-              <div class="ml-2 flex space-x-1">
-                <!-- Theme toggle button hidden
-                <button
-                  @click="toggleDarkMode"
-                  class="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                  title="Toggle theme"
-                >
-                  <SunIcon v-if="$colorMode.value === 'dark'" class="w-4 h-4" />
-                  <MoonIcon v-else class="w-4 h-4" />
-                </button>
-                -->
-                <button
-                  @click="authStore.logout"
-                  class="ml-2 flex items-center px-3 py-2 text-sm font-medium text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900 rounded-md transition-colors"
-                  title="Logout"
-                >
-                  <ArrowRightOnRectangleIcon class="w-4 h-4 mr-1" />
-                  Logout
-                </button>
-              </div>
             </div>
           </div>
         </div>
@@ -184,24 +156,28 @@
               </div>
               
               <div class="flex items-center space-x-4">
-                <!-- Logout button (desktop) -->
-                <button
-                  @click="authStore.logout"
-                  class="hidden md:flex items-center px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors"
-                  title="Logout"
+                <!-- Chatwoot button (desktop) -->
+                <a
+                  :href="chatwootUrl || '#'"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="hidden md:flex items-center px-3 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900 rounded-md transition-colors"
+                  title="Open Chatwoot"
                 >
-                  <ArrowRightOnRectangleIcon class="w-4 h-4 mr-2" />
-                  Logout
-                </button>
+                  <ChatBubbleLeftRightIcon class="w-4 h-4 mr-2" />
+                  Chatwoot
+                </a>
                 
-                <!-- Logout button (mobile) -->
-                <button
-                  @click="authStore.logout"
-                  class="md:hidden p-2 text-gray-400 hover:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors"
-                  title="Logout"
+                <!-- Chatwoot button (mobile) -->
+                <a
+                  :href="chatwootUrl || '#'"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="md:hidden p-2 text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900 rounded-md transition-colors"
+                  title="Open Chatwoot"
                 >
-                  <ArrowRightOnRectangleIcon class="w-5 h-5" />
-                </button>
+                  <ChatBubbleLeftRightIcon class="w-5 h-5" />
+                </a>
               </div>
             </div>
           </div>
@@ -221,7 +197,6 @@ import {
   HomeIcon,
   CpuChipIcon,
   CogIcon,
-  ArrowRightOnRectangleIcon,
   Bars3Icon,
   XMarkIcon,
   SunIcon,
@@ -233,6 +208,7 @@ import { sanitizeText, sanitizeEmail } from '~/utils/sanitize.js'
 
 const authStore = useAuthStore()
 const agentsStore = useAgentsStore()
+const settingsStore = useSettingsStore()
 const colorMode = useColorMode()
 const route = useRoute()
 
@@ -270,6 +246,15 @@ const currentPageName = computed(() => {
   return 'Agents'
 })
 
+// Get Chatwoot URL from settings
+const chatwootUrl = computed(() => {
+  const chatwootSettings = settingsStore.settings?.chatwoot
+  if (chatwootSettings?.enabled && chatwootSettings?.url) {
+    return chatwootSettings.url
+  }
+  return null
+})
+
 const toggleDarkMode = () => {
   colorMode.preference = colorMode.value === 'dark' ? 'light' : 'dark'
 }
@@ -287,14 +272,25 @@ watch(() => route.path, () => {
   mobileMenuOpen.value = false
 })
 
-// Fetch agents on mount if not already loaded
+// Fetch agents and settings on mount if not already loaded
 onMounted(async () => {
+  // Fetch agents if not loaded
   if (agentsStore.agents.length === 0 && !agentsStore.loading) {
     try {
       await agentsStore.fetchAgents()
     } catch (error) {
       // Silently fail - the user will see the count as 0 and can navigate to agents page
       console.error('Failed to fetch agents for sidebar count:', error)
+    }
+  }
+  
+  // Fetch settings if not loaded (needed for Chatwoot URL)
+  if (!settingsStore.settings && !settingsStore.loading) {
+    try {
+      await settingsStore.fetchSettings()
+    } catch (error) {
+      // Silently fail - Chatwoot button will use fallback URL
+      console.error('Failed to fetch settings for Chatwoot URL:', error)
     }
   }
 })
