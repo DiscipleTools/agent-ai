@@ -95,6 +95,71 @@ export default chatwootAuthMiddleware.agentAccess('write')(async (event, checker
       }
       agent.isActive = body.isActive
     }
+
+    // Validate and update agent type
+    if (body.agentType !== undefined) {
+      const sanitizedAgentType = sanitizeText(body.agentType)
+      const validAgentTypes = ['response']
+      if (!validAgentTypes.includes(sanitizedAgentType)) {
+        throw createError({
+          statusCode: 400,
+          statusMessage: `Invalid agent type. Must be one of: ${validAgentTypes.join(', ')}`
+        })
+      }
+      ;(agent as any).agentType = sanitizedAgentType
+    }
+
+    // Handle inbox updates with validation
+    if (body.inboxes !== undefined) {
+      const sanitizedInboxes = []
+      if (body.inboxes && Array.isArray(body.inboxes)) {
+        for (let i = 0; i < body.inboxes.length; i++) {
+          const inbox = body.inboxes[i]
+          
+          if (!inbox || typeof inbox !== 'object') {
+            throw createError({
+              statusCode: 400,
+              statusMessage: `Invalid inbox assignment at index ${i}`
+            })
+          }
+
+          const sanitizedInbox = {
+            accountId: sanitizeNumber(inbox.accountId),
+            inboxId: sanitizeNumber(inbox.inboxId),
+            accountName: sanitizeText(inbox.accountName) || '',
+            inboxName: sanitizeText(inbox.inboxName) || '',
+            channelType: sanitizeText(inbox.channelType) || ''
+          }
+
+          // Validate required fields
+          if (!sanitizedInbox.accountId || !sanitizedInbox.inboxId) {
+            throw createError({
+              statusCode: 400,
+              statusMessage: `Inbox assignment at index ${i} missing required accountId or inboxId`
+            })
+          }
+
+          sanitizedInboxes.push(sanitizedInbox)
+        }
+      }
+
+      // Validate response agent inbox constraints if this is a response agent
+      const currentAgentType = (agent as any).agentType || 'response'
+      if (currentAgentType === 'response' && sanitizedInboxes.length > 0) {
+        const responseAgentValidation = await (Agent as any).validateResponseAgentInboxes(sanitizedInboxes, agent._id)
+        if (!responseAgentValidation.isValid) {
+          const conflictMessages = responseAgentValidation.conflicts.map((conflict: any) => 
+            `Inbox "${conflict.inboxName}" already has response agent "${conflict.existingAgentName}"`
+          )
+          throw createError({
+            statusCode: 400,
+            statusMessage: conflictMessages.join(', ')
+          })
+        }
+      }
+
+      ;(agent as any).inboxes = sanitizedInboxes
+    }
     
     // Update settings with proper sanitization
     if (body.settings && typeof body.settings === 'object') {

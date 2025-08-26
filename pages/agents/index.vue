@@ -2,12 +2,12 @@
   <div>
     <div class="sm:flex sm:items-center sm:justify-between mb-6">
       <div>
-        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Agents</h1>
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Response Agents</h1>
         <p class="mt-2 text-sm text-gray-700 dark:text-gray-300">
-          Manage your AI agents for Chatwoot inboxes
+          Manage your AI response agents for Chatwoot inboxes. Each inbox can have only one response agent.
         </p>
       </div>
-      <div class="mt-4 sm:mt-0 flex space-x-2">
+      <div class="mt-4 sm:mt-0">
         <button
           @click="refreshChatwootData"
           :disabled="chatwootStore.loading"
@@ -15,13 +15,6 @@
         >
           <ArrowPathIcon class="w-4 h-4 mr-2" :class="{ 'animate-spin': chatwootStore.loading }" />
           Refresh Inboxes
-        </button>
-        <button
-          @click="createAgent"
-          class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
-        >
-          <PlusIcon class="w-4 h-4 mr-2" />
-          Create Agent
         </button>
       </div>
     </div>
@@ -67,7 +60,7 @@
         <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
           <h2 class="text-lg font-medium text-gray-900 dark:text-white">Chatwoot Inboxes</h2>
           <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
-            Create and manage AI agents for your Chatwoot inboxes
+            Create and manage AI response agents for your Chatwoot inboxes
           </p>
         </div>
         <div class="p-6">
@@ -110,111 +103,86 @@
                 </div>
               </div>
 
-              <!-- Agents for this inbox -->
+              <!-- Agent for this inbox -->
               <div class="mb-4">
-                <div class="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">Assigned Agents:</div>
-                <div v-if="getAgentsForInbox(inbox.accountId, inbox.id).length > 0" class="space-y-1">
+                <div class="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">Response Agent:</div>
+                <div v-if="getAgentsForInbox(inbox.accountId, inbox.id).length > 0" class="space-y-3">
                   <div 
                     v-for="agent in getAgentsForInbox(inbox.accountId, inbox.id)"
                     :key="agent._id"
-                    class="flex items-center justify-between text-xs bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-200 px-2 py-1 rounded"
+                    class="bg-green-50 dark:bg-green-900/20 rounded-lg p-3 border border-green-200 dark:border-green-800"
                   >
-                    <span class="truncate">{{ sanitizeText(agent.name) }}</span>
-                    <button
-                      @click="editAgent(agent)"
-                      class="text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-200"
-                    >
-                      <PencilIcon class="w-3 h-3" />
-                    </button>
+                    <!-- Agent Header -->
+                    <div class="flex items-start justify-between mb-2">
+                      <div class="min-w-0 flex-1">
+                        <h4 class="text-sm font-medium text-green-900 dark:text-green-100 truncate">
+                          {{ sanitizeText(agent.name) }}
+                        </h4>
+                        <div class="flex items-center space-x-2 mt-1">
+                          <span class="inline-block px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-200 rounded-full">
+                            {{ agent.agentType || 'response' }}
+                          </span>
+                          <span 
+                            :class="[
+                              'inline-block px-2 py-0.5 text-xs font-medium rounded-full',
+                              agent.isActive 
+                                ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-200' 
+                                : 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-200'
+                            ]"
+                          >
+                            {{ agent.isActive ? 'Active' : 'Inactive' }}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <!-- Agent Description -->
+                    <p v-if="agent.description" class="text-xs text-green-700 dark:text-green-300 mb-3 line-clamp-2">
+                      {{ sanitizeText(agent.description) }}
+                    </p>
+                    
+                    <!-- Agent Actions -->
+                    <div class="flex space-x-2">
+                      <button
+                        @click="editAgent(agent)"
+                        class="flex-1 inline-flex items-center justify-center px-2 py-1 text-xs font-medium text-green-700 dark:text-green-300 bg-white dark:bg-green-900/10 border border-green-300 dark:border-green-700 rounded hover:bg-green-50 dark:hover:bg-green-900/20"
+                      >
+                        <PencilIcon class="w-3 h-3 mr-1" />
+                        Edit
+                      </button>
+                      <button
+                        @click="deleteAgent(agent._id)"
+                        class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium text-red-700 dark:text-red-300 bg-white dark:bg-red-900/10 border border-red-300 dark:border-red-700 rounded hover:bg-red-50 dark:hover:bg-red-900/20"
+                      >
+                        <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                        </svg>
+                        Delete
+                      </button>
+                    </div>
                   </div>
                 </div>
-                <div v-else class="text-xs text-gray-500 dark:text-gray-400 italic">
-                  No agents assigned
+                <div v-else class="text-xs text-gray-500 dark:text-gray-400 italic bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3">
+                  No response agent assigned
                 </div>
               </div>
 
               <button
+                v-if="getAgentsForInbox(inbox.accountId, inbox.id).length === 0"
                 @click="createAgentForInbox(inbox)"
                 class="w-full inline-flex items-center justify-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
               >
                 <PlusIcon class="w-4 h-4 mr-2" />
-                Create Agent
+                Create Response Agent
               </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Existing Agents -->
-      <div v-if="agentsStore.agents.length > 0" class="bg-white dark:bg-gray-800 shadow rounded-lg">
-        <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-          <h2 class="text-lg font-medium text-gray-900 dark:text-white">All Agents</h2>
-          <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
-            Manage all your AI agents
-          </p>
-        </div>
-        <div class="p-6">
-          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <div
-              v-for="agent in agentsStore.agents"
-              :key="agent._id"
-              class="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 hover:shadow-lg transition-shadow"
-            >
-              <div class="flex justify-between items-start mb-4">
-                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
-                  {{ sanitizeText(agent.name) }}
-                </h3>
-                <span 
-                  :class="[
-                    'px-2 py-1 rounded-full text-xs',
-                    agent.isActive 
-                      ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' 
-                      : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                  ]"
-                >
-                  {{ agent.isActive ? 'Active' : 'Inactive' }}
-                </span>
-              </div>
-              
-              <p class="text-gray-600 dark:text-gray-300 mb-4 line-clamp-2">
-                {{ sanitizeText(agent.description) || 'No description' }}
-              </p>
-              
-              <!-- Inbox assignments -->
-              <div class="mb-4">
-                <div class="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">Assigned Inboxes:</div>
-                <div v-if="agent.inboxes && agent.inboxes.length > 0" class="flex flex-wrap gap-1">
-                  <span 
-                    v-for="inbox in agent.inboxes"
-                    :key="`${inbox.accountId}-${inbox.inboxId}`"
-                    class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-200"
-                  >
-                    {{ sanitizeText(inbox.inboxName) }}
-                  </span>
-                </div>
-                <div v-else class="text-xs text-gray-500 dark:text-gray-400 italic">
-                  No inboxes assigned
-                </div>
-              </div>
-              
-              <div class="flex items-center justify-between text-sm text-gray-500 dark:text-gray-400 mb-4">
-                <span>Created by {{ sanitizeText(agent.createdBy?.name) }}</span>
-                <span>{{ formatDate(agent.createdAt) }}</span>
-              </div>
-              
-              <div class="flex space-x-2">
-                <button
-                  @click="editAgent(agent)"
-                  class="flex-1 btn-primary text-center"
-                >
-                  Edit
-                </button>
-                <button
-                  @click="deleteAgent(agent._id)"
-                  class="px-4 py-2 border border-red-300 text-red-700 rounded hover:bg-red-50 dark:border-red-600 dark:text-red-400 dark:hover:bg-red-900"
-                >
-                  Delete
-                </button>
+              <div 
+                v-else
+                class="w-full inline-flex items-center justify-center px-3 py-2 border border-gray-300 dark:border-gray-600 text-sm leading-4 font-medium rounded-md text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-700"
+              >
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                Response Agent Assigned
               </div>
             </div>
           </div>
@@ -243,19 +211,13 @@
     <!-- Default Empty State -->
     <div v-else class="text-center py-12">
       <CpuChipIcon class="mx-auto h-12 w-12 text-gray-400" />
-      <h3 class="mt-2 text-sm font-medium text-gray-900 dark:text-white">No agents</h3>
+      <h3 class="mt-2 text-sm font-medium text-gray-900 dark:text-white">No Chatwoot inboxes available</h3>
       <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-        Get started by creating your first AI agent.
+        Response agents are created for specific Chatwoot inboxes. Each inbox can have one response agent.
       </p>
-      <div class="mt-6">
-        <button
-          @click="createAgent"
-          class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700"
-        >
-          <PlusIcon class="w-4 h-4 mr-2" />
-          Create Agent
-        </button>
-      </div>
+      <p class="mt-3 text-sm text-gray-500 dark:text-gray-400">
+        Please ensure you have access to Chatwoot inboxes or refresh your Chatwoot data.
+      </p>
     </div>
   </div>
 </template>
@@ -291,10 +253,6 @@ const fetchAgents = async () => {
     console.error('Failed to load agents:', sanitizeErrorMessage(error))
     toast(sanitizeErrorMessage(error) || 'Failed to load agents', { type: 'error' })
   }
-}
-
-const createAgent = () => {
-  navigateTo('/agents/create')
 }
 
 const createAgentForInbox = (inbox) => {
@@ -358,16 +316,6 @@ const deleteAgent = async (agentId) => {
   } catch (error) {
     console.error('Failed to delete agent:', sanitizeErrorMessage(error))
     toast(sanitizeErrorMessage(error) || 'Failed to delete agent', { type: 'error' })
-  }
-}
-
-const formatDate = (date) => {
-  if (!date) return 'Unknown'
-  try {
-    return new Date(date).toLocaleDateString()
-  } catch (error) {
-    console.error('Invalid date format:', error)
-    return 'Invalid date'
   }
 }
 

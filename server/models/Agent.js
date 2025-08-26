@@ -97,6 +97,12 @@ const agentSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.Mixed, // Support both ObjectId and simple IDs for Chatwoot users
     required: true
   },
+  agentType: {
+    type: String,
+    enum: ['response', 'analytics', 'moderation', 'routing'],
+    default: 'response',
+    required: [true, 'Agent type is required']
+  },
   isActive: {
     type: Boolean,
     default: true
@@ -113,6 +119,9 @@ const agentSchema = new mongoose.Schema({
 // Indexes for better performance
 agentSchema.index({ isActive: 1 })
 agentSchema.index({ createdBy: 1 })
+agentSchema.index({ agentType: 1 })
+// Compound index to track agents by inbox - for validation purposes only (not unique constraint)
+agentSchema.index({ 'inboxes.accountId': 1, 'inboxes.inboxId': 1, agentType: 1, isActive: 1 })
 
 // Generate webhook URL before saving
 agentSchema.pre('save', function(next) {
@@ -131,6 +140,47 @@ agentSchema.statics.findActive = function() {
 // Static method to find agents by creator
 agentSchema.statics.findByCreator = function(userId) {
   return this.find({ createdBy: userId, isActive: true })
+}
+
+// Static method to validate inbox assignments for response agents
+agentSchema.statics.validateResponseAgentInboxes = async function(inboxes, excludeAgentId = null) {
+  if (!inboxes || !Array.isArray(inboxes) || inboxes.length === 0) {
+    return { isValid: true, conflicts: [] }
+  }
+
+  const conflicts = []
+  
+  for (const inbox of inboxes) {
+    const query = {
+      'inboxes.accountId': inbox.accountId,
+      'inboxes.inboxId': inbox.inboxId,
+      agentType: 'response',
+      isActive: true
+    }
+    
+    // Exclude the current agent if we're updating
+    if (excludeAgentId) {
+      query._id = { $ne: excludeAgentId }
+    }
+    
+    const existingAgent = await this.findOne(query)
+    
+    if (existingAgent) {
+      conflicts.push({
+        accountId: inbox.accountId,
+        inboxId: inbox.inboxId,
+        accountName: inbox.accountName,
+        inboxName: inbox.inboxName,
+        existingAgentId: existingAgent._id,
+        existingAgentName: existingAgent.name
+      })
+    }
+  }
+  
+  return {
+    isValid: conflicts.length === 0,
+    conflicts
+  }
 }
 
 // Virtual for agent's basic info

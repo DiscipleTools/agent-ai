@@ -93,6 +93,7 @@ const form = reactive({
   name: props.agent?.name || '',
   description: props.agent?.description || '',
   prompt: props.agent?.prompt || '',
+  agentType: props.agent?.agentType || 'response',
   settings: {
     temperature: sanitizeNumber(props.agent?.settings?.temperature || 0.3),
     maxTokens: sanitizeNumber(props.agent?.settings?.maxTokens || 500),

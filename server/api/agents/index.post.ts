@@ -28,6 +28,7 @@ interface AgentRequestBody {
   name?: string
   description?: string
   prompt?: string
+  agentType?: string
   settings?: AgentSettings
   inboxes?: Array<{
     accountId: number
@@ -54,6 +55,7 @@ export default chatwootAuthMiddleware.auth(async (event, checker) => {
       name: sanitizeText(body.name),
       description: sanitizeContent(body.description),
       prompt: sanitizeContent(body.prompt),
+      agentType: sanitizeText(body.agentType) || 'response',
       inboxes: body.inboxes || []
     }
 
@@ -79,6 +81,12 @@ export default chatwootAuthMiddleware.auth(async (event, checker) => {
     // Validate description
     if (sanitizedBody.description && sanitizedBody.description.length > 500) {
       errors.push('Description cannot exceed 500 characters')
+    }
+
+    // Validate agent type
+    const validAgentTypes = ['response']
+    if (!validAgentTypes.includes(sanitizedBody.agentType)) {
+      errors.push(`Invalid agent type. Must be: ${validAgentTypes.join(', ')}`)
     }
 
     // Validate and sanitize inbox assignments
@@ -183,6 +191,17 @@ export default chatwootAuthMiddleware.auth(async (event, checker) => {
       }
     }
 
+    // Validate response agent inbox constraints - only one response agent per inbox
+    if (sanitizedBody.agentType === 'response' && sanitizedInboxes.length > 0) {
+      const responseAgentValidation = await (Agent as any).validateResponseAgentInboxes(sanitizedInboxes)
+      if (!responseAgentValidation.isValid) {
+        const conflictMessages = responseAgentValidation.conflicts.map((conflict: any) => 
+          `Inbox "${conflict.inboxName}" already has response agent "${conflict.existingAgentName}"`
+        )
+        errors.push(...conflictMessages)
+      }
+    }
+
     if (errors.length > 0) {
       throw createError({
         statusCode: 400,
@@ -195,6 +214,7 @@ export default chatwootAuthMiddleware.auth(async (event, checker) => {
       name: sanitizedBody.name.trim(),
       description: sanitizedBody.description?.trim() || '',
       prompt: sanitizedBody.prompt.trim(),
+      agentType: sanitizedBody.agentType,
       settings: {
         temperature: sanitizedSettings.temperature !== undefined ? sanitizedSettings.temperature : 0.3,
         maxTokens: sanitizedSettings.maxTokens !== undefined ? sanitizedSettings.maxTokens : 500,

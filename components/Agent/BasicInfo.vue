@@ -41,6 +41,28 @@
       </div>
 
       <div>
+        <label for="agentType" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+          Agent Type
+        </label>
+        <div class="relative">
+          <input
+            id="agentType"
+            v-model="form.agentType"
+            type="text"
+            readonly
+            class="input-field bg-gray-50 dark:bg-gray-700 cursor-not-allowed"
+            value="response"
+          />
+          <div class="absolute inset-y-0 right-0 flex items-center pr-3">
+            <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+          </div>
+        </div>
+        <p class="text-xs text-gray-500 mt-1">All agents are currently response agents. Only one response agent per inbox is allowed.</p>
+      </div>
+
+      <div>
         <label for="prompt" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
           System Prompt *
         </label>

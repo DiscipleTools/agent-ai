@@ -1,9 +1,14 @@
 <template>
   <div class="card hover:shadow-lg transition-shadow">
     <div class="flex justify-between items-start mb-4">
-      <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
-        {{ sanitizeText(agent.name) }}
-      </h3>
+      <div>
+        <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+          {{ sanitizeText(agent.name) }}
+        </h3>
+        <span class="inline-block px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 rounded-full mt-1">
+          {{ agent.agentType || 'response' }} agent
+        </span>
+      </div>
       <span 
         :class="[
           'px-2 py-1 rounded-full text-xs',
