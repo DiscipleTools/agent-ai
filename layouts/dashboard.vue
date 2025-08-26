@@ -259,7 +259,7 @@ const navigation = computed(() => [
     badge: agentsStore.agents.length > 0 ? agentsStore.agents.length.toString() : undefined 
   },
   { name: 'Chatwoot Profile', href: '/chatwoot-profile', icon: ChatBubbleLeftRightIcon },
-  ...(authStore.isAdmin ? [{ name: 'Settings', href: '/settings', icon: CogIcon }] : [])
+  ...(authStore.isSuperAdmin ? [{ name: 'Settings', href: '/settings', icon: CogIcon }] : [])
 ])
 
 const currentPageName = computed(() => {

@@ -127,8 +127,7 @@ const settingsSchema = new mongoose.Schema({
     }
   },
   updatedBy: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
+    type: String, // Chatwoot user ID as string
     required: true
   }
 }, {

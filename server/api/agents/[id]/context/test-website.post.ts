@@ -5,14 +5,14 @@
  * before actually performing the full website ingestion.
  */
 import { connectDB } from '~/server/utils/db'
-import { authMiddleware } from '~/server/utils/auth'
+import { chatwootAuthMiddleware } from '~/server/utils/auth'
 import { validateUrlOrThrow } from '~/server/utils/urlValidator'
 import Agent from '~/server/models/Agent'
 import webScrapingService from '~/server/services/webScrapingService'
 import mongoose from 'mongoose'
 
 // Using the new centralized permission system
-export default authMiddleware.agentAccess('read')(async (event, checker, agentId) => {
+export default chatwootAuthMiddleware.agentAccess('read')(async (event, checker, agentId) => {
   try {
     // Connect to database
     await connectDB()

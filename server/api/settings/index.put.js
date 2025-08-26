@@ -6,10 +6,10 @@
  */
 import Settings from '../../models/Settings.js'
 import settingsService from '../../services/settingsService.ts'
-import { authMiddleware } from '../../utils/auth.ts'
+import { chatwootAuthMiddleware } from '../../utils/auth.ts'
 import { sanitizeText, sanitizeEmail, sanitizeUrl, sanitizeAlphaNumeric, validators } from '~/utils/sanitize.js'
 
-export default authMiddleware.admin(async (event, checker) => {
+export default chatwootAuthMiddleware.superAdmin(async (event, checker) => {
   try {
     // Get user from checker
     const user = checker.user

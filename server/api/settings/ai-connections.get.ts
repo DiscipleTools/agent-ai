@@ -3,10 +3,10 @@
  * GET /api/settings/ai-connections
  */
 import settingsService from '~/server/services/settingsService'
-import { authMiddleware } from '~/server/utils/auth'
+import { chatwootAuthMiddleware } from '~/server/utils/auth'
 import { sanitizeText, sanitizeObjectId, sanitizeModelId, sanitizeUrl } from '~/utils/sanitize'
 
-export default authMiddleware.admin(async (event, checker) => {
+export default chatwootAuthMiddleware.auth(async (event, checker) => {
   try {
 
     const connections = await settingsService.getAllAIConnections()

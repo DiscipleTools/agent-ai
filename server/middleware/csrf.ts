@@ -23,14 +23,6 @@ export default defineEventHandler(async (event) => {
 
   // Skip CSRF check for certain endpoints that don't require it
   const skipCSRFPaths = [
-    '/api/auth/login',
-    '/api/auth/refresh',
-    '/api/auth/setup-account',
-    '/api/auth/forgot-password',
-    '/api/auth/reset-password',
-    '/api/auth/validate-reset-token',
-    '/api/users/complete-setup',
-    '/api/users/validate-invitation',
     '/api/health',
     '/api/rag/health',
     '/api/rag/test-connection'

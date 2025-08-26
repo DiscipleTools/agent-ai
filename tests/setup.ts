@@ -1,6 +1,6 @@
 import { beforeAll, afterAll, beforeEach, afterEach } from 'vitest'
 import mongoose from 'mongoose'
-import User from '~/server/models/User'
+// User model removed - using Chatwoot authentication
 import Agent from '~/server/models/Agent'
 import jwt from 'jsonwebtoken'
 

@@ -38,17 +38,12 @@ class CSRFService {
    * @returns {string} - CSRF token
    */
   generateToken(userId: string, sessionId: string): string {
-    // For Chatwoot authentication, we don't need MongoDB ObjectId validation
-    // Just ensure the inputs are valid strings
-    if (!userId || !sessionId || typeof userId !== 'string' || typeof sessionId !== 'string') {
-      throw new Error('Invalid userId or sessionId provided')
-    }
-    
-    const sanitizedUserId = userId.toString()
+    // Sanitize inputs
+    const sanitizedUserId = sanitizeObjectId(userId)
     const sanitizedSessionId = sanitizeToken(sessionId)
     
-    if (!sanitizedSessionId) {
-      throw new Error('Invalid sessionId provided')
+    if (!sanitizedUserId || !sanitizedSessionId) {
+      throw new Error('Invalid userId or sessionId provided')
     }
 
     const payload = {
@@ -77,16 +72,10 @@ class CSRFService {
     try {
       // Sanitize inputs
       const sanitizedToken = sanitizeToken(token)
-      
-      // For Chatwoot authentication, we don't need MongoDB ObjectId validation
-      if (!userId || !sessionId || typeof userId !== 'string' || typeof sessionId !== 'string') {
-        return false
-      }
-      
-      const sanitizedUserId = userId.toString()
+      const sanitizedUserId = sanitizeObjectId(userId)
       const sanitizedSessionId = sanitizeToken(sessionId)
       
-      if (!sanitizedToken || !sanitizedSessionId) {
+      if (!sanitizedToken || !sanitizedUserId || !sanitizedSessionId) {
         return false
       }
 
@@ -146,32 +135,15 @@ class CSRFService {
   generateFromRequest(event: any): string | null {
     try {
       const user = event.context.user
-      
-      if (!user || !user._id && !user.id) {
+      if (!user || !user._id) {
         return null
       }
 
-      // For Chatwoot authentication, use the user ID directly
-      const userId = user._id?.toString() || user.id?.toString()
-      
-      // For Chatwoot users, we don't need MongoDB ObjectId validation
-      // Just ensure it's a valid string/number
-      if (!userId || (typeof userId !== 'string' && typeof userId !== 'number')) {
+      const sanitizedUserId = sanitizeObjectId(user._id.toString())
+      if (!sanitizedUserId) {
         return null
       }
-      
-      const sanitizedUserId = userId.toString()
 
-      // For Chatwoot sessions, check for the session cookie
-      const chatwootSession = getCookie(event, 'cw_d_session_info')
-      
-      if (chatwootSession) {
-        // Use a hash of the Chatwoot session as the session ID
-        const sessionId = crypto.createHash('sha256').update(JSON.stringify(chatwootSession)).digest('hex').substring(0, 32)
-        return this.generateToken(sanitizedUserId, sessionId)
-      }
-
-      // Fallback to old JWT method for compatibility
       const accessToken = getCookie(event, 'access-token') || 
                          getHeader(event, 'authorization')?.replace('Bearer ', '')
 
@@ -196,29 +168,15 @@ class CSRFService {
   validateFromRequest(event: any, token: string): boolean {
     try {
       const user = event.context.user
-      if (!user || !user._id && !user.id) {
+      if (!user || !user._id) {
         return false
       }
 
-      // For Chatwoot authentication, use the user ID directly
-      const userId = user._id?.toString() || user.id?.toString()
-      
-      // For Chatwoot users, we don't need MongoDB ObjectId validation
-      if (!userId || (typeof userId !== 'string' && typeof userId !== 'number')) {
+      const sanitizedUserId = sanitizeObjectId(user._id.toString())
+      if (!sanitizedUserId) {
         return false
       }
-      
-      const sanitizedUserId = userId.toString()
 
-      // For Chatwoot sessions, check for the session cookie
-      const chatwootSession = getCookie(event, 'cw_d_session_info')
-      if (chatwootSession) {
-        // Use a hash of the Chatwoot session as the session ID
-        const sessionId = crypto.createHash('sha256').update(JSON.stringify(chatwootSession)).digest('hex').substring(0, 32)
-        return this.validateToken(token, sanitizedUserId, sessionId)
-      }
-
-      // Fallback to old JWT method for compatibility
       const accessToken = getCookie(event, 'access-token') || 
                          getHeader(event, 'authorization')?.replace('Bearer ', '')
       

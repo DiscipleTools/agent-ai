@@ -59,21 +59,15 @@ export default defineEventHandler(async (event) => {
       }
     }
 
-    // Get Chatwoot URL from environment (fallback to localhost)
-    const chatwootInstanceUrl = process.env.CHATWOOT_URL || 'http://localhost:5600'
-    
-    console.log('DEBUG: Chatwoot URL from env:', process.env.CHATWOOT_URL)
-    console.log('DEBUG: Using Chatwoot URL:', chatwootInstanceUrl)
+    // Get Chatwoot URL from environment (fallback to nginx proxy for Docker environments)
+    const chatwootInstanceUrl = process.env.CHATWOOT_URL || 'http://host.docker.internal:5600'
     
     const sanitizedChatwootUrl = sanitizeUrl(chatwootInstanceUrl)
     
-    console.log('DEBUG: Sanitized Chatwoot URL:', sanitizedChatwootUrl)
-    
     if (!sanitizedChatwootUrl) {
-      console.error('DEBUG: URL sanitization failed for:', chatwootInstanceUrl)
       return {
         success: false,
-        message: `Invalid Chatwoot URL configuration. Original: ${chatwootInstanceUrl}, Sanitized: ${sanitizedChatwootUrl}`,
+        message: `Invalid Chatwoot URL configuration: ${chatwootInstanceUrl}`,
         statusCode: 500
       }
     }

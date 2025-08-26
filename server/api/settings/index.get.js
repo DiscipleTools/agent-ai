@@ -7,17 +7,17 @@
  */
 
 import Settings from '../../models/Settings.js'
-import { authMiddleware } from '../../utils/auth.ts'
+import { chatwootAuthMiddleware } from '../../utils/auth.ts'
 import { sanitizeModelId, sanitizeText, sanitizeUrl } from '~/utils/sanitize'
 
 
-export default authMiddleware.admin(async (event, checker) => {
+export default chatwootAuthMiddleware.superAdmin(async (event, checker) => {
   try {
     // Get user from checker
     const user = checker.user
 
     // Get settings (there should only be one document)
-    let settings = await Settings.findOne().populate('updatedBy', 'name email')
+    let settings = await Settings.findOne()
 
     // If no settings exist, create default settings
     if (!settings) {
@@ -27,10 +27,9 @@ export default authMiddleware.admin(async (event, checker) => {
           maxFileSize: 10485760,
           allowedFileTypes: ['pdf', 'txt', 'doc', 'docx']
         },
-        updatedBy: user._id
+        updatedBy: user.id.toString()
       })
       await settings.save()
-      await settings.populate('updatedBy', 'name email')
     }
 
     const settingsObj = settings.toObject()

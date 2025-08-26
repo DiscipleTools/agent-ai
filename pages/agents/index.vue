@@ -61,7 +61,7 @@
     </div>
 
     <!-- Chatwoot Inboxes Section -->
-    <div v-else-if="chatwootStore.getAllInboxes.length > 0" class="space-y-8">
+    <div v-else-if="chatwootStore.getAdminInboxes.length > 0" class="space-y-8">
       <!-- Inboxes Grid -->
       <div class="bg-white dark:bg-gray-800 shadow rounded-lg">
         <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
@@ -71,9 +71,19 @@
           </p>
         </div>
         <div class="p-6">
-          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div v-if="chatwootStore.getAdminInboxes.length === 0 && chatwootStore.getAllInboxes.length > 0" class="text-center py-12">
+            <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-orange-100 dark:bg-orange-900/20">
+              <ExclamationTriangleIcon class="h-6 w-6 text-orange-600 dark:text-orange-400" />
+            </div>
+            <h3 class="mt-2 text-sm font-semibold text-gray-900 dark:text-white">No Administrator Access</h3>
+            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              You need administrator access to create agents for inboxes. 
+              Contact your Chatwoot account admin to get the required permissions.
+            </p>
+          </div>
+          <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <div
-              v-for="inbox in chatwootStore.getAllInboxes"
+              v-for="inbox in chatwootStore.getAdminInboxes"
               :key="`${inbox.accountId}-${inbox.id}`"
               class="border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
             >
@@ -370,7 +380,10 @@ onMounted(async () => {
       if (chatwootStore.accounts.length > 0) {
         return chatwootStore.loadAllInboxes()
       }
-    }).catch(console.error) : Promise.resolve()
+    }).catch(error => {
+      console.warn('Chatwoot profile loading failed (this is expected if Chatwoot is not configured):', error.message)
+      // Don't throw the error, just log it
+    }) : Promise.resolve()
   ]
   
   await Promise.allSettled(promises)

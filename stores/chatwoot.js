@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia'
+import { useAuthStore } from '~/stores/auth'
 
 export const useChatwootStore = defineStore('chatwoot', () => {
   const profile = ref(null)
@@ -127,6 +128,26 @@ export const useChatwootStore = defineStore('chatwoot', () => {
     return allInboxes
   })
 
+  // Get inboxes where user has administrator permissions (for agent creation)
+  const getAdminInboxes = computed(() => {
+    const { user } = useAuthStore()
+    
+    // Super admins can access all inboxes
+    if (user?.superadmin === true) {
+      return getAllInboxes.value
+    }
+
+    // Filter inboxes based on user's administrator role in accounts
+    const userAccounts = user?.chatwoot?.accounts || []
+    const adminAccountIds = userAccounts
+      .filter(account => account.role === 'administrator')
+      .map(account => account.id)
+
+    return getAllInboxes.value.filter(inbox => 
+      adminAccountIds.includes(inbox.accountId)
+    )
+  })
+
   // Check if user has Chatwoot session and is authenticated
   const checkChatwootSession = () => {
     const sessionData = parseChatwootSession()
@@ -157,6 +178,7 @@ export const useChatwootStore = defineStore('chatwoot', () => {
     
     // Computed
     getAllInboxes,
+    getAdminInboxes,
     
     // Actions
     loadProfile,

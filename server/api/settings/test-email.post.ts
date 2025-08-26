@@ -2,11 +2,11 @@
  * @description POST /api/settings/test-email
  * Sends a test email to the authenticated user to verify email settings.
  */
-import { authMiddleware } from '~/server/utils/auth'
+import { chatwootAuthMiddleware } from '~/server/utils/auth'
 import emailService from '~/server/services/emailService'
 import { sanitizeEmail } from '~/utils/sanitize'
 
-export default authMiddleware.admin(async (event, checker) => {
+export default chatwootAuthMiddleware.superAdmin(async (event, checker) => {
   // Get user from checker
   const user = checker.user
   const sanitizedEmail = sanitizeEmail(user.email)

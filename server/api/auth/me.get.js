@@ -93,7 +93,8 @@ export default defineEventHandler(async (event) => {
       id: profileData.id,
       name: sanitizeText(profileData.name || ''),
       email: sanitizeEmail(profileData.email || ''),
-      role: 'admin', // For now, all Chatwoot users are admins in Agent AI
+      superadmin: profileData.type === 'SuperAdmin',
+      role: 'admin',      //@todo
       avatar_url: sanitizeUrl(profileData.avatar_url) || null,
       isActive: profileData.confirmed || true,
       chatwoot: {

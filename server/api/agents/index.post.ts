@@ -10,9 +10,9 @@
  */
 
 import { connectDB } from '~/server/utils/db'
-import { chatwootAuthMiddleware } from '~/server/utils/auth'
+import { chatwootAuthMiddleware, validateInboxPermissions } from '~/server/utils/auth'
 import Agent from '~/server/models/Agent'
-import User from '~/server/models/User'
+// User model removed - using Chatwoot authentication
 import { sanitizeText, sanitizeContent, sanitizeNumber, sanitizeObjectId } from '~/utils/sanitize'
 
 interface AgentSettings {
@@ -172,6 +172,14 @@ export default chatwootAuthMiddleware.auth(async (event, checker) => {
         if (sanitizedSettings.chatwootApiKey.length > 200) {
           errors.push('Chatwoot API key cannot exceed 200 characters')
         }
+      }
+    }
+
+    // Validate inbox permissions - only allow inboxes where user is administrator
+    if (sanitizedInboxes.length > 0) {
+      const inboxValidation = await validateInboxPermissions(user, sanitizedInboxes)
+      if (!inboxValidation.isValid) {
+        errors.push(`Access denied to inboxes: ${inboxValidation.invalidInboxes.join('; ')}`)
       }
     }
 
