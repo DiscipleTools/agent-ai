@@ -321,14 +321,25 @@ export const sanitizeInternalUrl = (input) => {
 
 /**
  * Sanitize MongoDB ObjectId to prevent injection attacks
- * @param {string|any} input - The ObjectId to sanitize
+ * @param {string|ObjectId|any} input - The ObjectId to sanitize (string or MongoDB ObjectId object)
  * @returns {string} - Sanitized ObjectId or empty string if invalid
  */
 export const sanitizeObjectId = (input) => {
-  if (!input || typeof input !== 'string') return ''
+  if (!input) return ''
+  
+  // Convert ObjectId objects to string
+  let inputString = input
+  console.log('inputString', inputString)
+  console.log('typeof inputString', typeof inputString)
+
+  if (typeof input === 'object' && input.toString) {
+    inputString = input.toString()
+  } else if (typeof input !== 'string') {
+    return ''
+  }
   
   // Remove any non-hex characters and trim whitespace
-  const sanitized = input.trim().replace(/[^a-fA-F0-9]/g, '')
+  const sanitized = inputString.trim().replace(/[^a-fA-F0-9]/g, '')
   
   // MongoDB ObjectIds must be exactly 24 characters long
   if (sanitized.length !== 24) return ''

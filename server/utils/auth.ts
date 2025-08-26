@@ -100,9 +100,6 @@ export async function requireChatwootAuth(event: any) {
     }
     
     const profileData = response.data
-    console.log('profileData ---------- ')
-    console.log(JSON.stringify(response.data))
-    console.log(profileData.accounts)
 
     // Transform Chatwoot profile to Agent AI user format
     const userData = {
@@ -659,7 +656,6 @@ export const chatwootAuthMiddleware = {
       // Check if user has super admin role in any of their accounts
       //@todo user might not be returning role yet. not on the account level
       const isSuperAdmin = user.superadmin === true
-      console.log('user', user)
       
       if (!isSuperAdmin) {
         throw createError({
