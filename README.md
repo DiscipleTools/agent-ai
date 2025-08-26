@@ -32,11 +32,8 @@ Required environment variables:
 # Database
 MONGODB_URI=mongodb://localhost:27017/agent-ai-server
 
-# JWT Configuration
-JWT_SECRET=your-super-secret-jwt-key
-JWT_REFRESH_SECRET=your-super-secret-refresh-key
-JWT_EXPIRE=24h
-JWT_REFRESH_EXPIRE=7d
+# Security Configuration
+JWT_SECRET=your-super-secret-jwt-key  # Used for CSRF token signing only
 
 # Chatwoot Integration (optional)
 CHATWOOT_URL=https://your-chatwoot-instance.com

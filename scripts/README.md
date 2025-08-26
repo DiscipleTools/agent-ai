@@ -67,7 +67,6 @@ Make sure your `.env` file contains:
 ```env
 MONGODB_URI=mongodb://localhost:27017/agent-ai-server
 JWT_SECRET=your-jwt-secret
-JWT_REFRESH_SECRET=your-jwt-refresh-secret
 ```
 
 ## Security

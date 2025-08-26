@@ -11,9 +11,6 @@ services:
       - MONGODB_URI=${MONGODB_URI}
       - QDRANT_URL=http://qdrant:6333
       - JWT_SECRET=${JWT_SECRET}
-      - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}
-      - JWT_EXPIRE=${JWT_EXPIRE:-24h}
-      - JWT_REFRESH_EXPIRE=${JWT_REFRESH_EXPIRE:-7d}
       - APP_NAME=${APP_NAME:-Agent AI Server}
       - LOG_LEVEL=${LOG_LEVEL:-info}
       - CHATWOOT_URL=${CHATWOOT_URL:-}

@@ -3,7 +3,6 @@ import csrfService from '~/server/services/csrfService'
 
 export default chatwootAuthMiddleware.auth(async (event, checker) => {
   try {
-
     // Generate CSRF token for the authenticated user
     const csrfToken = csrfService.generateFromRequest(event)
 

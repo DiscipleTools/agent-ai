@@ -50,12 +50,8 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  const refreshTokens = async () => {
-    // No longer needed with Chatwoot authentication
-    // Chatwoot handles its own session management
-    console.log('Token refresh not needed with Chatwoot authentication')
-    return null
-  }
+  // Note: Token refresh not needed with Chatwoot authentication
+  // Chatwoot handles its own session management
 
   const updateProfile = async (profileData) => {
     // Profile updates should be handled in Chatwoot
@@ -74,7 +70,6 @@ export const useAuthStore = defineStore('auth', () => {
     login,
     logout,
     fetchUser,
-    refreshTokens,
     updateProfile
   }
 }) 

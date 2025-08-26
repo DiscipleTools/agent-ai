@@ -1,13 +1,14 @@
 /**
  * GET /api/agents
  * 
- * Retrieves a list of agents. Admins can see all agents,
- * while non-admin users can only see agents they have access to.
+ * Retrieves a list of agents based on Chatwoot account administration.
+ * Super admins can see all agents, while other users can only see agents
+ * that belong to Chatwoot accounts where they are administrators.
  * 
  */
 
 import { connectDB } from '~/server/utils/db'
-import { chatwootAuthMiddleware } from '~/server/utils/auth'
+import { chatwootAuthMiddleware, getAgentAccessQuery } from '~/server/utils/auth'
 import Agent from '~/server/models/Agent'
 
 export default chatwootAuthMiddleware.auth(async (event, checker) => {
@@ -18,17 +19,12 @@ export default chatwootAuthMiddleware.auth(async (event, checker) => {
     // Get user from checker
     const user = checker.user
 
-    // Build query based on user role
-    let query: any = {}
-    if (user.role !== 'admin') {
-      // Non-admin users can only see agents they have access to
-      query._id = { $in: user.agentAccess || [] }
-    }
+    // Build query based on user's Chatwoot account administration
+    const query = getAgentAccessQuery(user)
 
     // Fetch agents with only necessary fields for listing
     const agents = await Agent.find(query)
       .select('name description isActive createdAt createdBy inboxes')
-      .populate('createdBy', 'name')
       .sort({ createdAt: -1 })
 
     return {

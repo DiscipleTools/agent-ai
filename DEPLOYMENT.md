@@ -91,9 +91,10 @@ nano .env
 ```
 
 **Important**: Update these values in `.env`:
-- `JWT_SECRET` - Generate a secure 32+ character secret
-- `JWT_REFRESH_SECRET` - Generate another secure 32+ character secret
+- `JWT_SECRET` - Generate a secure 32+ character secret (used for CSRF token signing only)
 - `MONGO_ROOT_PASSWORD` - Set a strong MongoDB password
+
+**Note**: User authentication is handled through Chatwoot sessions, not JWT tokens.
 
 **Note**: AI provider configuration (API keys, endpoints, models) is now handled through the Settings interface in the application dashboard. No environment variables are required for AI configuration.
 

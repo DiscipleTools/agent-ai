@@ -2,19 +2,18 @@
  * Authentication and Authorization Utilities
  * 
  * This module provides centralized authentication and permission management for the Agent AI system.
- * It handles JWT token verification, user authentication, role-based access control, and resource-specific
+ * It handles Chatwoot session validation, role-based access control, and resource-specific
  * permissions (agents, context documents, users, settings, RAG operations).
  * 
  * Key Features:
- * - JWT token verification with proper validation
- * - Role-based access control (admin, user)
+ * - Chatwoot session validation and user authentication
+ * - Role-based access control (admin, user, superadmin)
  * - Resource-specific permissions with agent-level access control
  * - Permission checker utilities for fine-grained access control
  * - Middleware composers for common authentication patterns
  * - Input sanitization and validation for security
  */
 
-import jwt from 'jsonwebtoken'
 import mongoose from 'mongoose'
 import axios from 'axios'
 import { sanitizeToken, sanitizeObjectId, sanitizeErrorMessage, sanitizeText, sanitizeEmail, sanitizeUrl } from '~/utils/sanitize.js'
@@ -114,7 +113,7 @@ export async function requireChatwootAuth(event: any) {
       superadmin: profileData.type === 'SuperAdmin',
       avatar_url: sanitizeUrl(profileData.avatar_url) || null,
       isActive: profileData.confirmed || true,
-      agentAccess: [], // All agents for admin users
+      // agentAccess is now determined dynamically based on Chatwoot account administration
       chatwoot: {
         availability_status: sanitizeText(profileData.availability_status || ''),
         auto_offline: profileData.auto_offline,
@@ -291,15 +290,16 @@ export function createPermissionChecker(user: any): PermissionChecker {
 
     hasAgentAccess(agentId: string): boolean {
       if (user.superadmin === true) return true
-      if (!user.agentAccess || !agentId) return false
+      if (!agentId) return false
       
       // Sanitize the provided agentId for secure comparison
       const sanitizedAgentId = sanitizeObjectId(agentId)
       if (!sanitizedAgentId) return false
       
-      return user.agentAccess.some((id: mongoose.Types.ObjectId) => 
-        id.toString() === sanitizedAgentId
-      )
+      // For Chatwoot users, agent access is determined by whether the user
+      // is an administrator of any account that the agent's inboxes belong to
+      // This will be checked at the API level by fetching the agent and comparing inboxes
+      return true // Allow hasAgentAccess to pass, actual check happens in canAccessAgentResource
     },
 
     canAccessResource(permission: string, context: PermissionContext = {}): boolean {
@@ -345,6 +345,59 @@ export function createPermissionChecker(user: any): PermissionChecker {
           return false
       }
     }
+  }
+}
+
+/**
+ * Check if user can access an agent based on Chatwoot account administration
+ * @param user - The authenticated user object
+ * @param agent - The agent object with inboxes array
+ * @returns boolean - true if user can access the agent
+ */
+export function canAccessAgentResource(user: any, agent: any): boolean {
+  // Super admins can access all agents
+  if (user.superadmin === true) return true
+  
+  // If agent has no inboxes, only super admins can access it
+  if (!agent.inboxes || agent.inboxes.length === 0) return false
+  
+  // Get user's administered accounts
+  const userAccounts = user.chatwoot?.accounts || []
+  const adminAccountIds = userAccounts
+    .filter((account: any) => account.role === 'administrator')
+    .map((account: any) => account.id)
+  
+  if (adminAccountIds.length === 0) return false
+  
+  // Check if any of the agent's inboxes belong to accounts the user administers
+  return agent.inboxes.some((inbox: any) => 
+    adminAccountIds.includes(inbox.accountId)
+  )
+}
+
+/**
+ * Get MongoDB query to filter agents based on user's Chatwoot account administration
+ * @param user - The authenticated user object
+ * @returns object - MongoDB query object
+ */
+export function getAgentAccessQuery(user: any): object {
+  // Super admins can access all agents
+  if (user.superadmin === true) return {}
+  
+  // Get user's administered accounts
+  const userAccounts = user.chatwoot?.accounts || []
+  const adminAccountIds = userAccounts
+    .filter((account: any) => account.role === 'administrator')
+    .map((account: any) => account.id)
+  
+  if (adminAccountIds.length === 0) {
+    // User has no admin access to any accounts, return query that matches nothing
+    return { _id: { $in: [] } }
+  }
+  
+  // Return query that matches agents with inboxes belonging to user's administered accounts
+  return {
+    'inboxes.accountId': { $in: adminAccountIds }
   }
 }
 
@@ -412,7 +465,7 @@ export async function requirePermission(
 }
 
 /**
- * Agent-specific permission check (most common use case)
+ * Agent-specific permission check with database lookup (most common use case)
  * Usage: await requireAgentAccess(event, agentId, 'read')
  */
 export async function requireAgentAccess(
@@ -436,11 +489,39 @@ export async function requireAgentAccess(
     })
   }
 
-  const permission = operation === 'read' ? PERMISSIONS.AGENT.READ :
-                    operation === 'write' ? PERMISSIONS.AGENT.WRITE :
-                    PERMISSIONS.AGENT.DELETE
+  // Authenticate user first
+  const user = await requireChatwootAuth(event)
+  const checker = createPermissionChecker(user)
 
-  return await requirePermission(event, permission, { agentId: sanitizedAgentId })
+  // Super admins have access to everything
+  if (user.superadmin === true) {
+    return checker
+  }
+
+  // Import Agent model here to avoid circular dependency
+  const { connectDB } = await import('~/server/utils/db')
+  const Agent = await import('~/server/models/Agent').then(m => m.default)
+  
+  // Connect to database and fetch agent
+  await connectDB()
+  const agent = await Agent.findById(sanitizedAgentId).select('inboxes')
+  
+  if (!agent) {
+    throw createError({
+      statusCode: 404,
+      statusMessage: 'Agent not found'
+    })
+  }
+
+  // Check if user can access this agent based on Chatwoot account administration
+  if (!canAccessAgentResource(user, agent)) {
+    throw createError({
+      statusCode: 403,
+      statusMessage: 'Access denied'
+    })
+  }
+
+  return checker
 }
 
 /**
@@ -593,28 +674,15 @@ export const chatwootAuthMiddleware = {
   },
 
   /**
-   * Require Chatwoot authentication with agent access
+   * Require Chatwoot authentication with agent access based on account administration
    */
   agentAccess: (operation: 'read' | 'write' | 'delete' = 'read') => {
     return (handler: (event: any, checker: PermissionChecker, agentId: string) => Promise<any>) => {
       return defineEventHandler(async (event) => {
-        const user = await requireChatwootAuth(event)
         const agentId = getRequiredAgentId(event)
         
-        // Create permission checker
-        const checker = createPermissionChecker(user)
-        
-        // Check agent access permission
-        const permission = operation === 'read' ? PERMISSIONS.AGENT.READ :
-                          operation === 'write' ? PERMISSIONS.AGENT.WRITE :
-                          PERMISSIONS.AGENT.DELETE
-
-        if (!checker.canAccessResource(permission, { agentId })) {
-          throw createError({
-            statusCode: 403,
-            statusMessage: 'Access denied'
-          })
-        }
+        // Use the new requireAgentAccess function that checks Chatwoot account administration
+        const checker = await requireAgentAccess(event, agentId, operation)
         
         return handler(event, checker, agentId)
       })

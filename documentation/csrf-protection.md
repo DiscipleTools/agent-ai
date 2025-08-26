@@ -22,7 +22,7 @@ CSRF protection prevents attackers from performing unauthorized actions on behal
 - **Error handling**: Returns 403 errors for invalid/missing tokens
 
 #### CSRF Token Endpoint (`server/api/auth/csrf-token.get.ts`)
-- **Authenticated access**: Requires valid JWT authentication
+- **Authenticated access**: Requires valid Chatwoot session authentication
 - **Fresh tokens**: Generates new CSRF tokens on demand
 - **Consistent format**: Returns tokens in standard API response format
 
@@ -72,8 +72,8 @@ CSRF protection prevents attackers from performing unauthorized actions on behal
 
 ### Environment Variables
 ```bash
-# CSRF secret (automatically generated in production)
-CSRF_SECRET=your-csrf-secret-here
+# JWT secret used for CSRF token signing (automatically generated in production)
+JWT_SECRET=your-jwt-secret-here
 ```
 
 ### Skipped Endpoints

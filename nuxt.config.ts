@@ -28,11 +28,7 @@ export default defineNuxtConfig({
     // Private keys (only available on server-side)
     mongodbUri: process.env.MONGODB_URI,
     NODE_ENV: process.env.NODE_ENV,
-    jwtSecret: process.env.JWT_SECRET,
-    jwtRefreshSecret: process.env.JWT_REFRESH_SECRET,
-    csrfSecret: process.env.CSRF_SECRET,
-    jwtExpire: process.env.JWT_EXPIRE || '24h',
-    jwtRefreshExpire: process.env.JWT_REFRESH_EXPIRE || '7d',
+    jwtSecret: process.env.JWT_SECRET, // Used only for CSRF token signing
     logLevel: process.env.LOG_LEVEL || 'info',
     
     // Public keys (exposed to client-side)

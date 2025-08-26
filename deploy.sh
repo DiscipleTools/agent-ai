@@ -273,15 +273,11 @@ setup_environment() {
         # Generate secure secrets
         echo "🔑 Generating secure secrets..."
         JWT_SECRET=$(generate_jwt_secret)
-        JWT_REFRESH_SECRET=$(generate_jwt_secret)
-        CSRF_SECRET=$(generate_jwt_secret)
         MONGO_PASSWORD=$(generate_secure_password)
         
         # Debug: Show what we're about to replace
         echo "🔍 Generated secrets (first 8 chars):"
         echo "   JWT_SECRET: ${JWT_SECRET:0:8}..."
-        echo "   JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:0:8}..."
-        echo "   CSRF_SECRET: ${CSRF_SECRET:0:8}..."
         echo "   MONGO_PASSWORD: ${MONGO_PASSWORD:0:8}..."
         echo "   DOMAIN_NAME: $DOMAIN_NAME"
         
@@ -291,16 +287,6 @@ setup_environment() {
         
         if ! sed -i "s|GENERATE_JWT_SECRET_AUTOMATICALLY|$JWT_SECRET|" "$APP_DIR/.env"; then
             echo "❌ Error: Failed to update JWT_SECRET"
-            exit 1
-        fi
-        
-        if ! sed -i "s|GENERATE_JWT_REFRESH_SECRET_AUTOMATICALLY|$JWT_REFRESH_SECRET|" "$APP_DIR/.env"; then
-            echo "❌ Error: Failed to update JWT_REFRESH_SECRET"
-            exit 1
-        fi
-        
-        if ! sed -i "s|GENERATE_CSRF_SECRET_AUTOMATICALLY|$CSRF_SECRET|" "$APP_DIR/.env"; then
-            echo "❌ Error: Failed to update CSRF_SECRET"
             exit 1
         fi
         
@@ -320,16 +306,6 @@ setup_environment() {
         echo "🔍 Verifying replacements..."
         if grep -q "GENERATE_JWT_SECRET_AUTOMATICALLY" "$APP_DIR/.env"; then
             echo "❌ Error: JWT_SECRET was not replaced properly"
-            exit 1
-        fi
-        
-        if grep -q "GENERATE_JWT_REFRESH_SECRET_AUTOMATICALLY" "$APP_DIR/.env"; then
-            echo "❌ Error: JWT_REFRESH_SECRET was not replaced properly"
-            exit 1
-        fi
-        
-        if grep -q "GENERATE_CSRF_SECRET_AUTOMATICALLY" "$APP_DIR/.env"; then
-            echo "❌ Error: CSRF_SECRET was not replaced properly"
             exit 1
         fi
         
@@ -372,7 +348,7 @@ setup_environment() {
         echo "🔍 Last modified: $(stat -c %y "$APP_DIR/.env" 2>/dev/null || stat -f %Sm "$APP_DIR/.env" 2>/dev/null || echo "unknown")"
         
         # Check if the file contains default values that need to be replaced
-        if grep -q "GENERATE_JWT_SECRET_AUTOMATICALLY\|GENERATE_JWT_REFRESH_SECRET_AUTOMATICALLY\|GENERATE_CSRF_SECRET_AUTOMATICALLY\|GENERATE_MONGO_PASSWORD_AUTOMATICALLY" "$APP_DIR/.env"; then
+        if grep -q "GENERATE_JWT_SECRET_AUTOMATICALLY\|GENERATE_MONGO_PASSWORD_AUTOMATICALLY" "$APP_DIR/.env"; then
             echo "⚠️  Warning: .env file contains default values that should be replaced"
             echo "   Consider deleting .env file and re-running this script, or manually update the file"
         fi
