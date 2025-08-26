@@ -108,8 +108,8 @@ export default chatwootAuthMiddleware.superAdmin(async (event, checker) => {
     // Validate and sanitize Chatwoot configuration if provided
     if (body.chatwoot) {
       if (body.chatwoot.url) {
-        const sanitizedUrl = sanitizeUrl(body.chatwoot.url)
-        if (!validators.validUrl(sanitizedUrl)) {
+        const sanitizedUrl = sanitizeUrl(body.chatwoot.url, { allowLocalhost: true })
+        if (!validators.validUrl(body.chatwoot.url, { allowLocalhost: true })) {
           validationErrors.push('Please enter a valid Chatwoot URL')
         }
         body.chatwoot.url = sanitizedUrl

@@ -126,7 +126,7 @@
 
 <script setup>
 import { useToast } from 'vue-toastification'
-import { sanitizeText, sanitizeUrl } from '~/utils/sanitize'
+import { sanitizeText } from '~/utils/sanitize'
 
 const settingsStore = useSettingsStore()
 const toast = useToast()
@@ -141,13 +141,7 @@ const chatwootForm = reactive({
 // Chatwoot form visibility toggles
 const showChatwootApiToken = ref(false)
 
-// Real-time input sanitization watchers
-watch(() => chatwootForm.url, (newValue) => {
-  const sanitized = sanitizeUrl(newValue)
-  if (newValue !== sanitized) {
-    chatwootForm.url = sanitized
-  }
-})
+// No frontend URL sanitization - let the server handle it
 
 // Utility functions
 const logSafeData = (data, label = 'Data') => {
@@ -205,13 +199,9 @@ const validateChatwootForm = () => {
   if (!chatwootForm.url.trim()) {
     errors.url = 'Chatwoot URL is required'
   } else {
-    try {
-      const url = new URL(chatwootForm.url)
-      if (!['https:', 'http:'].includes(url.protocol)) {
-        errors.url = 'Only HTTP and HTTPS protocols are allowed'
-      }
-    } catch {
-      errors.url = 'Please enter a valid URL'
+    // Basic client-side validation - server will do the real sanitization
+    if (!chatwootForm.url.trim().match(/^https?:\/\/.+/)) {
+      errors.url = 'Please enter a valid URL starting with http:// or https://'
     }
   }
   
@@ -231,7 +221,7 @@ const handleChatwootSubmit = async () => {
     const updateData = {
       chatwoot: {
         enabled: chatwootForm.enabled,
-        url: sanitizeUrl(chatwootForm.url)
+        url: chatwootForm.url.trim()
       }
     }
     
