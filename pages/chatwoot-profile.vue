@@ -226,8 +226,6 @@ const parseChatwootSession = () => {
     return null
   } catch (e) {
     console.error('Failed to parse Chatwoot session cookie:', e)
-    console.log('Cookie value type:', typeof sessionCookie.value)
-    console.log('Cookie value:', sessionCookie.value)
     return null
   }
 }
@@ -240,24 +238,18 @@ const loadProfile = async () => {
   try {
     const sessionData = parseChatwootSession()
     
-    console.log('DEBUG: Session data:', sessionData)
-    
     if (!sessionData) {
-      console.log('DEBUG: No session data found')
       hasChatwootSession.value = false
       loading.value = false
       return
     }
 
-    console.log('DEBUG: Found session data, calling API')
     hasChatwootSession.value = true
 
     // Call our API endpoint to get Chatwoot profile
     const response = await $api('/api/chatwoot/profile', {
       method: 'GET'
     })
-
-    console.log('DEBUG: API response:', response)
 
     if (response.success) {
       profile.value = response.data.profile
