@@ -158,8 +158,7 @@
               <div class="flex items-center space-x-4">
                 <!-- Chatwoot button (desktop) -->
                 <a
-                  :href="chatwootUrl || '#'"
-                  target="_blank"
+                  href="/"
                   rel="noopener noreferrer"
                   class="hidden md:flex items-center px-3 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900 rounded-md transition-colors"
                   title="Open Chatwoot"
@@ -170,8 +169,7 @@
                 
                 <!-- Chatwoot button (mobile) -->
                 <a
-                  :href="chatwootUrl || '#'"
-                  target="_blank"
+                  href="/"
                   rel="noopener noreferrer"
                   class="md:hidden p-2 text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900 rounded-md transition-colors"
                   title="Open Chatwoot"
@@ -208,7 +206,6 @@ import { sanitizeText, sanitizeEmail } from '~/utils/sanitize.js'
 
 const authStore = useAuthStore()
 const agentsStore = useAgentsStore()
-const settingsStore = useSettingsStore()
 const colorMode = useColorMode()
 const route = useRoute()
 
@@ -246,14 +243,7 @@ const currentPageName = computed(() => {
   return 'Agents'
 })
 
-// Get Chatwoot URL from settings
-const chatwootUrl = computed(() => {
-  const chatwootSettings = settingsStore.settings?.chatwoot
-  if (chatwootSettings?.enabled && chatwootSettings?.url) {
-    return chatwootSettings.url
-  }
-  return null
-})
+
 
 const toggleDarkMode = () => {
   colorMode.preference = colorMode.value === 'dark' ? 'light' : 'dark'
@@ -272,7 +262,7 @@ watch(() => route.path, () => {
   mobileMenuOpen.value = false
 })
 
-// Fetch agents and settings on mount if not already loaded
+// Fetch agents on mount if not already loaded
 onMounted(async () => {
   // Fetch agents if not loaded
   if (agentsStore.agents.length === 0 && !agentsStore.loading) {
@@ -281,16 +271,6 @@ onMounted(async () => {
     } catch (error) {
       // Silently fail - the user will see the count as 0 and can navigate to agents page
       console.error('Failed to fetch agents for sidebar count:', error)
-    }
-  }
-  
-  // Fetch settings if not loaded (needed for Chatwoot URL)
-  if (!settingsStore.settings && !settingsStore.loading) {
-    try {
-      await settingsStore.fetchSettings()
-    } catch (error) {
-      // Silently fail - Chatwoot button will use fallback URL
-      console.error('Failed to fetch settings for Chatwoot URL:', error)
     }
   }
 })

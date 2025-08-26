@@ -6,7 +6,6 @@ export const useAuthStore = defineStore('auth', () => {
   const isAuthenticated = computed(() => !!user.value)
   const isAdmin = computed(() => user.value?.role === 'admin')
   const isSuperAdmin = computed(() => {
-    console.log('user.value is', user.value)
     // Check if user has super admin role from Chatwoot profile
     return user.value?.superadmin === true
   })
