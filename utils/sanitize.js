@@ -335,8 +335,6 @@ export const sanitizeObjectId = (input) => {
   
   // Convert ObjectId objects to string
   let inputString = input
-  console.log('inputString', inputString)
-  console.log('typeof inputString', typeof inputString)
 
   if (typeof input === 'object' && input.toString) {
     inputString = input.toString()

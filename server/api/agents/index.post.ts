@@ -14,6 +14,7 @@ import { chatwootAuthMiddleware, validateInboxPermissions } from '~/server/utils
 import Agent from '~/server/models/Agent'
 // User model removed - using Chatwoot authentication
 import { sanitizeText, sanitizeContent, sanitizeNumber, sanitizeObjectId } from '~/utils/sanitize'
+import chatwootService from '~/server/services/chatwootService'
 
 interface AgentSettings {
   temperature?: number | string
@@ -37,6 +38,42 @@ interface AgentRequestBody {
     inboxName?: string
     channelType?: string
   }>
+}
+
+// Helper function to extract Chatwoot session data from event
+function extractUserSessionData(event: any): { 'access-token': string; client: string; uid: string; expiry?: string } | null {
+  try {
+    const sessionCookie = getCookie(event, 'cw_d_session_info')
+    
+    if (!sessionCookie) {
+      return null
+    }
+
+    let sessionData
+    if (typeof sessionCookie === 'object') {
+      sessionData = sessionCookie
+    } else if (typeof sessionCookie === 'string') {
+      try {
+        const decodedCookie = decodeURIComponent(sessionCookie)
+        sessionData = JSON.parse(decodedCookie)
+      } catch (parseError) {
+        sessionData = sessionCookie
+      }
+    } else {
+      return null
+    }
+
+    const { 'access-token': accessToken, client, uid, expiry } = sessionData
+    
+    if (!accessToken || !client || !uid) {
+      return null
+    }
+
+    return { 'access-token': accessToken, client, uid, expiry }
+  } catch (error) {
+    console.error('Error extracting user session data:', error)
+    return null
+  }
 }
 
 export default chatwootAuthMiddleware.auth(async (event, checker) => {
@@ -231,6 +268,103 @@ export default chatwootAuthMiddleware.auth(async (event, checker) => {
     // Create agent
     const agent = new Agent(agentData)
     await agent.save()
+
+    // If this is a response agent with inboxes, create a Chatwoot bot and configure inboxes
+    let chatwootBotData = null
+    if (sanitizedBody.agentType === 'response' && sanitizedInboxes.length > 0) {
+      try {
+        // Get the first inbox's account ID for bot creation
+        const firstInbox = sanitizedInboxes[0]
+        const accountId = firstInbox.accountId
+        
+        // Get the full webhook URL for the agent
+        const webhookUrl = `${process.env.FRONTEND_URL}${agent.webhookUrl}`
+        
+        // Extract user session data for Chatwoot API calls
+        const userSessionData = extractUserSessionData(event)
+        
+        let botResponse
+        if (userSessionData) {
+          // Use user session authentication
+          console.log('Creating bot with user session authentication')
+          botResponse = await chatwootService.createAgentBotWithUserSession(
+            accountId,
+            agent.name,
+            agent.description || `AI Agent: ${agent.name}`,
+            webhookUrl,
+            userSessionData
+          )
+        } else {
+          // Fallback to custom API key or system configuration
+          console.log('Creating bot with fallback authentication (API key or system config)')
+          botResponse = await chatwootService.createAgentBot(
+            accountId,
+            agent.name,
+            agent.description || `AI Agent: ${agent.name}`,
+            webhookUrl,
+            sanitizedSettings.chatwootApiKey || undefined
+          )
+        }
+        
+        console.log('Chatwoot bot created:', botResponse)
+        
+        // Store bot information in agent
+        chatwootBotData = {
+          accountId: accountId,
+          botId: botResponse.id,
+          botName: botResponse.name,
+          createdAt: new Date(),
+          isConfigured: false
+        }
+        
+        // Configure each inbox with the new bot
+        const configurationPromises = sanitizedInboxes.map(async (inbox) => {
+          try {
+            if (userSessionData) {
+              // Use user session authentication
+              await chatwootService.configureInboxBotWithUserSession(
+                inbox.accountId,
+                inbox.inboxId,
+                botResponse.id,
+                userSessionData
+              )
+            } else {
+              // Fallback to custom API key or system configuration
+              await chatwootService.configureInboxBot(
+                inbox.accountId,
+                inbox.inboxId,
+                botResponse.id,
+                sanitizedSettings.chatwootApiKey || undefined
+              )
+            }
+            console.log(`Inbox ${inbox.inboxId} configured with bot ${botResponse.id}`)
+            return { success: true, inboxId: inbox.inboxId }
+          } catch (error: any) {
+            console.error(`Failed to configure inbox ${inbox.inboxId} with bot:`, error)
+            return { success: false, inboxId: inbox.inboxId, error: error.message }
+          }
+        })
+        
+        const configurationResults = await Promise.all(configurationPromises)
+        const successfulConfigurations = configurationResults.filter(result => result.success)
+        
+        if (successfulConfigurations.length > 0) {
+          chatwootBotData.isConfigured = true
+        }
+        
+        // Update agent with bot information
+        agent.chatwootBot = chatwootBotData
+        await agent.save()
+        
+        console.log(`Bot created and ${successfulConfigurations.length}/${sanitizedInboxes.length} inboxes configured successfully`)
+        
+      } catch (botError) {
+        console.error('Failed to create Chatwoot bot:', botError)
+        // Don't fail the agent creation, but log the error
+        // The agent can still be used without the Chatwoot bot integration
+        console.warn('Agent created successfully but Chatwoot bot creation failed. Bot integration can be set up manually later.')
+      }
+    }
 
     // Note: With Chatwoot authentication, user management is handled by Chatwoot
     // No need to update Agent AI User model since we're using Chatwoot users

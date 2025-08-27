@@ -128,18 +128,32 @@ class AIService {
     messages: OpenAIMessage[],
     settings: { temperature?: number, max_tokens?: number }
   ): Promise<string> {
-    const requestBody = {
+    const requestBody: any = {
       model: aiConfig.model,
-      messages,
-      temperature: settings.temperature || 0.3,
-      max_tokens: settings.max_tokens || 500
+      messages
+    }
+
+    // Handle temperature restrictions for newer models
+    if (aiConfig.model.includes('gpt-5') || aiConfig.model.includes('o1')) {
+      // GPT-5 and o1 models only support default temperature (1)
+      requestBody.temperature = 1
+    } else {
+      requestBody.temperature = settings.temperature || 0.3
+    }
+
+    // Use max_completion_tokens for GPT-4o and newer models, max_tokens for older models
+    const maxTokens = settings.max_tokens || 500
+    if (aiConfig.model.includes('gpt-4o') || aiConfig.model.includes('gpt-5') || aiConfig.model.includes('o1')) {
+      requestBody.max_completion_tokens = maxTokens
+    } else {
+      requestBody.max_tokens = maxTokens
     }
 
     console.log('Sending request to AI service:', {
       endpoint: `${aiConfig.endpoint}/chat/completions`,
       model: requestBody.model,
       temperature: requestBody.temperature,
-      max_tokens: requestBody.max_tokens,
+      max_tokens: requestBody.max_tokens || requestBody.max_completion_tokens,
       messageCount: messages.length
     })
 

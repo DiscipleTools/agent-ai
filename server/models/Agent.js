@@ -93,6 +93,28 @@ const agentSchema = new mongoose.Schema({
     inboxName: String,
     channelType: String
   }],
+  chatwootBot: {
+    accountId: {
+      type: Number,
+      required: false
+    },
+    botId: {
+      type: Number,
+      required: false
+    },
+    botName: {
+      type: String,
+      required: false
+    },
+    createdAt: {
+      type: Date,
+      required: false
+    },
+    isConfigured: {
+      type: Boolean,
+      default: false
+    }
+  },
   createdBy: {
     type: mongoose.Schema.Types.Mixed, // Support both ObjectId and simple IDs for Chatwoot users
     required: true

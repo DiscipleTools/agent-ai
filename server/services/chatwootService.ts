@@ -10,7 +10,7 @@
  * - POST /api/webhook/agent/[id]/chat
  */
 import settingsService from './settingsService'
-import { sanitizeUrl, sanitizeContent } from '~/utils/sanitize'
+import { sanitizeUrl, sanitizeContent, sanitizeText } from '~/utils/sanitize'
 
 class ChatwootService {
   private chatwootUrl: string
@@ -27,7 +27,7 @@ class ChatwootService {
       
       // Check if chatwoot is configured in settings and enabled
       if (chatwootSettings?.enabled && chatwootSettings.url) {
-        const sanitizedUrl = sanitizeUrl(chatwootSettings.url)
+        const sanitizedUrl = sanitizeUrl(chatwootSettings.url, { allowLocalhost: true })
         if (!sanitizedUrl) {
           console.error('Invalid or unsafe Chatwoot URL configured in settings:', chatwootSettings.url)
           return { url: '', apiToken: '' }
@@ -39,7 +39,7 @@ class ChatwootService {
       }
       
       // Fall back to environment variables
-      const sanitizedUrl = sanitizeUrl(this.chatwootUrl)
+      const sanitizedUrl = sanitizeUrl(this.chatwootUrl, { allowLocalhost: true })
       if (!sanitizedUrl) {
         console.error('Invalid or unsafe Chatwoot URL in environment variables')
         return { url: '', apiToken: '' }
@@ -51,7 +51,7 @@ class ChatwootService {
     } catch (error) {
       console.error('Failed to get chatwoot config from settings, using env vars:', error)
       // Fallback to environment variables on error, but still sanitize
-      const sanitizedUrl = sanitizeUrl(this.chatwootUrl)
+      const sanitizedUrl = sanitizeUrl(this.chatwootUrl, { allowLocalhost: true })
       return {
         url: sanitizedUrl,
         apiToken: this.apiToken
@@ -66,6 +66,7 @@ class ChatwootService {
       
       // Use custom API key if provided, otherwise use configured token
       const apiKey = customApiKey || config.apiToken
+
       
       // If we have a custom API key but no URL, try environment URL
       if (customApiKey && !config.url && this.chatwootUrl) {
@@ -76,7 +77,7 @@ class ChatwootService {
       }
 
       // Use configured URL or fall back to environment URL if we have a custom API key
-      const baseUrl = config.url || sanitizeUrl(this.chatwootUrl)
+      const baseUrl = config.url || sanitizeUrl(this.chatwootUrl, { allowLocalhost: true })
       const url = `${baseUrl}/api/v1/accounts/${accountId}/conversations/${conversationId}/messages`
       
       const requestBody = {
@@ -177,7 +178,7 @@ class ChatwootService {
       }
 
       // Use configured URL or fall back to environment URL if we have a custom API key
-      const baseUrl = config.url || sanitizeUrl(this.chatwootUrl)
+      const baseUrl = config.url || sanitizeUrl(this.chatwootUrl, { allowLocalhost: true })
       const url = `${baseUrl}/api/v1/accounts/${accountId}/conversations/${conversationId}/messages`
       
       console.log('Fetching conversation messages from:', url)
@@ -231,7 +232,7 @@ class ChatwootService {
       }
 
       // Use configured URL or fall back to environment URL if we have a custom API key
-      const baseUrl = config.url || sanitizeUrl(this.chatwootUrl)
+      const baseUrl = config.url || sanitizeUrl(this.chatwootUrl, { allowLocalhost: true })
       const url = `${baseUrl}/api/v1/accounts/${accountId}/conversations/${conversationId}/toggle_status`
       
       const requestBody = {
@@ -269,6 +270,424 @@ class ChatwootService {
     } catch (error: any) {
       console.error('Chatwoot Service Error updating status:', error)
       throw new Error(`Failed to update conversation status in Chatwoot: ${error.message}`)
+    }
+  }
+
+  /**
+   * Create an agent bot in Chatwoot using user session credentials
+   * @param accountId - The Chatwoot account ID
+   * @param name - Name of the bot
+   * @param description - Description of the bot
+   * @param outgoingUrl - Webhook URL for the bot
+   * @param userSessionData - User's Chatwoot session data with access-token, client, uid
+   */
+  async createAgentBotWithUserSession(
+    accountId: number, 
+    name: string, 
+    description: string, 
+    outgoingUrl: string, 
+    userSessionData: { 'access-token': string; client: string; uid: string; expiry?: string }
+  ): Promise<any> {
+    try {
+      // Get Chatwoot URL from environment or settings
+      const config = await this.getChatwootConfig()
+      const baseUrl = config.url || sanitizeUrl(this.chatwootUrl, { allowLocalhost: true })
+      
+      if (!baseUrl) {
+        throw new Error('Chatwoot URL not configured')
+      }
+
+      const url = `${baseUrl.replace(/\/$/, '')}/api/v1/accounts/${accountId}/agent_bots`
+      
+      const requestBody = {
+        name: sanitizeText(name),
+        description: sanitizeText(description),
+        outgoing_url: sanitizeUrl(outgoingUrl, { allowLocalhost: true }),
+        bot_type: 0 // Standard bot type
+      }
+
+      console.log('Creating agent bot in Chatwoot with user session:', {
+        url,
+        accountId,
+        name: requestBody.name,
+        description: requestBody.description,
+        outgoing_url: requestBody.outgoing_url,
+        uid: userSessionData.uid
+      })
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'access-token': userSessionData['access-token'],
+          'client': userSessionData.client,
+          'uid': userSessionData.uid,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(requestBody)
+      })
+
+      if (!response.ok) {
+        const errorData = await response.text()
+        console.error('Chatwoot API error creating bot:', response.status, errorData)
+        throw new Error(`Chatwoot API error: ${response.status} ${response.statusText} - ${errorData}`)
+      }
+
+      const data = await response.json()
+      console.log('Agent bot created successfully in Chatwoot:', data)
+      
+      return data
+
+    } catch (error: any) {
+      console.error('Chatwoot Service Error creating bot with user session:', error)
+      throw new Error(`Failed to create agent bot in Chatwoot: ${error.message}`)
+    }
+  }
+
+  /**
+   * Configure an inbox to use a specific agent bot using user session credentials
+   * @param accountId - The Chatwoot account ID
+   * @param inboxId - The inbox ID to configure
+   * @param agentBotId - The agent bot ID to assign
+   * @param userSessionData - User's Chatwoot session data
+   */
+  async configureInboxBotWithUserSession(
+    accountId: number, 
+    inboxId: number, 
+    agentBotId: number, 
+    userSessionData: { 'access-token': string; client: string; uid: string; expiry?: string }
+  ): Promise<any> {
+    try {
+      // Get Chatwoot URL from environment or settings
+      const config = await this.getChatwootConfig()
+      const baseUrl = config.url || sanitizeUrl(this.chatwootUrl, { allowLocalhost: true })
+      
+      if (!baseUrl) {
+        throw new Error('Chatwoot URL not configured')
+      }
+
+      const url = `${baseUrl.replace(/\/$/, '')}/api/v1/accounts/${accountId}/inboxes/${inboxId}/set_agent_bot`
+      
+      const requestBody = {
+        agent_bot: agentBotId
+      }
+
+      console.log('Configuring inbox bot in Chatwoot with user session:', {
+        url,
+        accountId,
+        inboxId,
+        agentBotId,
+        uid: userSessionData.uid
+      })
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'access-token': userSessionData['access-token'],
+          'client': userSessionData.client,
+          'uid': userSessionData.uid,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(requestBody)
+      })
+
+      if (!response.ok) {
+        const errorData = await response.text()
+        console.error('Chatwoot API error configuring inbox bot:', response.status, errorData)
+        throw new Error(`Chatwoot API error: ${response.status} ${response.statusText} - ${errorData}`)
+      }
+
+      // Check if response has content before parsing JSON
+      const responseText = await response.text()
+      console.log('Chatwoot API response text:', responseText)
+      
+      let data
+      if (responseText.trim()) {
+        try {
+          data = JSON.parse(responseText)
+        } catch (parseError) {
+          console.error('Failed to parse JSON response:', parseError)
+          console.error('Response text was:', responseText)
+          throw new Error(`Invalid JSON response from Chatwoot API: ${responseText}`)
+        }
+      } else {
+        // Empty response is often success for some endpoints
+        data = { success: true }
+      }
+      
+      console.log('Inbox bot configured successfully in Chatwoot')
+      
+      return data
+
+    } catch (error: any) {
+      console.error('Chatwoot Service Error configuring inbox bot with user session:', error)
+      throw new Error(`Failed to configure inbox bot in Chatwoot: ${error.message}`)
+    }
+  }
+
+  /**
+   * Delete an agent bot from Chatwoot using user session credentials
+   * @param accountId - The Chatwoot account ID
+   * @param agentBotId - The agent bot ID to delete
+   * @param userSessionData - User's Chatwoot session data
+   */
+  async deleteAgentBotWithUserSession(
+    accountId: number, 
+    agentBotId: number, 
+    userSessionData: { 'access-token': string; client: string; uid: string; expiry?: string }
+  ): Promise<any> {
+    try {
+      // Get Chatwoot URL from environment or settings
+      const config = await this.getChatwootConfig()
+      const baseUrl = config.url || sanitizeUrl(this.chatwootUrl, { allowLocalhost: true })
+      
+      if (!baseUrl) {
+        throw new Error('Chatwoot URL not configured')
+      }
+
+      const url = `${baseUrl.replace(/\/$/, '')}/api/v1/accounts/${accountId}/agent_bots/${agentBotId}`
+
+      console.log('Deleting agent bot from Chatwoot with user session:', {
+        url,
+        accountId,
+        agentBotId,
+        uid: userSessionData.uid
+      })
+
+      const response = await fetch(url, {
+        method: 'DELETE',
+        headers: {
+          'access-token': userSessionData['access-token'],
+          'client': userSessionData.client,
+          'uid': userSessionData.uid,
+          'Content-Type': 'application/json'
+        }
+      })
+
+      if (!response.ok) {
+        const errorData = await response.text()
+        console.error('Chatwoot API error deleting bot:', response.status, errorData)
+        throw new Error(`Chatwoot API error: ${response.status} ${response.statusText} - ${errorData}`)
+      }
+
+      console.log('Agent bot deleted successfully from Chatwoot')
+      
+      return { success: true }
+
+    } catch (error: any) {
+      console.error('Chatwoot Service Error deleting bot with user session:', error)
+      throw new Error(`Failed to delete agent bot from Chatwoot: ${error.message}`)
+    }
+  }
+
+  /**
+   * Create an agent bot in Chatwoot
+   * @param accountId - The Chatwoot account ID
+   * @param name - Name of the bot
+   * @param description - Description of the bot
+   * @param outgoingUrl - Webhook URL for the bot
+   * @param customApiKey - Optional custom API key
+   */
+  async createAgentBot(
+    accountId: number, 
+    name: string, 
+    description: string, 
+    outgoingUrl: string, 
+    customApiKey?: string
+  ): Promise<any> {
+    try {
+      // Get chatwoot configuration from settings or environment
+      const config = await this.getChatwootConfig()
+      
+      // Use custom API key if provided, otherwise use configured token
+      const apiKey = customApiKey || config.apiToken
+      
+      if (!config.url || !apiKey) {
+        throw new Error('Chatwoot URL or API token not configured')
+      }
+
+      // Use configured URL or fall back to environment URL if we have a custom API key
+      const baseUrl = config.url || sanitizeUrl(this.chatwootUrl, { allowLocalhost: true })
+      const url = `${baseUrl.replace(/\/$/, '')}/api/v1/accounts/${accountId}/agent_bots`
+      
+      const requestBody = {
+        name: sanitizeText(name),
+        description: sanitizeText(description),
+        outgoing_url: sanitizeUrl(outgoingUrl, { allowLocalhost: true }),
+        bot_type: 0 // Standard bot type
+      }
+
+      console.log('Creating agent bot in Chatwoot:', {
+        url,
+        accountId,
+        name: requestBody.name,
+        description: requestBody.description,
+        outgoing_url: requestBody.outgoing_url,
+        usingCustomApiKey: !!customApiKey
+      })
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'api_access_token': apiKey,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(requestBody)
+      })
+
+      if (!response.ok) {
+        const errorData = await response.text()
+        console.error('Chatwoot API error creating bot:', response.status, errorData)
+        throw new Error(`Chatwoot API error: ${response.status} ${response.statusText} - ${errorData}`)
+      }
+
+      const data = await response.json()
+      console.log('Agent bot created successfully in Chatwoot:', data)
+      
+      return data
+
+    } catch (error: any) {
+      console.error('Chatwoot Service Error creating bot:', error)
+      throw new Error(`Failed to create agent bot in Chatwoot: ${error.message}`)
+    }
+  }
+
+  /**
+   * Configure an inbox to use a specific agent bot
+   * @param accountId - The Chatwoot account ID
+   * @param inboxId - The inbox ID to configure
+   * @param agentBotId - The agent bot ID to assign
+   * @param customApiKey - Optional custom API key
+   */
+  async configureInboxBot(
+    accountId: number, 
+    inboxId: number, 
+    agentBotId: number, 
+    customApiKey?: string
+  ): Promise<any> {
+    try {
+      // Get chatwoot configuration from settings or environment
+      const config = await this.getChatwootConfig()
+      
+      // Use custom API key if provided, otherwise use configured token
+      const apiKey = customApiKey || config.apiToken
+      
+      if (!config.url || !apiKey) {
+        throw new Error('Chatwoot URL or API token not configured')
+      }
+
+      // Use configured URL or fall back to environment URL if we have a custom API key
+      const baseUrl = config.url || sanitizeUrl(this.chatwootUrl, { allowLocalhost: true })
+      const url = `${baseUrl.replace(/\/$/, '')}/api/v1/accounts/${accountId}/inboxes/${inboxId}/set_agent_bot`
+      
+      const requestBody = {
+        agent_bot: agentBotId
+      }
+
+      console.log('Configuring inbox bot in Chatwoot:', {
+        url,
+        accountId,
+        inboxId,
+        agentBotId,
+        usingCustomApiKey: !!customApiKey
+      })
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'api_access_token': apiKey,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(requestBody)
+      })
+
+      if (!response.ok) {
+        const errorData = await response.text()
+        console.error('Chatwoot API error configuring inbox bot:', response.status, errorData)
+        throw new Error(`Chatwoot API error: ${response.status} ${response.statusText} - ${errorData}`)
+      }
+
+      // Check if response has content before parsing JSON
+      const responseText = await response.text()
+      console.log('Chatwoot API response text:', responseText)
+      
+      let data
+      if (responseText.trim()) {
+        try {
+          data = JSON.parse(responseText)
+        } catch (parseError) {
+          console.error('Failed to parse JSON response:', parseError)
+          console.error('Response text was:', responseText)
+          throw new Error(`Invalid JSON response from Chatwoot API: ${responseText}`)
+        }
+      } else {
+        // Empty response is often success for some endpoints
+        data = { success: true }
+      }
+      
+      console.log('Inbox bot configured successfully in Chatwoot')
+      
+      return data
+
+    } catch (error: any) {
+      console.error('Chatwoot Service Error configuring inbox bot:', error)
+      throw new Error(`Failed to configure inbox bot in Chatwoot: ${error.message}`)
+    }
+  }
+
+  /**
+   * Delete an agent bot from Chatwoot
+   * @param accountId - The Chatwoot account ID
+   * @param agentBotId - The agent bot ID to delete
+   * @param customApiKey - Optional custom API key
+   */
+  async deleteAgentBot(
+    accountId: number, 
+    agentBotId: number, 
+    customApiKey?: string
+  ): Promise<any> {
+    try {
+      // Get chatwoot configuration from settings or environment
+      const config = await this.getChatwootConfig()
+      
+      // Use custom API key if provided, otherwise use configured token
+      const apiKey = customApiKey || config.apiToken
+      
+      if (!config.url || !apiKey) {
+        throw new Error('Chatwoot URL or API token not configured')
+      }
+
+      // Use configured URL or fall back to environment URL if we have a custom API key
+      const baseUrl = config.url || sanitizeUrl(this.chatwootUrl, { allowLocalhost: true })
+      const url = `${baseUrl.replace(/\/$/, '')}/api/v1/accounts/${accountId}/agent_bots/${agentBotId}`
+
+      console.log('Deleting agent bot from Chatwoot:', {
+        url,
+        accountId,
+        agentBotId,
+        usingCustomApiKey: !!customApiKey
+      })
+
+      const response = await fetch(url, {
+        method: 'DELETE',
+        headers: {
+          'api_access_token': apiKey,
+          'Content-Type': 'application/json'
+        }
+      })
+
+      if (!response.ok) {
+        const errorData = await response.text()
+        console.error('Chatwoot API error deleting bot:', response.status, errorData)
+        throw new Error(`Chatwoot API error: ${response.status} ${response.statusText} - ${errorData}`)
+      }
+
+      console.log('Agent bot deleted successfully from Chatwoot')
+      
+      return { success: true }
+
+    } catch (error: any) {
+      console.error('Chatwoot Service Error deleting bot:', error)
+      throw new Error(`Failed to delete agent bot from Chatwoot: ${error.message}`)
     }
   }
 }

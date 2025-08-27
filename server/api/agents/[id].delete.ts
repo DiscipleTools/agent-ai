@@ -21,6 +21,43 @@
 import { connectDB } from '~/server/utils/db'
 import { chatwootAuthMiddleware } from '~/server/utils/auth'
 import Agent from '~/server/models/Agent'
+import chatwootService from '~/server/services/chatwootService'
+
+// Helper function to extract Chatwoot session data from event
+function extractUserSessionData(event: any): { 'access-token': string; client: string; uid: string; expiry?: string } | null {
+  try {
+    const sessionCookie = getCookie(event, 'cw_d_session_info')
+    
+    if (!sessionCookie) {
+      return null
+    }
+
+    let sessionData
+    if (typeof sessionCookie === 'object') {
+      sessionData = sessionCookie
+    } else if (typeof sessionCookie === 'string') {
+      try {
+        const decodedCookie = decodeURIComponent(sessionCookie)
+        sessionData = JSON.parse(decodedCookie)
+      } catch (parseError) {
+        sessionData = sessionCookie
+      }
+    } else {
+      return null
+    }
+
+    const { 'access-token': accessToken, client, uid, expiry } = sessionData
+    
+    if (!accessToken || !client || !uid) {
+      return null
+    }
+
+    return { 'access-token': accessToken, client, uid, expiry }
+  } catch (error) {
+    console.error('Error extracting user session data:', error)
+    return null
+  }
+}
 
 export default chatwootAuthMiddleware.agentAccess('delete')(async (event, checker, agentId) => {
   try {
@@ -35,6 +72,41 @@ export default chatwootAuthMiddleware.agentAccess('delete')(async (event, checke
         statusCode: 404,
         statusMessage: 'Agent not found'
       })
+    }
+
+    // If the agent has a Chatwoot bot, try to delete it
+    if (agent.chatwootBot?.botId && agent.chatwootBot?.accountId) {
+      try {
+        console.log(`Attempting to delete Chatwoot bot ${agent.chatwootBot.botId} for agent ${agent.name}`)
+        
+        // Extract user session data for Chatwoot API calls
+        const userSessionData = extractUserSessionData(event)
+        
+        if (userSessionData) {
+          // Use user session authentication
+          console.log('Deleting bot with user session authentication')
+          await chatwootService.deleteAgentBotWithUserSession(
+            agent.chatwootBot.accountId,
+            agent.chatwootBot.botId,
+            userSessionData
+          )
+        } else {
+          // Fallback to custom API key or system configuration
+          console.log('Deleting bot with fallback authentication (API key or system config)')
+          const customApiKey = agent.settings?.chatwootApiKey || undefined
+          await chatwootService.deleteAgentBot(
+            agent.chatwootBot.accountId,
+            agent.chatwootBot.botId,
+            customApiKey
+          )
+        }
+        
+        console.log(`Successfully deleted Chatwoot bot ${agent.chatwootBot.botId}`)
+      } catch (botError: any) {
+        console.error('Failed to delete Chatwoot bot (proceeding with agent deletion):', botError)
+        // Don't fail the agent deletion if bot deletion fails
+        // The bot can be cleaned up manually later
+      }
     }
 
     // Delete agent
