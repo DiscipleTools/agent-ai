@@ -26,34 +26,23 @@ class ChatwootService {
       const chatwootSettings = await settingsService.getChatwootSettings()
       
       // Check if chatwoot is configured in settings and enabled
-      if (chatwootSettings?.enabled && chatwootSettings.url) {
-        const sanitizedUrl = sanitizeUrl(chatwootSettings.url, { allowLocalhost: true })
-        if (!sanitizedUrl) {
-          console.error('Invalid or unsafe Chatwoot URL configured in settings:', chatwootSettings.url)
-          return { url: '', apiToken: '' }
-        }
+      if (chatwootSettings?.enabled) {
         return {
-          url: sanitizedUrl,
+          url: this.chatwootUrl,
           apiToken: chatwootSettings.apiToken || this.apiToken
         }
       }
       
       // Fall back to environment variables
-      const sanitizedUrl = sanitizeUrl(this.chatwootUrl, { allowLocalhost: true })
-      if (!sanitizedUrl) {
-        console.error('Invalid or unsafe Chatwoot URL in environment variables')
-        return { url: '', apiToken: '' }
-      }
       return {
-        url: sanitizedUrl,
+        url: this.chatwootUrl,
         apiToken: this.apiToken
       }
     } catch (error) {
       console.error('Failed to get chatwoot config from settings, using env vars:', error)
-      // Fallback to environment variables on error, but still sanitize
-      const sanitizedUrl = sanitizeUrl(this.chatwootUrl, { allowLocalhost: true })
+      // Fallback to environment variables on error
       return {
-        url: sanitizedUrl,
+        url: this.chatwootUrl,
         apiToken: this.apiToken
       }
     }
@@ -76,8 +65,8 @@ class ChatwootService {
         return { success: true, message: 'Message logged (Chatwoot not configured)' }
       }
 
-      // Use configured URL or fall back to environment URL if we have a custom API key
-      const baseUrl = config.url || sanitizeUrl(this.chatwootUrl, { allowLocalhost: true })
+      // Use environment URL
+      const baseUrl = this.chatwootUrl
       const url = `${baseUrl}/api/v1/accounts/${accountId}/conversations/${conversationId}/messages`
       
       const requestBody = {
@@ -177,8 +166,8 @@ class ChatwootService {
         return [] // Return empty array instead of throwing
       }
 
-      // Use configured URL or fall back to environment URL if we have a custom API key
-      const baseUrl = config.url || sanitizeUrl(this.chatwootUrl, { allowLocalhost: true })
+      // Use environment URL
+      const baseUrl = this.chatwootUrl
       const url = `${baseUrl}/api/v1/accounts/${accountId}/conversations/${conversationId}/messages`
       
       console.log('Fetching conversation messages from:', url)
@@ -231,8 +220,8 @@ class ChatwootService {
         throw new Error(`Invalid conversation status: ${status}`)
       }
 
-      // Use configured URL or fall back to environment URL if we have a custom API key
-      const baseUrl = config.url || sanitizeUrl(this.chatwootUrl, { allowLocalhost: true })
+      // Use environment URL
+      const baseUrl = this.chatwootUrl
       const url = `${baseUrl}/api/v1/accounts/${accountId}/conversations/${conversationId}/toggle_status`
       
       const requestBody = {
@@ -289,9 +278,8 @@ class ChatwootService {
     userSessionData: { 'access-token': string; client: string; uid: string; expiry?: string }
   ): Promise<any> {
     try {
-      // Get Chatwoot URL from environment or settings
-      const config = await this.getChatwootConfig()
-      const baseUrl = config.url || sanitizeUrl(this.chatwootUrl, { allowLocalhost: true })
+      // Get Chatwoot URL from environment
+      const baseUrl = this.chatwootUrl
       
       if (!baseUrl) {
         throw new Error('Chatwoot URL not configured')
@@ -357,9 +345,8 @@ class ChatwootService {
     userSessionData: { 'access-token': string; client: string; uid: string; expiry?: string }
   ): Promise<any> {
     try {
-      // Get Chatwoot URL from environment or settings
-      const config = await this.getChatwootConfig()
-      const baseUrl = config.url || sanitizeUrl(this.chatwootUrl, { allowLocalhost: true })
+      // Get Chatwoot URL from environment
+      const baseUrl = this.chatwootUrl
       
       if (!baseUrl) {
         throw new Error('Chatwoot URL not configured')
@@ -436,9 +423,8 @@ class ChatwootService {
     userSessionData: { 'access-token': string; client: string; uid: string; expiry?: string }
   ): Promise<any> {
     try {
-      // Get Chatwoot URL from environment or settings
-      const config = await this.getChatwootConfig()
-      const baseUrl = config.url || sanitizeUrl(this.chatwootUrl, { allowLocalhost: true })
+      // Get Chatwoot URL from environment
+      const baseUrl = this.chatwootUrl
       
       if (!baseUrl) {
         throw new Error('Chatwoot URL not configured')
@@ -505,8 +491,8 @@ class ChatwootService {
         throw new Error('Chatwoot URL or API token not configured')
       }
 
-      // Use configured URL or fall back to environment URL if we have a custom API key
-      const baseUrl = config.url || sanitizeUrl(this.chatwootUrl, { allowLocalhost: true })
+      // Use environment URL
+      const baseUrl = this.chatwootUrl
       const url = `${baseUrl.replace(/\/$/, '')}/api/v1/accounts/${accountId}/agent_bots`
       
       const requestBody = {
@@ -575,8 +561,8 @@ class ChatwootService {
         throw new Error('Chatwoot URL or API token not configured')
       }
 
-      // Use configured URL or fall back to environment URL if we have a custom API key
-      const baseUrl = config.url || sanitizeUrl(this.chatwootUrl, { allowLocalhost: true })
+      // Use environment URL
+      const baseUrl = this.chatwootUrl
       const url = `${baseUrl.replace(/\/$/, '')}/api/v1/accounts/${accountId}/inboxes/${inboxId}/set_agent_bot`
       
       const requestBody = {
@@ -656,8 +642,8 @@ class ChatwootService {
         throw new Error('Chatwoot URL or API token not configured')
       }
 
-      // Use configured URL or fall back to environment URL if we have a custom API key
-      const baseUrl = config.url || sanitizeUrl(this.chatwootUrl, { allowLocalhost: true })
+      // Use environment URL
+      const baseUrl = this.chatwootUrl
       const url = `${baseUrl.replace(/\/$/, '')}/api/v1/accounts/${accountId}/agent_bots/${agentBotId}`
 
       console.log('Deleting agent bot from Chatwoot:', {

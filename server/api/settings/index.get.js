@@ -66,7 +66,6 @@ export default chatwootAuthMiddleware.superAdmin(async (event, checker) => {
       } : undefined,
       chatwoot: settings.chatwoot ? {
         ...settings.chatwoot,
-        url: sanitizeUrl(settings.chatwoot.url, { allowLocalhost: true }),
         accountId: sanitizeText(settings.chatwoot.accountId),
         apiToken: settings.chatwoot.apiToken ? '***HIDDEN***' : null
       } : undefined

@@ -46,23 +46,6 @@
       </div>
 
       <div v-if="chatwootForm.enabled" class="space-y-4">
-        <!-- Chatwoot URL -->
-        <div>
-          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-            Chatwoot URL *
-          </label>
-          <input
-            v-model="chatwootForm.url"
-            type="url"
-            class="input-field"
-            placeholder="https://your-chatwoot-instance.com"
-            required
-          />
-          <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-            The base URL of your Chatwoot instance (without /api/v1)
-          </p>
-        </div>
-
         <!-- Global API Token -->
         <div>
           <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -134,7 +117,6 @@ const toast = useToast()
 // Chatwoot form data
 const chatwootForm = reactive({
   enabled: false,
-  url: '',
   apiToken: ''
 })
 
@@ -176,14 +158,11 @@ const sanitizeErrorMessage = (error) => {
 // Chatwoot computed properties
 const isChatwootConfigured = computed(() => {
   const settings = settingsStore.settings?.chatwoot
-  return settings?.enabled && settings?.url
+  return settings?.enabled
 })
 
 const isChatwootFormValid = computed(() => {
-  if (!chatwootForm.enabled) return true
-  
-  const hasUrl = chatwootForm.url.trim().length > 0
-  return hasUrl
+  return true
 })
 
 const hasChatwootApiToken = computed(() => {
@@ -192,20 +171,7 @@ const hasChatwootApiToken = computed(() => {
 
 // Validation
 const validateChatwootForm = () => {
-  if (!chatwootForm.enabled) return null
-  
-  const errors = {}
-  
-  if (!chatwootForm.url.trim()) {
-    errors.url = 'Chatwoot URL is required'
-  } else {
-    // Basic client-side validation - server will do the real sanitization
-    if (!chatwootForm.url.trim().match(/^https?:\/\/.+/)) {
-      errors.url = 'Please enter a valid URL starting with http:// or https://'
-    }
-  }
-  
-  return Object.keys(errors).length === 0 ? null : errors
+  return null
 }
 
 // Chatwoot methods
@@ -220,8 +186,7 @@ const handleChatwootSubmit = async () => {
   try {
     const updateData = {
       chatwoot: {
-        enabled: chatwootForm.enabled,
-        url: chatwootForm.url.trim()
+        enabled: chatwootForm.enabled
       }
     }
     
@@ -246,7 +211,6 @@ const handleChatwootSubmit = async () => {
 
 const resetChatwootForm = () => {
   chatwootForm.enabled = false
-  chatwootForm.url = ''
   chatwootForm.apiToken = ''
   showChatwootApiToken.value = false
 }
@@ -256,7 +220,6 @@ const initializeChatwootForm = () => {
   if (settingsStore.settings?.chatwoot) {
     const chatwoot = settingsStore.settings.chatwoot
     chatwootForm.enabled = chatwoot.enabled || false
-    chatwootForm.url = chatwoot.url || ''
     // Don't populate the API token field - it's hidden for security
   }
 }

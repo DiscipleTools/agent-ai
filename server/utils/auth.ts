@@ -65,18 +65,10 @@ export async function requireChatwootAuth(event: any) {
 
   // Get Chatwoot URL from environment (fallback to localhost)
   const chatwootInstanceUrl = process.env.CHATWOOT_URL || 'http://localhost:5600'
-  const sanitizedChatwootUrl = sanitizeUrl(chatwootInstanceUrl)
-  
-  if (!sanitizedChatwootUrl) {
-    throw createError({
-      statusCode: 500,
-      statusMessage: 'Invalid Chatwoot URL configuration'
-    })
-  }
 
   try {
     // Make request to Chatwoot API to validate session
-    const profileUrl = `${sanitizedChatwootUrl.replace(/\/$/, '')}/api/v1/profile`
+    const profileUrl = `${chatwootInstanceUrl.replace(/\/$/, '')}/api/v1/profile`
     
     const response = await axios.get(profileUrl, {
       headers: {

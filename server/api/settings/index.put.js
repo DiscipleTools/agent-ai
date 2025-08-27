@@ -105,18 +105,8 @@ export default chatwootAuthMiddleware.superAdmin(async (event, checker) => {
       }
     }
 
-    // Validate and sanitize Chatwoot configuration if provided
+    // Validate Chatwoot configuration if provided
     if (body.chatwoot) {
-      if (body.chatwoot.url) {
-        const sanitizedUrl = sanitizeUrl(body.chatwoot.url, { allowLocalhost: true })
-        if (!validators.validUrl(body.chatwoot.url, { allowLocalhost: true })) {
-          validationErrors.push('Please enter a valid Chatwoot URL')
-        }
-        body.chatwoot.url = sanitizedUrl
-      } else if (body.chatwoot.enabled) {
-        validationErrors.push('Chatwoot URL is required when Chatwoot is enabled')
-      }
-
       // API token validation (don't sanitize, but validate length)
       if (body.chatwoot.apiToken && body.chatwoot.apiToken.length > 512) {
         validationErrors.push('Chatwoot API token is too long')
