@@ -146,45 +146,25 @@ export default chatwootAuthMiddleware.agentAccess('write')(async (event, checker
       }
 
       // Create new bot
-      if (userSessionData) {
-        // Use user session authentication
-        botResponse = await chatwootService.createAgentBotWithUserSession(
-          accountId!,
-          agent.name,
-          agent.description || `AI Agent: ${agent.name}`,
-          webhookUrl,
-          userSessionData
-        )
-      } else {
-        // Fallback to custom API key or system configuration
-        botResponse = await chatwootService.createAgentBot(
-          accountId!,
-          agent.name,
-          agent.description || `AI Agent: ${agent.name}`,
-          webhookUrl,
-          agent.settings?.chatwootApiKey || undefined
-        )
-      }
+      const authHeaders = userSessionData || agent.settings?.chatwootApiKey
+      botResponse = await chatwootService.createAgentBot(
+        accountId!,
+        agent.name,
+        agent.description || `AI Agent: ${agent.name}`,
+        webhookUrl,
+        authHeaders
+      )
 
     } else if (body.action === 'recreate') {
       // Delete existing bot if it exists
       if (agent.chatwootBot?.botId && agent.chatwootBot?.accountId) {
         try {
-          if (userSessionData) {
-            // Use user session authentication
-            await chatwootService.deleteAgentBotWithUserSession(
-              agent.chatwootBot.accountId,
-              agent.chatwootBot.botId,
-              userSessionData
-            )
-          } else {
-            // Fallback to custom API key or system configuration
-            await chatwootService.deleteAgentBot(
-              agent.chatwootBot.accountId,
-              agent.chatwootBot.botId,
-              agent.settings?.chatwootApiKey || undefined
-            )
-          }
+          const authHeaders = userSessionData || agent.settings?.chatwootApiKey
+          await chatwootService.deleteAgentBot(
+            agent.chatwootBot.accountId,
+            agent.chatwootBot.botId,
+            authHeaders
+          )
           console.log(`Deleted existing bot ${agent.chatwootBot.botId}`)
         } catch (deleteError: any) {
           console.warn('Failed to delete existing bot (proceeding with creation):', deleteError.message)
@@ -192,25 +172,14 @@ export default chatwootAuthMiddleware.agentAccess('write')(async (event, checker
       }
 
       // Create new bot
-      if (userSessionData) {
-        // Use user session authentication
-        botResponse = await chatwootService.createAgentBotWithUserSession(
-          accountId!,
-          agent.name,
-          agent.description || `AI Agent: ${agent.name}`,
-          webhookUrl,
-          userSessionData
-        )
-      } else {
-        // Fallback to custom API key or system configuration
-        botResponse = await chatwootService.createAgentBot(
-          accountId!,
-          agent.name,
-          agent.description || `AI Agent: ${agent.name}`,
-          webhookUrl,
-          agent.settings?.chatwootApiKey || undefined
-        )
-      }
+      const authHeaders = userSessionData || agent.settings?.chatwootApiKey
+      botResponse = await chatwootService.createAgentBot(
+        accountId!,
+        agent.name,
+        agent.description || `AI Agent: ${agent.name}`,
+        webhookUrl,
+        authHeaders
+      )
 
     } else if (body.action === 'configure') {
       // Just configure existing bot with inboxes
@@ -235,23 +204,13 @@ export default chatwootAuthMiddleware.agentAccess('write')(async (event, checker
     if (shouldConfigureInboxes && inboxesToConfigure.length > 0 && botResponse) {
       const configurationPromises = inboxesToConfigure.map(async (inbox: any) => {
         try {
-          if (userSessionData) {
-            // Use user session authentication
-            await chatwootService.configureInboxBotWithUserSession(
-              inbox.accountId,
-              inbox.inboxId,
-              botResponse!.id,
-              userSessionData
-            )
-          } else {
-            // Fallback to custom API key or system configuration
-            await chatwootService.configureInboxBot(
-              inbox.accountId,
-              inbox.inboxId,
-              botResponse!.id,
-              agent.settings?.chatwootApiKey || undefined
-            )
-          }
+          const authHeaders = userSessionData || agent.settings?.chatwootApiKey
+          await chatwootService.configureInboxBot(
+            inbox.accountId,
+            inbox.inboxId,
+            botResponse!.id,
+            authHeaders
+          )
           console.log(`Inbox ${inbox.inboxId} configured with bot ${botResponse!.id}`)
           return { success: true, inboxId: inbox.inboxId }
         } catch (error: any) {

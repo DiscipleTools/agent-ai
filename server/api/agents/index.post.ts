@@ -283,28 +283,15 @@ export default chatwootAuthMiddleware.auth(async (event, checker) => {
         // Extract user session data for Chatwoot API calls
         const userSessionData = extractUserSessionData(event)
         
-        let botResponse
-        if (userSessionData) {
-          // Use user session authentication
-          console.log('Creating bot with user session authentication')
-          botResponse = await chatwootService.createAgentBotWithUserSession(
-            accountId,
-            agent.name,
-            agent.description || `AI Agent: ${agent.name}`,
-            webhookUrl,
-            userSessionData
-          )
-        } else {
-          // Fallback to custom API key or system configuration
-          console.log('Creating bot with fallback authentication (API key or system config)')
-          botResponse = await chatwootService.createAgentBot(
-            accountId,
-            agent.name,
-            agent.description || `AI Agent: ${agent.name}`,
-            webhookUrl,
-            sanitizedSettings.chatwootApiKey || undefined
-          )
-        }
+        const authHeaders = userSessionData || sanitizedSettings.chatwootApiKey
+        console.log('Creating bot with authentication type:', userSessionData ? 'user session' : 'API key')
+        const botResponse = await chatwootService.createAgentBot(
+          accountId,
+          agent.name,
+          agent.description || `AI Agent: ${agent.name}`,
+          webhookUrl,
+          authHeaders
+        )
         
         console.log('Chatwoot bot created:', botResponse)
         
@@ -320,23 +307,13 @@ export default chatwootAuthMiddleware.auth(async (event, checker) => {
         // Configure each inbox with the new bot
         const configurationPromises = sanitizedInboxes.map(async (inbox) => {
           try {
-            if (userSessionData) {
-              // Use user session authentication
-              await chatwootService.configureInboxBotWithUserSession(
-                inbox.accountId,
-                inbox.inboxId,
-                botResponse.id,
-                userSessionData
-              )
-            } else {
-              // Fallback to custom API key or system configuration
-              await chatwootService.configureInboxBot(
-                inbox.accountId,
-                inbox.inboxId,
-                botResponse.id,
-                sanitizedSettings.chatwootApiKey || undefined
-              )
-            }
+            const authHeaders = userSessionData || sanitizedSettings.chatwootApiKey
+            await chatwootService.configureInboxBot(
+              inbox.accountId,
+              inbox.inboxId,
+              botResponse.id,
+              authHeaders
+            )
             console.log(`Inbox ${inbox.inboxId} configured with bot ${botResponse.id}`)
             return { success: true, inboxId: inbox.inboxId }
           } catch (error: any) {
