@@ -42,10 +42,6 @@ const agentSchema = new mongoose.Schema({
     minlength: [10, 'Prompt must be at least 10 characters long'],
     maxlength: [2000, 'Prompt cannot exceed 2000 characters']
   },
-  webhookUrl: {
-    type: String,
-    unique: true
-  },
   contextDocuments: [contextDocumentSchema],
   settings: {
     temperature: {
@@ -73,46 +69,6 @@ const agentSchema = new mongoose.Schema({
     modelId: {
       type: String,
       required: false
-    },
-    chatwootApiKey: {
-      type: String,
-      required: false,
-      trim: true
-    }
-  },
-  inboxes: [{
-    accountId: {
-      type: Number,
-      required: true
-    },
-    inboxId: {
-      type: Number,
-      required: true
-    },
-    accountName: String,
-    inboxName: String,
-    channelType: String
-  }],
-  chatwootBot: {
-    accountId: {
-      type: Number,
-      required: false
-    },
-    botId: {
-      type: Number,
-      required: false
-    },
-    botName: {
-      type: String,
-      required: false
-    },
-    createdAt: {
-      type: Date,
-      required: false
-    },
-    isConfigured: {
-      type: Boolean,
-      default: false
     }
   },
   createdBy: {
@@ -121,7 +77,7 @@ const agentSchema = new mongoose.Schema({
   },
   agentType: {
     type: String,
-    enum: ['response', 'analytics', 'moderation', 'routing'],
+    enum: ['response', 'pre-process', 'analytics', 'moderation', 'routing', 'post-process'],
     default: 'response',
     required: [true, 'Agent type is required']
   },
@@ -142,17 +98,7 @@ const agentSchema = new mongoose.Schema({
 agentSchema.index({ isActive: 1 })
 agentSchema.index({ createdBy: 1 })
 agentSchema.index({ agentType: 1 })
-// Compound index to track agents by inbox - for validation purposes only (not unique constraint)
-agentSchema.index({ 'inboxes.accountId': 1, 'inboxes.inboxId': 1, agentType: 1, isActive: 1 })
 
-// Generate webhook URL before saving
-agentSchema.pre('save', function(next) {
-  if (!this.webhookUrl) {
-    const webhookId = crypto.randomBytes(16).toString('hex')
-    this.webhookUrl = `/api/webhook/agent/${webhookId}`
-  }
-  next()
-})
 
 // Static method to find active agents
 agentSchema.statics.findActive = function() {
@@ -164,37 +110,38 @@ agentSchema.statics.findByCreator = function(userId) {
   return this.find({ createdBy: userId, isActive: true })
 }
 
-// Static method to validate inbox assignments for response agents
-agentSchema.statics.validateResponseAgentInboxes = async function(inboxes, excludeAgentId = null) {
-  if (!inboxes || !Array.isArray(inboxes) || inboxes.length === 0) {
-    return { isValid: true, conflicts: [] }
-  }
+// Static method to get assigned inboxes (computed from Inbox model)
+agentSchema.statics.getAssignedInboxes = async function(agentId) {
+  const Inbox = mongoose.model('Inbox')
+  return await Inbox.find({
+    $or: [
+      { 'responseAgent.agentId': agentId },
+      { 'agents.agentId': agentId }
+    ]
+  })
+}
 
+// Static method to validate response agent inbox constraints
+agentSchema.statics.validateResponseAgentInboxes = async function(inboxIds, excludeAgentId = null) {
+  const Inbox = mongoose.model('Inbox')
+  
   const conflicts = []
   
-  for (const inbox of inboxes) {
-    const query = {
-      'inboxes.accountId': inbox.accountId,
-      'inboxes.inboxId': inbox.inboxId,
-      agentType: 'response',
-      isActive: true
-    }
+  // Check each inbox for existing response agents
+  for (const inboxId of inboxIds) {
+    const inbox = await Inbox.findById(inboxId).populate('responseAgent.agentId')
     
-    // Exclude the current agent if we're updating
-    if (excludeAgentId) {
-      query._id = { $ne: excludeAgentId }
-    }
-    
-    const existingAgent = await this.findOne(query)
-    
-    if (existingAgent) {
+    if (inbox && inbox.responseAgent && inbox.responseAgent.agentId) {
+      // Skip if it's the same agent being updated
+      if (excludeAgentId && inbox.responseAgent.agentId._id.toString() === excludeAgentId.toString()) {
+        continue
+      }
+      
       conflicts.push({
-        accountId: inbox.accountId,
-        inboxId: inbox.inboxId,
-        accountName: inbox.accountName,
-        inboxName: inbox.inboxName,
-        existingAgentId: existingAgent._id,
-        existingAgentName: existingAgent.name
+        inboxId: inbox._id,
+        inboxName: inbox.name,
+        existingAgentId: inbox.responseAgent.agentId._id,
+        existingAgentName: inbox.responseAgent.agentId.name
       })
     }
   }
@@ -211,8 +158,8 @@ agentSchema.virtual('info').get(function() {
     id: this._id,
     name: this.name,
     description: this.description,
+    agentType: this.agentType,
     isActive: this.isActive,
-    webhookUrl: this.webhookUrl,
     createdAt: this.createdAt
   }
 })

@@ -40,12 +40,60 @@ const toast = useToast()
 
 const handleSubmit = async (agentData) => {
   try {
-    await agentsStore.createAgent(agentData)
+    const route = useRoute()
+    const { useInboxesStore } = await import('~/stores/inboxes')
+    const inboxesStore = useInboxesStore()
     
-    toast('Agent created successfully!', { type: 'success' })
+    // Import the same CSRF request function used by the agents store
+    const { useCsrf } = await import('~/composables/useCsrf')
+    const { csrfRequest } = useCsrf()
     
-    // Navigate back to agents list
-    await router.push('/agents')
+    const inboxId = route.query.inboxId
+    
+    // Create the agent first
+    const agent = await agentsStore.createAgent(agentData)
+    
+    // If inboxId is provided, assign the agent to that inbox
+    if (inboxId && agent) {
+      try {
+        if (agent.agentType === 'response') {
+          // Assign as response agent
+          await csrfRequest(`/api/inboxes/${inboxId}/agents/response`, {
+            method: 'PUT',
+            body: {
+              agentId: agent._id,
+              config: {}
+            }
+          })
+        } else {
+          // Add to processing pipeline
+          await csrfRequest(`/api/inboxes/${inboxId}/agents`, {
+            method: 'POST',
+            body: {
+              agentId: agent._id,
+              priority: 100,
+              config: {}
+            }
+          })
+        }
+        
+        toast('Agent created and assigned to inbox successfully!', { type: 'success' })
+        
+        // Refresh inbox data to show the newly assigned agent
+        await inboxesStore.fetchInboxes()
+        
+        // Navigate back to inbox list
+        await router.push('/inboxes')
+      } catch (assignError) {
+        console.error('Failed to assign agent to inbox:', assignError)
+        const errorMessage = assignError.data?.message || assignError.message || 'Unknown error'
+        toast(`Agent created but failed to assign to inbox: ${errorMessage}`, { type: 'warning' })
+        await router.push('/agents')
+      }
+    } else {
+      toast('Agent created successfully!', { type: 'success' })
+      await router.push('/agents')
+    }
   } catch (error) {
     console.error('Failed to create agent:', sanitizeErrorMessage(error))
     toast(sanitizeErrorMessage(error) || 'Failed to create agent', { type: 'error' })

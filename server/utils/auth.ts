@@ -102,6 +102,13 @@ export async function requireChatwootAuth(event: any) {
       superadmin: profileData.type === 'SuperAdmin',
       avatar_url: sanitizeUrl(profileData.avatar_url) || null,
       isActive: profileData.confirmed || true,
+      // Store session data for API calls
+      chatwootSessionData: {
+        'access-token': accessToken,
+        client,
+        uid,
+        expiry
+      },
       // agentAccess is now determined dynamically based on Chatwoot account administration
       chatwoot: {
         availability_status: sanitizeText(profileData.availability_status || ''),
@@ -676,4 +683,23 @@ export const chatwootAuthMiddleware = {
       })
     }
   }
+}
+
+/**
+ * Simple helper to get user from event context
+ * Works with both Chatwoot auth and test scenarios
+ */
+export function getUserFromEvent(event: any) {
+  // Check for test user ID header first (for tests)
+  const testUserId = getHeader(event, 'user-id')
+  if (testUserId) {
+    return { id: testUserId, _id: testUserId }
+  }
+  
+  // Check for authenticated user in context (from Chatwoot auth)
+  if (event.context?.user) {
+    return event.context.user
+  }
+  
+  return null
 }

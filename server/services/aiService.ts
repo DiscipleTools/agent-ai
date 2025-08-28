@@ -142,8 +142,13 @@ class AIService {
     }
 
     // Use max_completion_tokens for GPT-4o and newer models, max_tokens for older models
-    const maxTokens = settings.max_tokens || 500
-    if (aiConfig.model.includes('gpt-4o') || aiConfig.model.includes('gpt-5') || aiConfig.model.includes('o1')) {
+    // For reasoning models, use a higher default to allow for both reasoning and completion
+    let maxTokens = settings.max_tokens || 500
+    if (aiConfig.model.includes('gpt-5') || aiConfig.model.includes('o1')) {
+      // Reasoning models need more tokens - increase default
+      maxTokens = settings.max_tokens || 2000
+      requestBody.max_completion_tokens = maxTokens
+    } else if (aiConfig.model.includes('gpt-4o')) {
       requestBody.max_completion_tokens = maxTokens
     } else {
       requestBody.max_tokens = maxTokens
@@ -192,7 +197,14 @@ class AIService {
       throw new Error('Invalid response format from AI API - missing choices or message')
     }
 
-    return data.choices[0].message.content
+    const content = data.choices[0].message.content
+
+    if (!content || content.trim().length === 0) {
+      console.error('Empty content from AI API. Full response:', JSON.stringify(data, null, 2))
+      throw new Error('AI API returned empty content')
+    }
+
+    return content
   }
 
   private async getAIConfig(agentId: string): Promise<{ apiKey: string; endpoint: string; model: string }> {

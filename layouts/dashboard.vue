@@ -200,7 +200,8 @@ import {
   SunIcon,
   MoonIcon,
   ChevronRightIcon,
-  ChatBubbleLeftRightIcon
+  ChatBubbleLeftRightIcon,
+  InboxIcon
 } from '@heroicons/vue/24/outline'
 import { sanitizeText, sanitizeEmail } from '~/utils/sanitize.js'
 
@@ -231,6 +232,7 @@ const navigation = computed(() => [
     icon: CpuChipIcon, 
     badge: agentsStore.agents.length > 0 ? agentsStore.agents.length.toString() : undefined 
   },
+  { name: 'Inboxes', href: '/inboxes', icon: InboxIcon },
   { name: 'Chatwoot Profile', href: '/chatwoot-profile', icon: ChatBubbleLeftRightIcon },
   ...(authStore.isSuperAdmin ? [{ name: 'Settings', href: '/settings', icon: CogIcon }] : [])
 ])
@@ -238,6 +240,7 @@ const navigation = computed(() => [
 const currentPageName = computed(() => {
   const path = route.path
   if (path.includes('/agents')) return 'Agents'
+  if (path.includes('/inboxes')) return 'Inboxes'
   if (path.includes('/chatwoot-profile')) return 'Chatwoot Profile'
   if (path.includes('/settings')) return 'Settings'
   return 'Agents'
