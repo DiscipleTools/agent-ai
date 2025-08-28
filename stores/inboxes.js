@@ -247,6 +247,60 @@ export const useInboxesStore = defineStore('inboxes', () => {
     }
   }
 
+  /**
+   * Create Chatwoot bot for an inbox
+   */
+  async function createBot(inboxId) {
+    loading.value = true
+    error.value = null
+
+    try {
+      const csrfToken = await getCsrfToken()
+
+      const response = await $fetch(`/api/inboxes/${inboxId}/bot`, {
+        method: 'POST',
+        headers: {
+          'x-csrf-token': csrfToken
+        },
+        body: {
+          action: 'create'
+        }
+      })
+
+      if (response.success) {
+        // Update the inbox in the store with the new bot information
+        const inbox = inboxes.value.find(i => i._id === inboxId)
+        if (inbox) {
+          inbox.chatwoot = {
+            ...inbox.chatwoot,
+            botId: response.data.bot.botId,
+            botName: response.data.bot.botName,
+            isConfigured: true
+          }
+        }
+        
+        if (currentInbox.value?._id === inboxId) {
+          currentInbox.value.chatwoot = {
+            ...currentInbox.value.chatwoot,
+            botId: response.data.bot.botId,
+            botName: response.data.bot.botName,
+            isConfigured: true
+          }
+        }
+        
+        return response.data
+      }
+
+      throw new Error(response.message || 'Failed to create bot')
+    } catch (err) {
+      console.error('Error creating bot:', err)
+      error.value = err.message || 'Failed to create bot'
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
   // Agent assignment actions
 
   /**
@@ -554,6 +608,7 @@ export const useInboxesStore = defineStore('inboxes', () => {
     getInbox,
     syncWithChatwoot,
     testWebhook,
+    createBot,
     
     // Agent actions
     getInboxAgents,

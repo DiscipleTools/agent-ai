@@ -51,7 +51,6 @@ function extractUserSessionData(event: any): { 'access-token': string; client: s
 
 interface BotActionRequest {
   action?: 'create' | 'recreate'
-  botName?: string
 }
 
 interface BotResponse {
@@ -99,8 +98,8 @@ export default defineEventHandler(async (event) => {
       })
     }
 
-    // Determine bot name
-    const botName = body.botName || `${inbox.name} Bot`
+    // Generate bot name automatically
+    const botName = `${inbox.name} Bot`
     
     // Determine action
     const action = body.action || (inbox.chatwoot?.botId ? 'recreate' : 'create')

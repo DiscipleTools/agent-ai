@@ -18,120 +18,7 @@
       </div>
     </div>
 
-    <!-- Stats Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-      <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-        <div class="flex items-center">
-          <div class="flex-shrink-0">
-            <div class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-              <InboxIcon class="w-5 h-5 text-blue-600" />
-            </div>
-          </div>
-          <div class="ml-3">
-            <p class="text-sm font-medium text-gray-500">Total Inboxes</p>
-            <p class="text-2xl font-semibold text-gray-900">{{ inboxStats.total }}</p>
-          </div>
-        </div>
-      </div>
 
-      <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-        <div class="flex items-center">
-          <div class="flex-shrink-0">
-            <div class="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-              <CheckCircleIcon class="w-5 h-5 text-green-600" />
-            </div>
-          </div>
-          <div class="ml-3">
-            <p class="text-sm font-medium text-gray-500">Active</p>
-            <p class="text-2xl font-semibold text-gray-900">{{ inboxStats.active }}</p>
-          </div>
-        </div>
-      </div>
-
-      <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-        <div class="flex items-center">
-          <div class="flex-shrink-0">
-            <div class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-              <CogIcon class="w-5 h-5 text-blue-600" />
-            </div>
-          </div>
-          <div class="ml-3">
-            <p class="text-sm font-medium text-gray-500">Configured</p>
-            <p class="text-2xl font-semibold text-gray-900">{{ inboxStats.configured }}</p>
-          </div>
-        </div>
-      </div>
-
-      <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-        <div class="flex items-center">
-          <div class="flex-shrink-0">
-            <div class="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
-              <UserIcon class="w-5 h-5 text-purple-600" />
-            </div>
-          </div>
-          <div class="ml-3">
-            <p class="text-sm font-medium text-gray-500">With Response Agent</p>
-            <p class="text-2xl font-semibold text-gray-900">{{ inboxStats.withResponseAgent }}</p>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Filters and Search -->
-    <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200 mb-6">
-      <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Search</label>
-          <input
-            v-model="searchQuery"
-            type="text"
-            placeholder="Search inboxes..."
-            class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-          />
-        </div>
-
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Channel Type</label>
-          <select
-            v-model="localFilters.channelType"
-            class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-          >
-            <option value="">All Channels</option>
-            <option value="web_widget">Web Widget</option>
-            <option value="email">Email</option>
-            <option value="api">API</option>
-            <option value="whatsapp">WhatsApp</option>
-            <option value="facebook">Facebook</option>
-            <option value="twitter">Twitter</option>
-            <option value="telegram">Telegram</option>
-            <option value="line">Line</option>
-            <option value="sms">SMS</option>
-            <option value="website">Website</option>
-          </select>
-        </div>
-
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
-          <select
-            v-model="localFilters.isActive"
-            class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-          >
-            <option value="">All Statuses</option>
-            <option value="true">Active</option>
-            <option value="false">Inactive</option>
-          </select>
-        </div>
-
-        <div class="flex items-end">
-          <button
-            @click="applyFilters"
-            class="w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700"
-          >
-            Apply Filters
-          </button>
-        </div>
-      </div>
-    </div>
 
     <!-- Inboxes Grid -->
     <div v-if="loading && inboxes.length === 0" class="text-center py-12">
@@ -157,26 +44,42 @@
       </div>
     </div>
 
-    <div v-else-if="filteredInboxes.length === 0" class="text-center py-12">
+    <div v-else-if="inboxes.length === 0" class="text-center py-12">
       <InboxIcon class="mx-auto h-12 w-12 text-gray-400 mb-4" />
       <h3 class="text-lg font-medium text-gray-900 mb-2">No inboxes found</h3>
       <p class="text-gray-500 mb-4">
-        {{ searchQuery || hasActiveFilters ? 'No inboxes match your search criteria.' : 'No inboxes found. Create inboxes in Chatwoot and they will automatically appear here.' }}
+        No inboxes found. Create inboxes in Chatwoot and they will automatically appear here.
       </p>
     </div>
 
-    <div v-else class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-      <InboxCard
-        v-for="inbox in filteredInboxes"
-        :key="inbox._id"
-        :inbox="inbox"
-        @manage-agents="manageAgents"
-        @configure-chatwoot="configureChatwoot"
-        @test-webhook="testWebhook"
-        @view-details="viewDetails"
-        @create-agent="createAgentForInbox"
-        @edit-agent="editAgent"
-      />
+    <!-- Inboxes Grouped by Account -->
+    <div v-else class="space-y-8">
+      <div v-for="(accountInboxes, accountId) in inboxesByAccount" :key="accountId" class="space-y-4">
+        <!-- Account Header -->
+        <div class="border-b border-gray-200 pb-2">
+          <h2 class="text-xl font-semibold text-gray-900">
+            {{ getAccountName(accountId) }}
+          </h2>
+          <p class="text-sm text-gray-600 mt-1">
+            {{ accountInboxes.length }} inbox{{ accountInboxes.length !== 1 ? 'es' : '' }}
+          </p>
+        </div>
+        
+        <!-- Inboxes for this Account -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+          <InboxCard
+            v-for="inbox in accountInboxes"
+            :key="inbox._id"
+            :inbox="inbox"
+            @manage-agents="manageAgents"
+            @configure-chatwoot="configureChatwoot"
+            @view-details="viewDetails"
+            @create-agent="createAgentForInbox"
+            @edit-agent="editAgent"
+            @enable-ai-connection="enableAiConnection"
+          />
+        </div>
+      </div>
     </div>
 
     <!-- Pagination -->
@@ -226,16 +129,15 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useInboxesStore } from '~/stores/inboxes'
 import { useAgentsStore } from '~/stores/agents'
+import { useAuthStore } from '~/stores/auth'
 import InboxCard from '~/components/Inbox/InboxCard.vue'
+import { useToast } from 'vue-toastification'
 import {
   InboxIcon,
-  CheckCircleIcon,
-  CogIcon,
-  UserIcon,
   ExclamationTriangleIcon
 } from '@heroicons/vue/24/outline'
 
@@ -246,26 +148,20 @@ definePageMeta({
 
 const inboxesStore = useInboxesStore()
 const agentsStore = useAgentsStore()
+const authStore = useAuthStore()
 const router = useRouter()
+const toast = useToast()
 
 // Destructure reactive state
 const { 
   inboxes, 
   loading, 
   error, 
-  pagination, 
-  inboxStats 
+  pagination
 } = storeToRefs(inboxesStore)
 
 // Local state
-const searchQuery = ref('')
-const showSyncModal = ref(false)
 const syncLoading = ref(false)
-
-const localFilters = ref({
-  channelType: '',
-  isActive: ''
-})
 
 const syncForm = ref({
   accountId: null,
@@ -275,24 +171,24 @@ const syncForm = ref({
 
 
 // Computed
-const hasActiveFilters = computed(() => {
-  return Object.values(localFilters.value).some(value => value !== '')
-})
-
-const filteredInboxes = computed(() => {
-  let filtered = [...inboxes.value]
-
-  // Apply search filter
-  if (searchQuery.value) {
-    const query = searchQuery.value.toLowerCase()
-    filtered = filtered.filter(inbox => 
-      inbox.name.toLowerCase().includes(query) ||
-      inbox.channelType.toLowerCase().includes(query) ||
-      inbox.accountId.toString().includes(query)
-    )
-  }
-
-  return filtered
+const inboxesByAccount = computed(() => {
+  const grouped = {}
+  
+  inboxes.value.forEach(inbox => {
+    const accountId = inbox.accountId
+    if (!grouped[accountId]) {
+      grouped[accountId] = []
+    }
+    grouped[accountId].push(inbox)
+  })
+  
+  // Sort accounts by ID for consistent ordering
+  const sortedAccounts = {}
+  Object.keys(grouped).sort().forEach(accountId => {
+    sortedAccounts[accountId] = grouped[accountId]
+  })
+  
+  return sortedAccounts
 })
 
 const pageNumbers = computed(() => {
@@ -312,14 +208,18 @@ const pageNumbers = computed(() => {
 })
 
 // Methods
+const getAccountName = (accountId) => {
+  // Try to get account name from user's Chatwoot accounts
+  const userAccounts = authStore.user?.chatwoot?.accounts || []
+  const account = userAccounts.find(acc => acc.id.toString() === accountId.toString())
+  return account?.name || `Account ${accountId}`
+}
+
 const refreshInboxes = async () => {
   await inboxesStore.fetchInboxes()
 }
 
-const applyFilters = async () => {
-  inboxesStore.setFilters(localFilters.value)
-  await inboxesStore.fetchInboxes()
-}
+
 
 const changePage = async (page) => {
   if (page >= 1 && page <= pagination.value.pages) {
@@ -339,22 +239,7 @@ const configureChatwoot = (inbox) => {
   router.push(`/inboxes/${inbox._id}/configure`)
 }
 
-const testWebhook = async (inbox) => {
-  try {
-    const result = await inboxesStore.testWebhook(inbox._id)
-    
-    if (result.success) {
-      alert('Webhook test successful! Check the response details in the console.')
-    } else {
-      alert('Webhook test failed. Check the error details in the console.')
-    }
-    
-    console.log('Webhook test result:', result)
-  } catch (error) {
-    console.error('Webhook test error:', error)
-    alert('Webhook test failed with an error.')
-  }
-}
+
 
 const viewDetails = (inbox) => {
   router.push(`/inboxes/${inbox._id}`)
@@ -373,6 +258,21 @@ const editAgent = (agent) => {
   router.push(`/agents/${agentId}`)
 }
 
+const enableAiConnection = async (inbox) => {
+  try {
+    const result = await inboxesStore.createBot(inbox._id)
+    
+    // Show success message
+    toast(`AI Connection enabled successfully! Bot "${result.bot.botName}" has been created.`, { type: 'success' })
+    
+    // Refresh the inboxes to show updated status
+    await refreshInboxes()
+  } catch (error) {
+    console.error('Failed to enable AI connection:', error)
+    toast(`Failed to enable AI connection: ${error.message}`, { type: 'error' })
+  }
+}
+
 
 
 const handleSync = async () => {
@@ -387,10 +287,10 @@ const handleSync = async () => {
     showSyncModal.value = false
     syncForm.value = { accountId: null, apiKey: '' }
     
-    alert(`Sync completed! Created: ${result.results.created.length}, Updated: ${result.results.updated.length}, Errors: ${result.results.errors.length}`)
+    toast(`Sync completed! Created: ${result.results.created.length}, Updated: ${result.results.updated.length}, Errors: ${result.results.errors.length}`, { type: 'success' })
   } catch (error) {
     console.error('Sync failed:', error)
-    alert('Sync failed. Please check your credentials and try again.')
+    toast('Sync failed. Please check your credentials and try again.', { type: 'error' })
   } finally {
     syncLoading.value = false
   }
