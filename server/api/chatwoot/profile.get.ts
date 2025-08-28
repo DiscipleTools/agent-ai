@@ -60,7 +60,7 @@ export default defineEventHandler(async (event) => {
     }
 
     // Get Chatwoot URL from environment (fallback to nginx proxy for Docker environments)
-    const chatwootInstanceUrl = process.env.CHATWOOT_URL || 'http://localhost:5600'
+    const chatwootInstanceUrl = process.env.CHATWOOT_URL
 
     // Make request to Chatwoot API
     const profileUrl = `${chatwootInstanceUrl.replace(/\/$/, '')}/api/v1/profile`

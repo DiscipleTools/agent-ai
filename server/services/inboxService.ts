@@ -129,7 +129,7 @@ class InboxService {
    */
   private async syncAccountInboxes(accountId: number, user: any) {
     try {
-      const chatwootInstanceUrl = (process.env.CHATWOOT_URL || 'http://localhost:5600').replace(/\/$/, '')
+      const chatwootInstanceUrl = (process.env.CHATWOOT_URL).replace(/\/$/, '')
       
       // Get session data from the user object (set during authentication)
       const sessionData = user.chatwootSessionData

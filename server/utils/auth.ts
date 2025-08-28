@@ -64,7 +64,7 @@ export async function requireChatwootAuth(event: any) {
   }
 
   // Get Chatwoot URL from environment (fallback to localhost)
-  const chatwootInstanceUrl = process.env.CHATWOOT_URL || 'http://localhost:5600'
+  const chatwootInstanceUrl = process.env.CHATWOOT_URL
 
   try {
     // Make request to Chatwoot API to validate session
