@@ -17,6 +17,7 @@
 import { connectDB } from '~/server/utils/db'
 import { chatwootAuthMiddleware } from '~/server/utils/auth'
 import Agent from '~/server/models/Agent'
+import Inbox from '~/server/models/Inbox'
 import mongoose from 'mongoose'
 import { sanitizeText, sanitizeContent, sanitizeObjectId, sanitizeNumber } from '~/utils/sanitize'
 
@@ -99,14 +100,54 @@ export default chatwootAuthMiddleware.agentAccess('write')(async (event, checker
     // Validate and update agent type
     if (body.agentType !== undefined) {
       const sanitizedAgentType = sanitizeText(body.agentType)
-      const validAgentTypes = ['response']
+      const validAgentTypes = ['response', 'pre-process', 'analytics', 'moderation', 'routing', 'post-process']
       if (!validAgentTypes.includes(sanitizedAgentType)) {
         throw createError({
           statusCode: 400,
           statusMessage: `Invalid agent type. Must be one of: ${validAgentTypes.join(', ')}`
         })
       }
-      ;(agent as any).agentType = sanitizedAgentType
+
+      // Check if agent type change would break existing assignments
+      const currentAgentType = agent.agentType
+      if (sanitizedAgentType !== currentAgentType) {
+        // Check if agent is assigned to any inboxes
+        const assignedInboxes = await Inbox.find({
+          $or: [
+            { 'responseAgent.agentId': agentId },
+            { 'agents.agentId': agentId }
+          ]
+        }).select('name responseAgent agents')
+
+        if (assignedInboxes.length > 0) {
+          // Check for specific constraint violations
+          if (currentAgentType === 'response' && sanitizedAgentType !== 'response') {
+            const responseInboxes = assignedInboxes.filter(inbox => 
+              inbox.responseAgent?.agentId?.toString() === agentId
+            )
+            if (responseInboxes.length > 0) {
+              throw createError({
+                statusCode: 400,
+                statusMessage: `Cannot change agent type from 'response' - agent is assigned as response agent to ${responseInboxes.length} inbox(es). Remove from response assignments first.`
+              })
+            }
+          }
+
+          if (currentAgentType !== 'response' && sanitizedAgentType === 'response') {
+            const processingInboxes = assignedInboxes.filter(inbox =>
+              inbox.agents?.some(a => a.agentId.toString() === agentId)
+            )
+            if (processingInboxes.length > 0) {
+              throw createError({
+                statusCode: 400,
+                statusMessage: `Cannot change agent type to 'response' - agent is assigned to processing pipeline of ${processingInboxes.length} inbox(es). Remove from processing assignments first.`
+              })
+            }
+          }
+        }
+      }
+
+      agent.agentType = sanitizedAgentType
     }
 
     // Handle inbox updates with validation

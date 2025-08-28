@@ -142,10 +142,10 @@
                     <li>
                       <div class="flex items-center">
                         <HomeIcon class="w-4 h-4 text-gray-400" />
-                        <span class="ml-2 text-sm font-medium text-gray-500 dark:text-gray-400">Agents</span>
+                        <span class="ml-2 text-sm font-medium text-gray-500 dark:text-gray-400">Inboxes</span>
                       </div>
                     </li>
-                    <li v-if="currentPageName !== 'Agents'">
+                    <li v-if="currentPageName !== 'Inboxes'">
                       <div class="flex items-center">
                         <ChevronRightIcon class="w-4 h-4 text-gray-400 mx-2" />
                         <span class="text-sm font-medium text-gray-900 dark:text-white">{{ currentPageName }}</span>
@@ -206,7 +206,6 @@ import {
 import { sanitizeText, sanitizeEmail } from '~/utils/sanitize.js'
 
 const authStore = useAuthStore()
-const agentsStore = useAgentsStore()
 const colorMode = useColorMode()
 const route = useRoute()
 
@@ -226,12 +225,6 @@ const sanitizedUser = computed(() => {
 })
 
 const navigation = computed(() => [
-  { 
-    name: 'Agents', 
-    href: '/agents', 
-    icon: CpuChipIcon, 
-    badge: agentsStore.agents.length > 0 ? agentsStore.agents.length.toString() : undefined 
-  },
   { name: 'Inboxes', href: '/inboxes', icon: InboxIcon },
   { name: 'Chatwoot Profile', href: '/chatwoot-profile', icon: ChatBubbleLeftRightIcon },
   ...(authStore.isSuperAdmin ? [{ name: 'Settings', href: '/settings', icon: CogIcon }] : [])
@@ -239,11 +232,10 @@ const navigation = computed(() => [
 
 const currentPageName = computed(() => {
   const path = route.path
-  if (path.includes('/agents')) return 'Agents'
   if (path.includes('/inboxes')) return 'Inboxes'
   if (path.includes('/chatwoot-profile')) return 'Chatwoot Profile'
   if (path.includes('/settings')) return 'Settings'
-  return 'Agents'
+  return 'Inboxes'
 })
 
 
@@ -265,16 +257,5 @@ watch(() => route.path, () => {
   mobileMenuOpen.value = false
 })
 
-// Fetch agents on mount if not already loaded
-onMounted(async () => {
-  // Fetch agents if not loaded
-  if (agentsStore.agents.length === 0 && !agentsStore.loading) {
-    try {
-      await agentsStore.fetchAgents()
-    } catch (error) {
-      // Silently fail - the user will see the count as 0 and can navigate to agents page
-      console.error('Failed to fetch agents for sidebar count:', error)
-    }
-  }
-})
+
 </script> 

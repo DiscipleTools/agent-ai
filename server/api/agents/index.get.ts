@@ -24,7 +24,7 @@ export default chatwootAuthMiddleware.auth(async (event, checker) => {
 
     // Fetch agents with only necessary fields for listing
     const agents = await Agent.find(query)
-      .select('name description isActive createdAt createdBy inboxes')
+      .select('name description isActive createdAt createdBy')
       .sort({ createdAt: -1 })
 
     return {

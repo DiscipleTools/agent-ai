@@ -33,12 +33,13 @@
 
     
     <div class="flex space-x-2">
-      <NuxtLink
-        :to="`/agents/${agent._id}`"
-        class="flex-1 btn-primary text-center"
+      <button
+        disabled
+        class="flex-1 btn-primary text-center opacity-50 cursor-not-allowed"
+        title="Agent editing is now done through inbox management"
       >
-        Edit
-      </NuxtLink>
+        Edit (via Inboxes)
+      </button>
       <button
         @click="handleDelete"
         :disabled="isDeleting"

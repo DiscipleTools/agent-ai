@@ -1,8 +1,12 @@
+import { connectDB } from '~/server/utils/db'
 import Inbox from '~/server/models/Inbox'
 import { requireChatwootAuth } from '~/server/utils/auth'
 
 export default defineEventHandler(async (event) => {
   try {
+    // Connect to database
+    await connectDB()
+    
     const user = await requireChatwootAuth(event)
 
     const inboxId = getRouterParam(event, 'id')

@@ -7,7 +7,7 @@
           class="inline-flex items-center text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
         >
           <ArrowLeftIcon class="w-4 h-4 mr-1" />
-          Back to Agents
+          Back
         </button>
       </div>
       <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
@@ -50,45 +50,30 @@ definePageMeta({
   middleware: 'auth'
 })
 
-const route = useRoute()
 const router = useRouter()
+const route = useRoute()
 const agentsStore = useAgentsStore()
 const toast = useToast()
 
-const agent = computed(() => agentsStore.currentAgent)
+const agentId = route.params.id
+const agent = ref(null)
 
 const fetchAgent = async () => {
   try {
-    // Validate agent ID format
-    const agentId = sanitizeText(route.params.id)
-    if (!agentId || agentId.length !== 24) {
-      throw new Error('Invalid agent ID format')
-    }
-    
-    await agentsStore.fetchAgent(agentId)
+    agent.value = await agentsStore.fetchAgent(agentId)
   } catch (error) {
-    console.error('Failed to load agent:', sanitizeErrorMessage(error))
-    toast(sanitizeErrorMessage(error) || 'Failed to load agent', { type: 'error' })
+    console.error('Error fetching agent:', error)
   }
 }
 
 const handleSubmit = async (agentData) => {
   try {
-    // Validate agent ID format
-    const agentId = sanitizeText(route.params.id)
-    if (!agentId || agentId.length !== 24) {
-      throw new Error('Invalid agent ID format')
-    }
-    
     await agentsStore.updateAgent(agentId, agentData)
-    
-    toast('Agent updated successfully!', { type: 'success' })
-    
-    // Refresh the agent data to show updated information
-    await fetchAgent()
+    toast.success('Agent updated successfully!')
+    router.back()
   } catch (error) {
-    console.error('Failed to update agent:', sanitizeErrorMessage(error))
-    toast(sanitizeErrorMessage(error) || 'Failed to update agent', { type: 'error' })
+    console.error('Error updating agent:', error)
+    toast.error('Failed to update agent: ' + error.message)
   }
 }
 
@@ -98,8 +83,8 @@ const handleCancel = () => {
 
 // Fetch agent on mount
 onMounted(() => {
-  fetchAgent()
+  if (agentId) {
+    fetchAgent()
+  }
 })
 </script>
-
- 

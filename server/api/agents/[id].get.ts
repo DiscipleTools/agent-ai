@@ -15,6 +15,7 @@
 import { connectDB } from '~/server/utils/db'
 import { chatwootAuthMiddleware } from '~/server/utils/auth'
 import Agent from '~/server/models/Agent'
+import Inbox from '~/server/models/Inbox'
 import { ragService } from '~/server/services/ragService'
 import { sanitizeContent, sanitizeObjectId, sanitizeFilename, sanitizeUrl, sanitizeObject, sanitizeErrorMessage } from '~/utils/sanitize'
 
@@ -57,7 +58,30 @@ export default chatwootAuthMiddleware.agentAccess('read')(async (event, checker,
       })
     )
 
-    // Create enhanced agent object with RAG summary
+    // Get inbox assignments for this agent
+    const inboxAssignments = await Inbox.find({
+      $or: [
+        { 'responseAgent.agentId': agentId },
+        { 'agents.agentId': agentId }
+      ]
+    }).select('name channelType responseAgent agents').lean()
+
+    const assignments = inboxAssignments.map(inbox => {
+      const isResponseAgent = inbox.responseAgent?.agentId?.toString() === agentId
+      const processingAgent = inbox.agents?.find(a => a.agentId.toString() === agentId)
+      
+      return {
+        inboxId: inbox._id,
+        inboxName: inbox.name,
+        channelType: inbox.channelType,
+        assignmentType: isResponseAgent ? 'response' : 'processing',
+        priority: isResponseAgent ? null : processingAgent?.priority,
+        isActive: isResponseAgent ? true : processingAgent?.isActive,
+        config: isResponseAgent ? inbox.responseAgent.config : processingAgent?.config
+      }
+    })
+
+    // Create enhanced agent object with RAG summary and assignments
     const enhancedAgent = {
       ...agent.toObject(),
       contextDocuments: contextDocumentsWithRAG,
@@ -65,6 +89,12 @@ export default chatwootAuthMiddleware.agentAccess('read')(async (event, checker,
         totalDocuments: contextDocumentsWithRAG.length,
         documentsInRAG: contextDocumentsWithRAG.filter((doc: any) => doc.rag.inRAG).length,
         totalChunks: contextDocumentsWithRAG.reduce((sum: number, doc: any) => sum + doc.rag.chunksCount, 0)
+      },
+      assignments: {
+        inboxes: assignments,
+        totalInboxes: assignments.length,
+        responseInboxes: assignments.filter(a => a.assignmentType === 'response').length,
+        processingInboxes: assignments.filter(a => a.assignmentType === 'processing').length
       }
     }
 

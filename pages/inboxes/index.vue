@@ -220,6 +220,8 @@
       </div>
     </div>
 
+
+
   </div>
 </template>
 
@@ -227,6 +229,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useInboxesStore } from '~/stores/inboxes'
+import { useAgentsStore } from '~/stores/agents'
 import InboxCard from '~/components/Inbox/InboxCard.vue'
 import {
   InboxIcon,
@@ -242,6 +245,7 @@ definePageMeta({
 })
 
 const inboxesStore = useInboxesStore()
+const agentsStore = useAgentsStore()
 const router = useRouter()
 
 // Destructure reactive state
@@ -267,6 +271,8 @@ const syncForm = ref({
   accountId: null,
   apiKey: ''
 })
+
+
 
 // Computed
 const hasActiveFilters = computed(() => {
@@ -355,17 +361,19 @@ const viewDetails = (inbox) => {
 }
 
 const createAgentForInbox = (inbox) => {
-  // Navigate to agent creation page with inbox pre-selected
-  router.push({
-    path: '/agents/create',
-    query: { inboxId: inbox._id }
-  })
+  // Navigate to inbox agents page to create agent
+  router.push(`/inboxes/${inbox._id}/agents`)
 }
 
 const editAgent = (agent) => {
+  console.log('editAgent called with:', agent)
+  
   // Navigate to agent edit page
-  router.push(`/agents/${agent._id}`)
+  const agentId = agent._id || agent.id || agent
+  router.push(`/agents/${agentId}`)
 }
+
+
 
 const handleSync = async () => {
   syncLoading.value = true
