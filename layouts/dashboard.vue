@@ -40,7 +40,11 @@
         </nav>
         
         <div class="p-4 border-t border-gray-200 dark:border-gray-700">
-          <div class="flex items-center">
+          <NuxtLink
+            to="/chatwoot-profile"
+            @click="closeMobileMenu"
+            class="flex items-center hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-colors cursor-pointer"
+          >
             <div class="flex items-center flex-1 min-w-0 p-2">
               <div class="flex-shrink-0">
                 <div class="w-10 h-10 bg-primary-100 dark:bg-primary-900 rounded-full flex items-center justify-center">
@@ -58,7 +62,7 @@
                 </p>
               </div>
             </div>
-          </div>
+          </NuxtLink>
         </div>
       </div>
     </div>
@@ -98,7 +102,10 @@
           
           <!-- User Info -->
           <div class="flex-shrink-0 p-4 border-t border-gray-200 dark:border-gray-700">
-            <div class="flex items-center">
+            <NuxtLink
+              to="/chatwoot-profile"
+              class="flex items-center hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-colors cursor-pointer"
+            >
               <div class="flex items-center flex-1 min-w-0 p-2">
                 <div class="flex-shrink-0">
                   <div class="w-10 h-10 bg-primary-100 dark:bg-primary-900 rounded-full flex items-center justify-center">
@@ -116,7 +123,7 @@
                   </p>
                 </div>
               </div>
-            </div>
+            </NuxtLink>
           </div>
         </div>
       </div>
@@ -228,7 +235,6 @@ const sanitizedUser = computed(() => {
 const navigation = computed(() => [
   { name: 'Inboxes', href: '/inboxes', icon: InboxIcon },
   { name: 'Agents', href: '/agents', icon: RocketLaunchIcon },
-  { name: 'Chatwoot Profile', href: '/chatwoot-profile', icon: ChatBubbleLeftRightIcon },
   ...(authStore.isSuperAdmin ? [{ name: 'Settings', href: '/settings', icon: CogIcon }] : [])
 ])
 
@@ -236,7 +242,6 @@ const currentPageName = computed(() => {
   const path = route.path
   if (path.includes('/inboxes')) return 'Inboxes'
   if (path.includes('/agents')) return 'Agents'
-  if (path.includes('/chatwoot-profile')) return 'Chatwoot Profile'
   if (path.includes('/settings')) return 'Settings'
   return 'Inboxes'
 })
