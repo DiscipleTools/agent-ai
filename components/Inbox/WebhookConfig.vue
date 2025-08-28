@@ -114,6 +114,7 @@
 
 <script setup>
 import { ref, computed } from 'vue'
+import { useToast } from 'vue-toastification'
 import { EyeIcon, EyeSlashIcon } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
@@ -136,6 +137,7 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['test-webhook'])
+const toast = useToast()
 
 const showSecret = ref(false)
 const urlCopied = ref(false)
@@ -181,7 +183,7 @@ const copyToClipboard = async (text) => {
     }
   } catch (error) {
     console.error('Failed to copy to clipboard:', error)
-    alert('Failed to copy to clipboard')
+    toast('Failed to copy to clipboard', { type: 'error' })
   }
 }
 

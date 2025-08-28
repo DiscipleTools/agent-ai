@@ -264,6 +264,7 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
+import { useToast } from 'vue-toastification'
 import { useInboxesStore } from '~/stores/inboxes'
 import WebhookConfig from '~/components/Inbox/WebhookConfig.vue'
 import SyncStatus from '~/components/Inbox/SyncStatus.vue'
@@ -282,6 +283,7 @@ definePageMeta({
 const router = useRouter()
 const route = useRoute()
 const inboxId = route.params.id
+const toast = useToast()
 
 const inboxesStore = useInboxesStore()
 const { currentInbox, loading, error } = storeToRefs(inboxesStore)
@@ -310,10 +312,10 @@ const saveConfiguration = async () => {
       isActive: configForm.isActive
     })
     
-    alert('Configuration saved successfully!')
+    toast('Configuration saved successfully!', { type: 'success' })
   } catch (error) {
     console.error('Failed to save configuration:', error)
-    alert('Failed to save configuration. Please try again.')
+    toast('Failed to save configuration. Please try again.', { type: 'error' })
   } finally {
     saving.value = false
   }
@@ -337,13 +339,13 @@ const createOrUpdateBot = async () => {
     if (response.success) {
       // Update the current inbox with the bot info
       await inboxesStore.getInbox(inboxId)
-      alert(`Bot "${botName}" ${action}d successfully!`)
+      toast(`Bot "${botName}" ${action}d successfully!`, { type: 'success' })
     } else {
-      alert('Failed to create/update bot. Please check your API key.')
+      toast('Failed to create/update bot. Please check your API key.', { type: 'error' })
     }
   } catch (error) {
     console.error('Bot creation/update failed:', error)
-    alert('Bot creation/update failed. Please check your API key and try again.')
+    toast('Bot creation/update failed. Please check your API key and try again.', { type: 'error' })
   } finally {
     creatingBot.value = false
   }
@@ -360,13 +362,13 @@ const testChatwootConnection = async () => {
     })
     
     if (response.success) {
-      alert('Chatwoot connection successful!')
+      toast('Chatwoot connection successful!', { type: 'success' })
     } else {
-      alert('Chatwoot connection failed. Please check your API key.')
+      toast('Chatwoot connection failed. Please check your API key.', { type: 'error' })
     }
   } catch (error) {
     console.error('Connection test failed:', error)
-    alert('Connection test failed. Please check your API key and try again.')
+    toast('Connection test failed. Please check your API key and try again.', { type: 'error' })
   } finally {
     testing.value = false
   }
@@ -381,7 +383,7 @@ const copyWebhookUrl = async () => {
     }, 2000)
   } catch (error) {
     console.error('Failed to copy webhook URL:', error)
-    alert('Failed to copy webhook URL')
+    toast('Failed to copy webhook URL', { type: 'error' })
   }
 }
 

@@ -273,6 +273,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
+import { useToast } from 'vue-toastification'
 import { useInboxesStore } from '~/stores/inboxes'
 import WebhookConfig from '~/components/Inbox/WebhookConfig.vue'
 import SyncStatus from '~/components/Inbox/SyncStatus.vue'
@@ -294,6 +295,7 @@ definePageMeta({
 const router = useRouter()
 const route = useRoute()
 const inboxId = route.params.id
+const toast = useToast()
 
 const inboxesStore = useInboxesStore()
 const { currentInbox, loading, error } = storeToRefs(inboxesStore)
@@ -358,15 +360,15 @@ const testWebhook = async () => {
     const result = await inboxesStore.testWebhook(inboxId)
     
     if (result.success) {
-      alert('Webhook test successful!')
+      toast('Webhook test successful!', { type: 'success' })
     } else {
-      alert('Webhook test failed. Check the console for details.')
+      toast('Webhook test failed. Check the console for details.', { type: 'error' })
     }
     
     console.log('Webhook test result:', result)
   } catch (error) {
     console.error('Webhook test error:', error)
-    alert('Webhook test failed with an error.')
+    toast('Webhook test failed with an error.', { type: 'error' })
   } finally {
     webhookTesting.value = false
   }

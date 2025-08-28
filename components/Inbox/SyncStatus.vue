@@ -27,6 +27,7 @@
 
 <script setup>
 import { ref, computed } from 'vue'
+import { useToast } from 'vue-toastification'
 import { useInboxesStore } from '~/stores/inboxes'
 
 const props = defineProps({
@@ -43,6 +44,7 @@ const props = defineProps({
 const emit = defineEmits(['sync-completed'])
 
 const inboxesStore = useInboxesStore()
+const toast = useToast()
 const syncing = ref(false)
 
 const syncStatus = computed(() => {
@@ -141,7 +143,7 @@ const triggerSync = async () => {
     emit('sync-completed')
   } catch (error) {
     console.error('Sync failed:', error)
-    alert('Sync failed. Please check your Chatwoot connection and try again.')
+    toast('Sync failed. Please check your Chatwoot connection and try again.', { type: 'error' })
   } finally {
     syncing.value = false
   }
