@@ -340,7 +340,9 @@ class AIService {
         // Fallback to traditional context document concatenation if RAG is not available
         systemPrompt = this.appendContextDocuments(systemPrompt, contextDocuments)
       }
-    } catch (ragError) {
+      
+    } catch (ragError: any) {
+      console.warn('RAG service unavailable, falling back to traditional context documents:', ragError.message)
       // Fallback to traditional context documents
       systemPrompt = this.appendContextDocuments(systemPrompt, contextDocuments)
     }

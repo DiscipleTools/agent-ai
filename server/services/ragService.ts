@@ -10,7 +10,7 @@
  * - Vector storage and similarity search via Qdrant
  * - Support for multiple document types (files, URLs, websites)
  * - Language detection and preprocessing for improved search relevance
- * - Batch processing with connection resilience and timeout handling
+ * - Batch processing with connection resilience
  * 
  * Document Processing Flow:
  * 1. Text content is cleaned and chunked into manageable pieces
@@ -66,19 +66,66 @@ class RAGService {
 
   constructor() {
     this.qdrantUrl = process.env.QDRANT_URL || 'http://localhost:6333'
+    
+    // Start loading embedding model immediately on service initialization
+    this.initializeEmbeddingModelOnStartup()
+  }
+
+  private async initializeEmbeddingModelOnStartup(): Promise<void> {
+    if (!this.embeddingModel) {
+      try {
+        console.log('🚀 Starting embedding model download in background...')
+        
+        // No timeout for startup - let it take as long as needed
+        this.embeddingModel = await pipeline('feature-extraction', this.modelName, {
+          quantized: false,
+          progress_callback: (progress: any) => {
+            if (progress.status === 'downloading') {
+              console.log(`📥 Downloading model: ${progress.name} - ${progress.progress?.toFixed(1)}%`)
+            } else if (progress.status === 'ready') {
+              console.log(`✅ Model ready: ${progress.name}`)
+            }
+          }
+        })
+        console.log('✅ Multilingual embedding model loaded successfully')
+        
+      } catch (error: any) {
+        console.error('❌ Failed to initialize embedding model on startup:', error.message)
+        
+        // Provide specific error guidance
+        if (error.message.includes('terminated') || error.message.includes('network')) {
+          console.warn('🌐 Network connection issue detected. RAG features will be disabled.')
+          console.warn('💡 Try restarting the server when network connectivity is restored.')
+        } else {
+          console.warn('⚠️  Model initialization failed. RAG features will be disabled.')
+          console.warn('💡 Check your internet connection and try restarting the server.')
+        }
+        
+        // Don't throw - let the service continue without embedding capabilities
+        this.embeddingModel = null
+      }
+    }
   }
 
   private async initializeEmbeddingModel(): Promise<void> {
     if (!this.embeddingModel) {
-      this.embeddingModel = await pipeline('feature-extraction', this.modelName, {
-        quantized: false,
-        progress_callback: (progress: any) => {
-          if (progress.status === 'downloading') {
-            console.log(`Downloading model: ${progress.name} - ${progress.progress?.toFixed(1)}%`)
+      try {
+        console.log('Loading multilingual embedding model...')
+        
+        this.embeddingModel = await pipeline('feature-extraction', this.modelName, {
+          quantized: false,
+          progress_callback: (progress: any) => {
+            if (progress.status === 'downloading') {
+              console.log(`Downloading model: ${progress.name} - ${progress.progress?.toFixed(1)}%`)
+            }
           }
-        }
-      })
-      console.log('✅ Multilingual embedding model loaded successfully')
+        })
+        console.log('✅ Multilingual embedding model loaded successfully')
+        
+      } catch (error: any) {
+        console.error('❌ Failed to initialize embedding model:', error.message)
+        this.embeddingModel = null
+      }
     }
   }
 
