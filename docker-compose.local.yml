@@ -25,7 +25,7 @@ services:
       - '127.0.0.1:5510:3000'
     volumes:
       - agent_storage:/app/storage
-      - huggingface_cache:/root/.cache/huggingface
+      - huggingface_cache:/app/.output/server/node_modules/@xenova/transformers/.cache
     networks:
       - agent-network
     healthcheck:

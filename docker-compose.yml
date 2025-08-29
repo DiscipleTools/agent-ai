@@ -21,6 +21,8 @@ services:
     depends_on:
       - mongodb
       - qdrant
+    volumes:
+      - huggingface_cache:/app/.output/server/node_modules/@xenova/transformers/.cache
     networks:
       - app-network
     healthcheck:
@@ -105,4 +107,6 @@ volumes:
   mongodb_data:
     driver: local
   nginx_logs:
+    driver: local
+  huggingface_cache:
     driver: local 

@@ -23,6 +23,8 @@
 import { pipeline } from '@xenova/transformers'
 import type { Pipeline } from '@xenova/transformers'
 import crypto from 'crypto'
+import fs from 'fs'
+import path from 'path'
 import { 
   sanitizeContent, 
   sanitizeSearchQuery, 
@@ -63,69 +65,73 @@ class RAGService {
   private qdrantUrl: string
   private modelName = 'Xenova/all-MiniLM-L12-v2' // Multilingual model
   private isInitialized = false
+  private isLoadingModel = false
 
   constructor() {
     this.qdrantUrl = process.env.QDRANT_URL || 'http://localhost:6333'
     
     // Start loading embedding model immediately on service initialization
-    this.initializeEmbeddingModelOnStartup()
+    this.initializeEmbeddingModel()
   }
 
-  private async initializeEmbeddingModelOnStartup(): Promise<void> {
-    if (!this.embeddingModel) {
-      try {
-        console.log('🚀 Starting embedding model download in background...')
-        
-        // No timeout for startup - let it take as long as needed
-        this.embeddingModel = await pipeline('feature-extraction', this.modelName, {
-          quantized: false,
-          progress_callback: (progress: any) => {
-            if (progress.status === 'downloading') {
-              console.log(`📥 Downloading model: ${progress.name} - ${progress.progress?.toFixed(1)}%`)
-            } else if (progress.status === 'ready') {
-              console.log(`✅ Model ready: ${progress.name}`)
-            }
-          }
-        })
-        console.log('✅ Multilingual embedding model loaded successfully')
-        
-      } catch (error: any) {
-        console.error('❌ Failed to initialize embedding model on startup:', error.message)
-        
-        // Provide specific error guidance
-        if (error.message.includes('terminated') || error.message.includes('network')) {
-          console.warn('🌐 Network connection issue detected. RAG features will be disabled.')
-          console.warn('💡 Try restarting the server when network connectivity is restored.')
-        } else {
-          console.warn('⚠️  Model initialization failed. RAG features will be disabled.')
-          console.warn('💡 Check your internet connection and try restarting the server.')
+  private logCacheStatus(): boolean {
+    const xenovaCache = '/app/.output/server/node_modules/@xenova/transformers/.cache'
+    
+    try {
+      if (fs.existsSync(xenovaCache)) {
+        // Check for our specific model
+        const modelPath = path.join(xenovaCache, 'Xenova', 'all-MiniLM-L12-v2')
+        if (fs.existsSync(modelPath)) {
+          return true // Cache hit
         }
-        
-        // Don't throw - let the service continue without embedding capabilities
-        this.embeddingModel = null
       }
+    } catch (error) {
+      // Ignore errors, will be detected during model loading
     }
+    
+    return false // Cache miss
   }
+
+
 
   private async initializeEmbeddingModel(): Promise<void> {
-    if (!this.embeddingModel) {
-      try {
-        console.log('Loading multilingual embedding model...')
-        
-        this.embeddingModel = await pipeline('feature-extraction', this.modelName, {
-          quantized: false,
-          progress_callback: (progress: any) => {
-            if (progress.status === 'downloading') {
-              console.log(`Downloading model: ${progress.name} - ${progress.progress?.toFixed(1)}%`)
-            }
+    // If model is already loaded or currently being loaded, don't load again
+    if (this.embeddingModel || this.isLoadingModel) {
+      return
+    }
+    
+    this.isLoadingModel = true
+    
+    try {
+      // Check if model is cached before loading
+      const isCached = this.logCacheStatus()
+      
+      const startTime = Date.now()
+      let downloadDetected = false
+      
+      this.embeddingModel = await pipeline('feature-extraction', this.modelName, {
+        quantized: false,
+        progress_callback: (progress: any) => {
+          if (progress.status === 'downloading') {
+            downloadDetected = true
           }
-        })
-        console.log('✅ Multilingual embedding model loaded successfully')
-        
-      } catch (error: any) {
-        console.error('❌ Failed to initialize embedding model:', error.message)
-        this.embeddingModel = null
+        }
+      })
+      
+      const loadTime = Date.now() - startTime
+      
+      // Single line status
+      if (isCached && !downloadDetected) {
+        console.log(`⚡ Embedding model loaded from cache (${loadTime}ms)`)
+      } else {
+        console.log(`🌐 Embedding model downloaded and cached (${loadTime}ms)`)
       }
+      
+    } catch (error: any) {
+      console.error('❌ Failed to initialize embedding model:', error.message)
+      this.embeddingModel = null
+    } finally {
+      this.isLoadingModel = false
     }
   }
 
