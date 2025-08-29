@@ -1,5 +1,6 @@
 import Inbox from '~/server/models/Inbox'
 import agentProcessingEngine from '~/server/services/agentProcessingEngine'
+import chatwootService from '~/server/services/chatwootService'
 import * as crypto from 'crypto'
 
 // Helper function to validate webhook signature
@@ -104,6 +105,34 @@ export default defineEventHandler(async (event) => {
           inbox: inbox.name,
           skipped: true
         }
+      }
+    }
+
+    // Check if this is a new conversation and mark as open if needed
+    if (payload.conversation?.id && payload.account?.id) {
+      try {
+        // Check if this is a new conversation by getting conversation details
+        const conversationData = await chatwootService.getConversation(
+          payload.account.id,
+          payload.conversation.id,
+          inbox.chatwoot?.apiKey
+        )
+        
+        // Mark conversation as open if it's not already open
+        // Chatwoot conversations can be: open, resolved, pending, snoozed
+        if (conversationData && conversationData.status !== 'open') {
+          console.log(`Marking conversation ${payload.conversation.id} as open`)
+          await chatwootService.updateConversationStatus(
+            payload.account.id,
+            payload.conversation.id,
+            'open',
+            inbox.chatwoot?.apiKey
+          )
+          console.log(`Successfully marked conversation ${payload.conversation.id} as open`)
+        }
+      } catch (convError: any) {
+        console.warn(`Failed to check/update conversation status for ${payload.conversation.id}:`, convError.message)
+        // Don't throw error - continue with message processing even if status update fails
       }
     }
 
