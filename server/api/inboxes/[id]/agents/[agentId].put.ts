@@ -1,4 +1,5 @@
 import Inbox from '~/server/models/Inbox'
+import Agent from '~/server/models/Agent'
 import { getUserFromEvent } from '~/server/utils/auth'
 import { z } from 'zod'
 

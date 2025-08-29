@@ -29,10 +29,10 @@
           
           <div class="flex items-center space-x-2">
             <button
-              @click="editResponseAgentConfig"
+              @click="navigateToEditAgent(responseAgent._id)"
               class="text-sm text-blue-600 hover:text-blue-800"
             >
-              Configure
+              Edit
             </button>
             <button
               @click="removeResponseAgent"
@@ -131,10 +131,10 @@
               
               <div class="flex items-center space-x-2">
                 <button
-                  @click="editAgentConfig(agent)"
+                  @click="navigateToEditAgent(agent._id)"
                   class="text-sm text-blue-600 hover:text-blue-800"
                 >
-                  Configure
+                  Edit
                 </button>
                 <button
                   @click="removeAgent(agent)"
@@ -215,63 +215,12 @@
       </div>
     </div>
 
-    <!-- Configuration Modal -->
-    <div v-if="configModal.show" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-      <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
-        <div class="mt-3">
-          <h3 class="text-lg font-medium text-gray-900 mb-4">
-            Configure {{ configModal.agent.name }}
-          </h3>
-          
-          <div class="space-y-4">
-            <div v-if="configModal.type === 'pipeline'">
-              <label class="block text-sm font-medium text-gray-700 mb-1">Priority</label>
-              <input
-                v-model.number="configModal.config.priority"
-                type="number"
-                min="1"
-                max="999"
-                class="w-full px-3 py-2 border border-gray-300 rounded-md"
-              />
-            </div>
-            
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Custom Configuration (JSON)</label>
-              <textarea
-                v-model="configModal.configJson"
-                rows="6"
-                class="w-full px-3 py-2 border border-gray-300 rounded-md font-mono text-sm"
-                placeholder='{"key": "value"}'
-              ></textarea>
-              <p class="text-xs text-gray-500 mt-1">
-                Optional configuration overrides for this inbox
-              </p>
-            </div>
-          </div>
-          
-          <div class="flex items-center justify-end space-x-3 mt-6">
-            <button
-              @click="closeConfigModal"
-              class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
-            >
-              Cancel
-            </button>
-            <button
-              @click="saveAgentConfig"
-              class="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700"
-            >
-              Save Configuration
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { UserIcon, Bars3Icon } from '@heroicons/vue/24/outline'
+import { UserIcon } from '@heroicons/vue/24/outline'
 
 const props = defineProps({
   inbox: {
@@ -299,13 +248,6 @@ const newAgent = ref({
   priority: 100
 })
 
-const configModal = ref({
-  show: false,
-  type: '', // 'response' or 'pipeline'
-  agent: null,
-  config: {},
-  configJson: ''
-})
 
 // Computed
 const responseAgent = computed(() => {
@@ -428,76 +370,8 @@ const updateAgentStatus = async (agent) => {
 }
 
 
-const editResponseAgentConfig = () => {
-  configModal.value = {
-    show: true,
-    type: 'response',
-    agent: responseAgent.value,
-    config: { ...responseAgent.value.config },
-    configJson: JSON.stringify(responseAgent.value.config || {}, null, 2)
-  }
-}
-
-const editAgentConfig = (agent) => {
-  configModal.value = {
-    show: true,
-    type: 'pipeline',
-    agent,
-    config: { 
-      priority: agent.priority,
-      ...agent.config 
-    },
-    configJson: JSON.stringify(agent.config || {}, null, 2)
-  }
-}
-
-const closeConfigModal = () => {
-  configModal.value = {
-    show: false,
-    type: '',
-    agent: null,
-    config: {},
-    configJson: ''
-  }
-}
-
-const saveAgentConfig = async () => {
-  try {
-    let parsedConfig = {}
-    
-    if (configModal.value.configJson.trim()) {
-      parsedConfig = JSON.parse(configModal.value.configJson)
-    }
-    
-    const updateData = {
-      config: parsedConfig
-    }
-    
-    if (configModal.value.type === 'pipeline') {
-      updateData.priority = configModal.value.config.priority
-    }
-    
-    const { csrfRequest } = useCsrf()
-    if (configModal.value.type === 'response') {
-      await csrfRequest(`/api/inboxes/${props.inbox._id}/agents/response`, {
-        method: 'PUT',
-        body: {
-          agentId: configModal.value.agent._id,
-          config: parsedConfig
-        }
-      })
-    } else {
-      await csrfRequest(`/api/inboxes/${props.inbox._id}/agents/${configModal.value.agent._id}`, {
-        method: 'PUT',
-        body: updateData
-      })
-    }
-    
-    closeConfigModal()
-    emit('agent-updated')
-  } catch (error) {
-    console.error('Error saving agent configuration:', error)
-  }
+const navigateToEditAgent = (agentId) => {
+  navigateTo(`/agents/${agentId}`)
 }
 
 const getAgentTypeColor = (type, variant = 'icon') => {
