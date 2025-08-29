@@ -25,6 +25,7 @@ services:
       - '127.0.0.1:5510:3000'
     volumes:
       - agent_storage:/app/storage
+      - huggingface_cache:/root/.cache/huggingface
     networks:
       - agent-network
     healthcheck:
@@ -84,3 +85,4 @@ volumes:
   agent_storage:
   mongodb_data:
   qdrant_data:
+  huggingface_cache:

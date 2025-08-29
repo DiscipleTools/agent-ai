@@ -18,6 +18,8 @@ interface ProcessingResult {
 
 interface ProcessingContext {
   message: string
+  message_id?: string
+  message_type?: string
   conversation_id?: number
   account_id?: number
   sender?: any
@@ -46,16 +48,41 @@ class AgentProcessingEngine {
       console.log(`Processing with agent: ${agent.name} (${agent.agentType})`)
       
       // Get conversation history if needed and not already provided
-      let conversationHistory = context.conversation_history || []
-      if (!conversationHistory.length && context.conversation_id && context.account_id) {
+      let conversationHistory: Array<{ role: 'user' | 'assistant', content: string }> = []
+      if (context.conversation_id && context.account_id) {
         try {
-          conversationHistory = await chatwootService.getConversationMessages(
+          const messages = await chatwootService.getConversationMessages(
             context.account_id,
             context.conversation_id,
             config.chatwootApiKey || agent.settings?.chatwootApiKey
           )
+          
+          if (messages && Array.isArray(messages)) {
+            conversationHistory = messages
+              .filter(msg => 
+                msg.content && 
+                msg.content.trim() && 
+                msg.content !== context.message.trim() && // Exclude current message
+                msg.id !== context.message_id // Exclude current message by ID too
+              )
+              .slice(-10) // Get last 10 messages for context
+              .map((msg): { role: 'user' | 'assistant', content: string } => {
+                const isIncoming = msg.message_type === 0 || 
+                                  msg.message_type === 'incoming' || 
+                                  msg.sender_type === 'Contact'
+                const role: 'user' | 'assistant' = isIncoming ? 'user' : 'assistant'
+                return {
+                  role,
+                  content: msg.content.trim()
+                }
+              })
+              .filter(msg => msg.content.length > 0)
+              
+            console.log(`Retrieved ${conversationHistory.length} previous messages for context`)
+          }
         } catch (historyError) {
           console.warn(`Failed to get conversation history for agent ${agent.name}:`, historyError)
+          conversationHistory = []
         }
       }
 
@@ -86,10 +113,19 @@ class AgentProcessingEngine {
       }
 
       // Process with AI service
-      const response = await aiService.processMessage(
+      const response = await aiService.generateResponse(
+        agent._id,
         agent.prompt,
-        aiContext,
-        processingSettings
+        processingSettings.contextDocuments || [],
+        aiContext.message,
+        {
+          temperature: processingSettings.temperature,
+          maxTokens: processingSettings.maxTokens,
+          responseDelay: processingSettings.responseDelay,
+          connectionId: processingSettings.connectionId?.toString(),
+          modelId: processingSettings.modelId
+        },
+        aiContext.conversation_history || []
       )
 
       const duration = Date.now() - startTime
