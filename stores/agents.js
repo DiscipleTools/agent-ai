@@ -196,7 +196,10 @@ export const useAgentsStore = defineStore('agents', () => {
       }
       
       // Use fetch with streaming for progress updates
-      const response = await fetch(`/api/agents/${agentId}/context/${docId}`, {
+      // Construct the full URL respecting the base path
+      const nuxtApp = useNuxtApp()
+      const baseURL = nuxtApp.$config.app.baseURL === '/' ? '' : nuxtApp.$config.app.baseURL
+      const response = await fetch(`${baseURL}api/agents/${agentId}/context/${docId}`, {
         method: 'PUT',
         headers,
         credentials: 'include', // This will include cookies automatically
@@ -421,7 +424,10 @@ export const useAgentsStore = defineStore('agents', () => {
       
       // In client-side, use browser's built-in cookie handling
       // In server-side, this won't work anyway since SSE is client-only
-      const response = await fetch(`/api/agents/${agentId}/context/website`, {
+      // Construct the full URL respecting the base path
+      const nuxtApp = useNuxtApp()
+      const baseURL = nuxtApp.$config.app.baseURL === '/' ? '' : nuxtApp.$config.app.baseURL
+      const response = await fetch(`${baseURL}api/agents/${agentId}/context/website`, {
         method: 'POST',
         headers,
         credentials: 'include', // This will include cookies automatically

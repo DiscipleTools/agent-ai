@@ -43,10 +43,14 @@ export const sanitizeNumber = (input) => {
 /**
  * Sanitize URL input and prevent dangerous protocols and SSRF attacks
  * @param {string|any} input - The URL to sanitize
+ * @param {Object} options - Options for URL sanitization
+ * @param {boolean} options.allowLocalhost - Whether to allow localhost URLs (for development)
  * @returns {string} - Sanitized URL or empty string if invalid
  */
-export const sanitizeUrl = (input) => {
+export const sanitizeUrl = (input, options = {}) => {
   if (!input || typeof input !== 'string') return ''
+  
+  const { allowLocalhost = false } = options
   
   // Basic URL sanitization - remove dangerous protocols and characters
   const cleaned = input.trim()
@@ -68,13 +72,15 @@ export const sanitizeUrl = (input) => {
     
     // Block localhost and private IP ranges (but allow Docker internal communication)
     const hostname = url.hostname.toLowerCase()
-    if ((hostname === 'localhost' || 
+    const isLocalOrPrivate = (hostname === 'localhost' || 
         hostname === '127.0.0.1' || 
         hostname === '0.0.0.0' ||
         hostname.match(/^10\./) ||
         hostname.match(/^172\.(1[6-9]|2[0-9]|3[01])\./) ||
         hostname.match(/^192\.168\./)) &&
-        hostname !== 'host.docker.internal') {
+        hostname !== 'host.docker.internal'
+    
+    if (isLocalOrPrivate && !allowLocalhost) {
       return ''
     }
     
@@ -321,14 +327,23 @@ export const sanitizeInternalUrl = (input) => {
 
 /**
  * Sanitize MongoDB ObjectId to prevent injection attacks
- * @param {string|any} input - The ObjectId to sanitize
+ * @param {string|ObjectId|any} input - The ObjectId to sanitize (string or MongoDB ObjectId object)
  * @returns {string} - Sanitized ObjectId or empty string if invalid
  */
 export const sanitizeObjectId = (input) => {
-  if (!input || typeof input !== 'string') return ''
+  if (!input) return ''
+  
+  // Convert ObjectId objects to string
+  let inputString = input
+
+  if (typeof input === 'object' && input.toString) {
+    inputString = input.toString()
+  } else if (typeof input !== 'string') {
+    return ''
+  }
   
   // Remove any non-hex characters and trim whitespace
-  const sanitized = input.trim().replace(/[^a-fA-F0-9]/g, '')
+  const sanitized = inputString.trim().replace(/[^a-fA-F0-9]/g, '')
   
   // MongoDB ObjectIds must be exactly 24 characters long
   if (sanitized.length !== 24) return ''
@@ -437,8 +452,8 @@ export const validators = {
   /**
    * Validate that a sanitized URL is valid
    */
-  validUrl: (url) => {
-    const sanitized = sanitizeUrl(url)
+  validUrl: (url, options = {}) => {
+    const sanitized = sanitizeUrl(url, options)
     if (!sanitized) return false
     
     try {

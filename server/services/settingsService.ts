@@ -88,7 +88,7 @@ class SettingsService {
     }
   }
 
-  async getChatwootSettings(): Promise<{ url: string; apiToken: string; enabled: boolean } | null> {
+  async getChatwootSettings(): Promise<{ apiToken: string; enabled: boolean } | null> {
     try {
       const settings = await this.getAllSettings()
       
@@ -97,7 +97,6 @@ class SettingsService {
       }
       
       return {
-        url: settings.chatwoot.url || '',
         apiToken: settings.chatwoot.apiToken || '',
         enabled: settings.chatwoot.enabled || false
       }
@@ -197,7 +196,6 @@ class SettingsService {
       // Chatwoot
       if (settingsData.chatwoot && typeof settingsData.chatwoot === 'object') {
         sanitized.chatwoot = {
-          url: sanitizeUrl(settingsData.chatwoot.url),
           apiToken: sanitizeText(settingsData.chatwoot.apiToken),
           enabled: !!settingsData.chatwoot.enabled
         }

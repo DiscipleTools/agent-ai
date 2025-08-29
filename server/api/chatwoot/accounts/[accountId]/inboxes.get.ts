@@ -70,19 +70,10 @@ export default defineEventHandler(async (event) => {
     }
 
     // Get Chatwoot URL from environment (fallback to localhost)
-    const chatwootInstanceUrl = process.env.CHATWOOT_URL || 'http://localhost:5500'
-    const sanitizedChatwootUrl = sanitizeUrl(chatwootInstanceUrl)
-    
-    if (!sanitizedChatwootUrl) {
-      return {
-        success: false,
-        message: 'Invalid Chatwoot URL configuration',
-        statusCode: 500
-      }
-    }
+    const chatwootInstanceUrl = process.env.CHATWOOT_URL
 
     // Make request to Chatwoot API for inboxes
-    const inboxesUrl = `${sanitizedChatwootUrl.replace(/\/$/, '')}/api/v1/accounts/${accountId}/inboxes`
+    const inboxesUrl = `${chatwootInstanceUrl.replace(/\/$/, '')}/api/v1/accounts/${accountId}/inboxes`
     
     const response = await axios.get(inboxesUrl, {
       headers: {

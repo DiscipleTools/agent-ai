@@ -15,10 +15,25 @@ export default chatwootAuthMiddleware.superAdmin(async (event, checker) => {
     const connectionId = sanitizeObjectId(body.connectionId)
     const modelId = sanitizeModelId(body.modelId)
 
-    if (!connectionId || !modelId) {
+    // Improved validation with specific error messages
+    if (!body.connectionId || typeof body.connectionId !== 'string') {
       throw createError({
         statusCode: 400,
-        statusMessage: 'Connection ID and model ID are required'
+        statusMessage: 'Connection ID is required and must be a valid string'
+      })
+    }
+
+    if (!connectionId) {
+      throw createError({
+        statusCode: 400,
+        statusMessage: 'Connection ID must be a valid 24-character ObjectId'
+      })
+    }
+
+    if (!modelId) {
+      throw createError({
+        statusCode: 400,
+        statusMessage: 'Model ID is required'
       })
     }
 

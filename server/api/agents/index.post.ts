@@ -14,6 +14,7 @@ import { chatwootAuthMiddleware, validateInboxPermissions } from '~/server/utils
 import Agent from '~/server/models/Agent'
 // User model removed - using Chatwoot authentication
 import { sanitizeText, sanitizeContent, sanitizeNumber, sanitizeObjectId } from '~/utils/sanitize'
+import chatwootService from '~/server/services/chatwootService'
 
 interface AgentSettings {
   temperature?: number | string
@@ -21,13 +22,13 @@ interface AgentSettings {
   responseDelay?: number | string
   connectionId?: string
   modelId?: string
-  chatwootApiKey?: string
 }
 
 interface AgentRequestBody {
   name?: string
   description?: string
   prompt?: string
+  agentType?: string
   settings?: AgentSettings
   inboxes?: Array<{
     accountId: number
@@ -36,6 +37,42 @@ interface AgentRequestBody {
     inboxName?: string
     channelType?: string
   }>
+}
+
+// Helper function to extract Chatwoot session data from event
+function extractUserSessionData(event: any): { 'access-token': string; client: string; uid: string; expiry?: string } | null {
+  try {
+    const sessionCookie = getCookie(event, 'cw_d_session_info')
+    
+    if (!sessionCookie) {
+      return null
+    }
+
+    let sessionData
+    if (typeof sessionCookie === 'object') {
+      sessionData = sessionCookie
+    } else if (typeof sessionCookie === 'string') {
+      try {
+        const decodedCookie = decodeURIComponent(sessionCookie)
+        sessionData = JSON.parse(decodedCookie)
+      } catch (parseError) {
+        sessionData = sessionCookie
+      }
+    } else {
+      return null
+    }
+
+    const { 'access-token': accessToken, client, uid, expiry } = sessionData
+    
+    if (!accessToken || !client || !uid) {
+      return null
+    }
+
+    return { 'access-token': accessToken, client, uid, expiry }
+  } catch (error) {
+    console.error('Error extracting user session data:', error)
+    return null
+  }
 }
 
 export default chatwootAuthMiddleware.auth(async (event, checker) => {
@@ -54,7 +91,7 @@ export default chatwootAuthMiddleware.auth(async (event, checker) => {
       name: sanitizeText(body.name),
       description: sanitizeContent(body.description),
       prompt: sanitizeContent(body.prompt),
-      inboxes: body.inboxes || []
+      agentType: sanitizeText(body.agentType) || 'response'
     }
 
     // Enhanced validation with sanitized inputs
@@ -81,34 +118,13 @@ export default chatwootAuthMiddleware.auth(async (event, checker) => {
       errors.push('Description cannot exceed 500 characters')
     }
 
-    // Validate and sanitize inbox assignments
-    const sanitizedInboxes = []
-    if (sanitizedBody.inboxes && Array.isArray(sanitizedBody.inboxes)) {
-      for (let i = 0; i < sanitizedBody.inboxes.length; i++) {
-        const inbox = sanitizedBody.inboxes[i]
-        
-        if (!inbox || typeof inbox !== 'object') {
-          errors.push(`Invalid inbox assignment at index ${i}`)
-          continue
-        }
-
-        const sanitizedInbox = {
-          accountId: sanitizeNumber(inbox.accountId),
-          inboxId: sanitizeNumber(inbox.inboxId),
-          accountName: sanitizeText(inbox.accountName) || '',
-          inboxName: sanitizeText(inbox.inboxName) || '',
-          channelType: sanitizeText(inbox.channelType) || ''
-        }
-
-        // Validate required fields
-        if (!sanitizedInbox.accountId || !sanitizedInbox.inboxId) {
-          errors.push(`Inbox assignment at index ${i} missing required accountId or inboxId`)
-          continue
-        }
-
-        sanitizedInboxes.push(sanitizedInbox)
-      }
+    // Validate agent type
+    const validAgentTypes = ['response', 'pre-process', 'analytics', 'moderation', 'routing', 'post-process']
+    if (!validAgentTypes.includes(sanitizedBody.agentType)) {
+      errors.push(`Invalid agent type. Must be: ${validAgentTypes.join(', ')}`)
     }
+
+
 
     // Validate settings with additional sanitization
     const sanitizedSettings: {
@@ -117,7 +133,6 @@ export default chatwootAuthMiddleware.auth(async (event, checker) => {
       responseDelay?: number
       connectionId?: string | null
       modelId?: string | null
-      chatwootApiKey?: string | null
     } = {}
 
     if (body.settings) {
@@ -166,22 +181,10 @@ export default chatwootAuthMiddleware.auth(async (event, checker) => {
         }
       }
 
-      // Sanitize chatwootApiKey if present
-      if (body.settings.chatwootApiKey) {
-        sanitizedSettings.chatwootApiKey = sanitizeText(body.settings.chatwootApiKey)
-        if (sanitizedSettings.chatwootApiKey.length > 200) {
-          errors.push('Chatwoot API key cannot exceed 200 characters')
-        }
-      }
+
     }
 
-    // Validate inbox permissions - only allow inboxes where user is administrator
-    if (sanitizedInboxes.length > 0) {
-      const inboxValidation = await validateInboxPermissions(user, sanitizedInboxes)
-      if (!inboxValidation.isValid) {
-        errors.push(`Access denied to inboxes: ${inboxValidation.invalidInboxes.join('; ')}`)
-      }
-    }
+
 
     if (errors.length > 0) {
       throw createError({
@@ -195,15 +198,14 @@ export default chatwootAuthMiddleware.auth(async (event, checker) => {
       name: sanitizedBody.name.trim(),
       description: sanitizedBody.description?.trim() || '',
       prompt: sanitizedBody.prompt.trim(),
+      agentType: sanitizedBody.agentType,
       settings: {
         temperature: sanitizedSettings.temperature !== undefined ? sanitizedSettings.temperature : 0.3,
         maxTokens: sanitizedSettings.maxTokens !== undefined ? sanitizedSettings.maxTokens : 500,
         responseDelay: sanitizedSettings.responseDelay !== undefined ? sanitizedSettings.responseDelay : 0,
         connectionId: sanitizedSettings.connectionId || null,
-        modelId: sanitizedSettings.modelId || null,
-        chatwootApiKey: sanitizedSettings.chatwootApiKey || null
+        modelId: sanitizedSettings.modelId || null
       },
-      inboxes: sanitizedInboxes,
       createdBy: user._id,
       isActive: true
     }
@@ -211,6 +213,8 @@ export default chatwootAuthMiddleware.auth(async (event, checker) => {
     // Create agent
     const agent = new Agent(agentData)
     await agent.save()
+
+
 
     // Note: With Chatwoot authentication, user management is handled by Chatwoot
     // No need to update Agent AI User model since we're using Chatwoot users

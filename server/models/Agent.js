@@ -42,10 +42,6 @@ const agentSchema = new mongoose.Schema({
     minlength: [10, 'Prompt must be at least 10 characters long'],
     maxlength: [2000, 'Prompt cannot exceed 2000 characters']
   },
-  webhookUrl: {
-    type: String,
-    unique: true
-  },
   contextDocuments: [contextDocumentSchema],
   settings: {
     temperature: {
@@ -73,29 +69,17 @@ const agentSchema = new mongoose.Schema({
     modelId: {
       type: String,
       required: false
-    },
-    chatwootApiKey: {
-      type: String,
-      required: false,
-      trim: true
     }
   },
-  inboxes: [{
-    accountId: {
-      type: Number,
-      required: true
-    },
-    inboxId: {
-      type: Number,
-      required: true
-    },
-    accountName: String,
-    inboxName: String,
-    channelType: String
-  }],
   createdBy: {
     type: mongoose.Schema.Types.Mixed, // Support both ObjectId and simple IDs for Chatwoot users
     required: true
+  },
+  agentType: {
+    type: String,
+    enum: ['response', 'pre-process', 'analytics', 'moderation', 'routing', 'post-process'],
+    default: 'response',
+    required: [true, 'Agent type is required']
   },
   isActive: {
     type: Boolean,
@@ -113,15 +97,8 @@ const agentSchema = new mongoose.Schema({
 // Indexes for better performance
 agentSchema.index({ isActive: 1 })
 agentSchema.index({ createdBy: 1 })
+agentSchema.index({ agentType: 1 })
 
-// Generate webhook URL before saving
-agentSchema.pre('save', function(next) {
-  if (!this.webhookUrl) {
-    const webhookId = crypto.randomBytes(16).toString('hex')
-    this.webhookUrl = `/api/webhook/agent/${webhookId}`
-  }
-  next()
-})
 
 // Static method to find active agents
 agentSchema.statics.findActive = function() {
@@ -133,14 +110,56 @@ agentSchema.statics.findByCreator = function(userId) {
   return this.find({ createdBy: userId, isActive: true })
 }
 
+// Static method to get assigned inboxes (computed from Inbox model)
+agentSchema.statics.getAssignedInboxes = async function(agentId) {
+  const Inbox = mongoose.model('Inbox')
+  return await Inbox.find({
+    $or: [
+      { 'responseAgent.agentId': agentId },
+      { 'agents.agentId': agentId }
+    ]
+  })
+}
+
+// Static method to validate response agent inbox constraints
+agentSchema.statics.validateResponseAgentInboxes = async function(inboxIds, excludeAgentId = null) {
+  const Inbox = mongoose.model('Inbox')
+  
+  const conflicts = []
+  
+  // Check each inbox for existing response agents
+  for (const inboxId of inboxIds) {
+    const inbox = await Inbox.findById(inboxId).populate('responseAgent.agentId')
+    
+    if (inbox && inbox.responseAgent && inbox.responseAgent.agentId) {
+      // Skip if it's the same agent being updated
+      if (excludeAgentId && inbox.responseAgent.agentId._id.toString() === excludeAgentId.toString()) {
+        continue
+      }
+      
+      conflicts.push({
+        inboxId: inbox._id,
+        inboxName: inbox.name,
+        existingAgentId: inbox.responseAgent.agentId._id,
+        existingAgentName: inbox.responseAgent.agentId.name
+      })
+    }
+  }
+  
+  return {
+    isValid: conflicts.length === 0,
+    conflicts
+  }
+}
+
 // Virtual for agent's basic info
 agentSchema.virtual('info').get(function() {
   return {
     id: this._id,
     name: this.name,
     description: this.description,
+    agentType: this.agentType,
     isActive: this.isActive,
-    webhookUrl: this.webhookUrl,
     createdAt: this.createdAt
   }
 })

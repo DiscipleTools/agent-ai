@@ -60,20 +60,10 @@ export default defineEventHandler(async (event) => {
     }
 
     // Get Chatwoot URL from environment (fallback to nginx proxy for Docker environments)
-    const chatwootInstanceUrl = process.env.CHATWOOT_URL || 'http://host.docker.internal:5600'
-    
-    const sanitizedChatwootUrl = sanitizeUrl(chatwootInstanceUrl)
-    
-    if (!sanitizedChatwootUrl) {
-      return {
-        success: false,
-        message: `Invalid Chatwoot URL configuration: ${chatwootInstanceUrl}`,
-        statusCode: 500
-      }
-    }
+    const chatwootInstanceUrl = process.env.CHATWOOT_URL
 
     // Make request to Chatwoot API
-    const profileUrl = `${sanitizedChatwootUrl.replace(/\/$/, '')}/api/v1/profile`
+    const profileUrl = `${chatwootInstanceUrl.replace(/\/$/, '')}/api/v1/profile`
     
     const response = await axios.get(profileUrl, {
       headers: {
@@ -126,7 +116,7 @@ export default defineEventHandler(async (event) => {
       data: {
         profile: sanitizedProfile,
         accounts: accounts,
-        chatwootUrl: sanitizedChatwootUrl
+        chatwootUrl: chatwootInstanceUrl
       }
     }
 

@@ -99,10 +99,6 @@ const settingsSchema = new mongoose.Schema({
     }
   },
   chatwoot: {
-    url: {
-      type: String,
-      required: false
-    },
     apiToken: {
       type: String,
       required: false

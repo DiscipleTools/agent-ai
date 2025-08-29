@@ -164,7 +164,7 @@ class EmailService {
       }
 
       const appName = config.from.name || 'Agent AI Server'
-      const baseUrl = process.env.FRONTEND_URL || 'http://localhost:3000'
+      const baseUrl = process.env.FRONTEND_URL
       const setupUrl = `${baseUrl}/setup-account?token=${sanitizeToken(invitationToken)}`
 
       const templateData = {
@@ -214,7 +214,7 @@ class EmailService {
       }
 
       const appName = config.from.name || 'Agent AI Server'
-      const baseUrl = process.env.FRONTEND_URL || 'http://localhost:3000'
+      const baseUrl = process.env.FRONTEND_URL
       const resetUrl = `${baseUrl}/reset-password?token=${sanitizeToken(resetToken)}`
 
       const templateData = {
@@ -260,7 +260,7 @@ class EmailService {
       }
 
       const appName = config.from.name || 'Agent AI Server'
-      const baseUrl = process.env.FRONTEND_URL || 'http://localhost:3000'
+      const baseUrl = process.env.FRONTEND_URL
 
       const templateData = {
         userName: sanitizeText(userName),

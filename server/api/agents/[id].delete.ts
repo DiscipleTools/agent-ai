@@ -22,6 +22,7 @@ import { connectDB } from '~/server/utils/db'
 import { chatwootAuthMiddleware } from '~/server/utils/auth'
 import Agent from '~/server/models/Agent'
 
+
 export default chatwootAuthMiddleware.agentAccess('delete')(async (event, checker, agentId) => {
   try {
     // Connect to database
@@ -36,6 +37,8 @@ export default chatwootAuthMiddleware.agentAccess('delete')(async (event, checke
         statusMessage: 'Agent not found'
       })
     }
+
+
 
     // Delete agent
     await Agent.findByIdAndDelete(agentId)

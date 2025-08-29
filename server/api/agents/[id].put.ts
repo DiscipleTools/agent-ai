@@ -17,6 +17,7 @@
 import { connectDB } from '~/server/utils/db'
 import { chatwootAuthMiddleware } from '~/server/utils/auth'
 import Agent from '~/server/models/Agent'
+import Inbox from '~/server/models/Inbox'
 import mongoose from 'mongoose'
 import { sanitizeText, sanitizeContent, sanitizeObjectId, sanitizeNumber } from '~/utils/sanitize'
 
@@ -94,6 +95,111 @@ export default chatwootAuthMiddleware.agentAccess('write')(async (event, checker
         })
       }
       agent.isActive = body.isActive
+    }
+
+    // Validate and update agent type
+    if (body.agentType !== undefined) {
+      const sanitizedAgentType = sanitizeText(body.agentType)
+      const validAgentTypes = ['response', 'pre-process', 'analytics', 'moderation', 'routing', 'post-process']
+      if (!validAgentTypes.includes(sanitizedAgentType)) {
+        throw createError({
+          statusCode: 400,
+          statusMessage: `Invalid agent type. Must be one of: ${validAgentTypes.join(', ')}`
+        })
+      }
+
+      // Check if agent type change would break existing assignments
+      const currentAgentType = agent.agentType
+      if (sanitizedAgentType !== currentAgentType) {
+        // Check if agent is assigned to any inboxes
+        const assignedInboxes = await Inbox.find({
+          $or: [
+            { 'responseAgent.agentId': agentId },
+            { 'agents.agentId': agentId }
+          ]
+        }).select('name responseAgent agents')
+
+        if (assignedInboxes.length > 0) {
+          // Check for specific constraint violations
+          if (currentAgentType === 'response' && sanitizedAgentType !== 'response') {
+            const responseInboxes = assignedInboxes.filter(inbox => 
+              inbox.responseAgent?.agentId?.toString() === agentId
+            )
+            if (responseInboxes.length > 0) {
+              throw createError({
+                statusCode: 400,
+                statusMessage: `Cannot change agent type from 'response' - agent is assigned as response agent to ${responseInboxes.length} inbox(es). Remove from response assignments first.`
+              })
+            }
+          }
+
+          if (currentAgentType !== 'response' && sanitizedAgentType === 'response') {
+            const processingInboxes = assignedInboxes.filter(inbox =>
+              inbox.agents?.some(a => a.agentId.toString() === agentId)
+            )
+            if (processingInboxes.length > 0) {
+              throw createError({
+                statusCode: 400,
+                statusMessage: `Cannot change agent type to 'response' - agent is assigned to processing pipeline of ${processingInboxes.length} inbox(es). Remove from processing assignments first.`
+              })
+            }
+          }
+        }
+      }
+
+      agent.agentType = sanitizedAgentType
+    }
+
+    // Handle inbox updates with validation
+    if (body.inboxes !== undefined) {
+      const sanitizedInboxes = []
+      if (body.inboxes && Array.isArray(body.inboxes)) {
+        for (let i = 0; i < body.inboxes.length; i++) {
+          const inbox = body.inboxes[i]
+          
+          if (!inbox || typeof inbox !== 'object') {
+            throw createError({
+              statusCode: 400,
+              statusMessage: `Invalid inbox assignment at index ${i}`
+            })
+          }
+
+          const sanitizedInbox = {
+            accountId: sanitizeNumber(inbox.accountId),
+            inboxId: sanitizeNumber(inbox.inboxId),
+            accountName: sanitizeText(inbox.accountName) || '',
+            inboxName: sanitizeText(inbox.inboxName) || '',
+            channelType: sanitizeText(inbox.channelType) || ''
+          }
+
+          // Validate required fields
+          if (!sanitizedInbox.accountId || !sanitizedInbox.inboxId) {
+            throw createError({
+              statusCode: 400,
+              statusMessage: `Inbox assignment at index ${i} missing required accountId or inboxId`
+            })
+          }
+
+          sanitizedInboxes.push(sanitizedInbox)
+        }
+      }
+
+      // Validate response agent inbox constraints if this is a response agent
+      const currentAgentType = (agent as any).agentType || 'response'
+      if (currentAgentType === 'response' && sanitizedInboxes.length > 0) {
+        const responseAgentValidation = await (Agent as any).validateResponseAgentInboxes(sanitizedInboxes, agent._id)
+        if (!responseAgentValidation.isValid) {
+          const conflictMessages = responseAgentValidation.conflicts.map((conflict: any) => 
+            `Inbox "${conflict.inboxName}" already has response agent "${conflict.existingAgentName}"`
+          )
+          throw createError({
+            statusCode: 400,
+            statusMessage: conflictMessages.join(', ')
+          })
+        }
+      }
+
+      ;(agent as any).inboxes = sanitizedInboxes
     }
     
     // Update settings with proper sanitization

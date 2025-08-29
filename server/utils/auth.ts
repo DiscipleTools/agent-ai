@@ -64,19 +64,11 @@ export async function requireChatwootAuth(event: any) {
   }
 
   // Get Chatwoot URL from environment (fallback to localhost)
-  const chatwootInstanceUrl = process.env.CHATWOOT_URL || 'http://localhost:5600'
-  const sanitizedChatwootUrl = sanitizeUrl(chatwootInstanceUrl)
-  
-  if (!sanitizedChatwootUrl) {
-    throw createError({
-      statusCode: 500,
-      statusMessage: 'Invalid Chatwoot URL configuration'
-    })
-  }
+  const chatwootInstanceUrl = process.env.CHATWOOT_URL
 
   try {
     // Make request to Chatwoot API to validate session
-    const profileUrl = `${sanitizedChatwootUrl.replace(/\/$/, '')}/api/v1/profile`
+    const profileUrl = `${chatwootInstanceUrl.replace(/\/$/, '')}/api/v1/profile`
     
     const response = await axios.get(profileUrl, {
       headers: {
@@ -100,9 +92,6 @@ export async function requireChatwootAuth(event: any) {
     }
     
     const profileData = response.data
-    console.log('profileData ---------- ')
-    console.log(JSON.stringify(response.data))
-    console.log(profileData.accounts)
 
     // Transform Chatwoot profile to Agent AI user format
     const userData = {
@@ -113,6 +102,13 @@ export async function requireChatwootAuth(event: any) {
       superadmin: profileData.type === 'SuperAdmin',
       avatar_url: sanitizeUrl(profileData.avatar_url) || null,
       isActive: profileData.confirmed || true,
+      // Store session data for API calls
+      chatwootSessionData: {
+        'access-token': accessToken,
+        client,
+        uid,
+        expiry
+      },
       // agentAccess is now determined dynamically based on Chatwoot account administration
       chatwoot: {
         availability_status: sanitizeText(profileData.availability_status || ''),
@@ -659,7 +655,6 @@ export const chatwootAuthMiddleware = {
       // Check if user has super admin role in any of their accounts
       //@todo user might not be returning role yet. not on the account level
       const isSuperAdmin = user.superadmin === true
-      console.log('user', user)
       
       if (!isSuperAdmin) {
         throw createError({
@@ -688,4 +683,23 @@ export const chatwootAuthMiddleware = {
       })
     }
   }
+}
+
+/**
+ * Simple helper to get user from event context
+ * Works with both Chatwoot auth and test scenarios
+ */
+export function getUserFromEvent(event: any) {
+  // Check for test user ID header first (for tests)
+  const testUserId = getHeader(event, 'user-id')
+  if (testUserId) {
+    return { id: testUserId, _id: testUserId }
+  }
+  
+  // Check for authenticated user in context (from Chatwoot auth)
+  if (event.context?.user) {
+    return event.context.user
+  }
+  
+  return null
 }

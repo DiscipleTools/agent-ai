@@ -128,18 +128,37 @@ class AIService {
     messages: OpenAIMessage[],
     settings: { temperature?: number, max_tokens?: number }
   ): Promise<string> {
-    const requestBody = {
+    const requestBody: any = {
       model: aiConfig.model,
-      messages,
-      temperature: settings.temperature || 0.3,
-      max_tokens: settings.max_tokens || 500
+      messages
+    }
+
+    // Handle temperature restrictions for newer models
+    if (aiConfig.model.includes('gpt-5') || aiConfig.model.includes('o1')) {
+      // GPT-5 and o1 models only support default temperature (1)
+      requestBody.temperature = 1
+    } else {
+      requestBody.temperature = settings.temperature || 0.3
+    }
+
+    // Use max_completion_tokens for GPT-4o and newer models, max_tokens for older models
+    // For reasoning models, use a higher default to allow for both reasoning and completion
+    let maxTokens = settings.max_tokens || 500
+    if (aiConfig.model.includes('gpt-5') || aiConfig.model.includes('o1')) {
+      // Reasoning models need more tokens - increase default
+      maxTokens = settings.max_tokens || 2000
+      requestBody.max_completion_tokens = maxTokens
+    } else if (aiConfig.model.includes('gpt-4o')) {
+      requestBody.max_completion_tokens = maxTokens
+    } else {
+      requestBody.max_tokens = maxTokens
     }
 
     console.log('Sending request to AI service:', {
       endpoint: `${aiConfig.endpoint}/chat/completions`,
       model: requestBody.model,
       temperature: requestBody.temperature,
-      max_tokens: requestBody.max_tokens,
+      max_tokens: requestBody.max_tokens || requestBody.max_completion_tokens,
       messageCount: messages.length
     })
 
@@ -178,7 +197,14 @@ class AIService {
       throw new Error('Invalid response format from AI API - missing choices or message')
     }
 
-    return data.choices[0].message.content
+    const content = data.choices[0].message.content
+
+    if (!content || content.trim().length === 0) {
+      console.error('Empty content from AI API. Full response:', JSON.stringify(data, null, 2))
+      throw new Error('AI API returned empty content')
+    }
+
+    return content
   }
 
   private async getAIConfig(agentId: string): Promise<{ apiKey: string; endpoint: string; model: string }> {
@@ -314,7 +340,9 @@ class AIService {
         // Fallback to traditional context document concatenation if RAG is not available
         systemPrompt = this.appendContextDocuments(systemPrompt, contextDocuments)
       }
-    } catch (ragError) {
+      
+    } catch (ragError: any) {
+      console.warn('RAG service unavailable, falling back to traditional context documents:', ragError.message)
       // Fallback to traditional context documents
       systemPrompt = this.appendContextDocuments(systemPrompt, contextDocuments)
     }

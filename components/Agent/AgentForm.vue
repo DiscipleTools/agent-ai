@@ -93,13 +93,13 @@ const form = reactive({
   name: props.agent?.name || '',
   description: props.agent?.description || '',
   prompt: props.agent?.prompt || '',
+  agentType: props.agent?.agentType || 'response',
   settings: {
     temperature: sanitizeNumber(props.agent?.settings?.temperature || 0.3),
     maxTokens: sanitizeNumber(props.agent?.settings?.maxTokens || 500),
     responseDelay: sanitizeNumber(props.agent?.settings?.responseDelay || 0),
     connectionId: props.agent?.settings?.connectionId || '',
     modelId: props.agent?.settings?.modelId || '',
-    chatwootApiKey: props.agent?.settings?.chatwootApiKey || ''
   },
   inboxes: props.agent?.inboxes || []
 })
@@ -172,8 +172,7 @@ watch(() => props.agent, (newAgent) => {
       maxTokens: sanitizeNumber(newAgent.settings?.maxTokens || 500),
       responseDelay: sanitizeNumber(newAgent.settings?.responseDelay || 0),
       connectionId: newAgent.settings?.connectionId || '',
-      modelId: newAgent.settings?.modelId || '',
-      chatwootApiKey: newAgent.settings?.chatwootApiKey || ''
+      modelId: newAgent.settings?.modelId || ''
     }
     form.inboxes = newAgent.inboxes || []
     
@@ -255,8 +254,7 @@ const handleSubmit = async () => {
           maxTokens: 'number',
           responseDelay: 'number',
           connectionId: 'text',
-          modelId: 'text',
-          chatwootApiKey: 'text'
+          modelId: 'text'
         })
       },
       inboxes: form.inboxes || []
@@ -265,7 +263,6 @@ const handleSubmit = async () => {
     // Clean up null/empty values
     if (!agentData.settings.connectionId) agentData.settings.connectionId = null
     if (!agentData.settings.modelId) agentData.settings.modelId = null
-    if (!agentData.settings.chatwootApiKey) agentData.settings.chatwootApiKey = null
 
     emit('submit', agentData)
   } catch (error) {
