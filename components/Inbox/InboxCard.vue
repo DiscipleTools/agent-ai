@@ -41,59 +41,27 @@
           </div>
         </div>
         
-        <div class="flex items-center space-x-2">
-          <span 
-            :class="[
-              'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium',
-              inbox.isActive 
-                ? 'bg-green-100 text-green-800' 
-                : 'bg-red-100 text-red-800'
-            ]"
-          >
-            {{ inbox.isActive ? 'Active' : 'Inactive' }}
-          </span>
-        </div>
       </div>
 
-      <!-- Agent Assignment Summary -->
+      <!-- Agents List -->
       <div class="mb-4">
-        <div class="flex items-center justify-between mb-2">
-          <h4 class="text-sm font-medium text-gray-900">Agent Configuration</h4>
-          <button
-            @click="$emit('manage-agents', inbox)"
-            class="text-sm text-blue-600 hover:text-blue-800 font-medium"
-          >
-            Manage Agents
-          </button>
-        </div>
+        <h4 class="text-sm font-medium text-gray-900 mb-3">Agents</h4>
         
-        <div class="space-y-2">
-          <!-- Response Agent -->
-          <div class="flex items-center justify-between text-sm">
-            <span class="text-gray-600">Response Agent:</span>
-            <button 
-              v-if="!inbox.responseAgent?.agentId"
-              @click="$emit('create-agent', inbox)"
-              class="text-blue-600 hover:text-blue-800 font-medium text-sm underline"
-            >
-              create agent
-            </button>
-            <button 
-              v-else
-              @click="$emit('edit-agent', inbox.responseAgent.agentId)"
-              :class="responseAgentStatus.class + ' hover:underline cursor-pointer'"
-            >
-              {{ responseAgentStatus.text }}
-            </button>
+        <div v-if="hasAgents" class="space-y-2">
+          <div 
+            v-if="inbox.responseAgent?.agentId"
+            @click="$emit('edit-agent', inbox.responseAgent.agentId)"
+            class="flex items-center justify-between p-2 bg-gray-50 rounded-md hover:bg-gray-100 cursor-pointer"
+          >
+            <span class="text-sm text-gray-900">{{ inbox.responseAgent.agentId.name || 'Response Agent' }}</span>
+            <span class="text-xs text-gray-500">Response</span>
           </div>
           
-          <!-- Processing Pipeline -->
-          <div class="flex items-center justify-between text-sm">
-            <span class="text-gray-600">Pipeline Agents:</span>
-            <span class="text-gray-900">
-              {{ inbox.activeAgentCount || 0 }} active / {{ inbox.agentCount || 0 }} total
-            </span>
-          </div>
+          <!-- Additional pipeline agents would go here -->
+        </div>
+        
+        <div v-else class="text-center py-6">
+          <p class="text-sm text-gray-500 mb-3">No agents configured</p>
         </div>
       </div>
 
@@ -111,12 +79,6 @@
               {{ chatwootStatus.text }}
             </span>
             
-            <button
-              @click="$emit('configure-chatwoot', inbox)"
-              class="text-blue-600 hover:text-blue-800 text-xs font-medium"
-            >
-              Configure
-            </button>
           </div>
         </div>
       </div>
@@ -132,7 +94,7 @@
             @click="$emit('view-details', inbox)"
             class="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
           >
-            View Details
+            Configure
           </button>
         </div>
       </div>
@@ -158,8 +120,6 @@ const props = defineProps({
 })
 
 const emit = defineEmits([
-  'manage-agents',
-  'configure-chatwoot',
   'view-details',
   'create-agent',
   'edit-agent',
@@ -200,18 +160,9 @@ const channelIcon = computed(() => {
   return iconMap[props.inbox.channelType] || ComputerDesktopIcon
 })
 
-// Response agent status
-const responseAgentStatus = computed(() => {
-  if (props.inbox.responseAgent?.agentId) {
-    return {
-      text: props.inbox.responseAgent.agentId.name || 'Assigned',
-      class: 'text-green-600 font-medium'
-    }
-  }
-  return {
-    text: 'create agent',
-    class: 'text-orange-600'
-  }
+// Check if inbox has any agents configured
+const hasAgents = computed(() => {
+  return !!(props.inbox.responseAgent?.agentId || (props.inbox.agentCount && props.inbox.agentCount > 0))
 })
 
 // Chatwoot integration status

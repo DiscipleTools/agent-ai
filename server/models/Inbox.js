@@ -1,6 +1,9 @@
 import mongoose from 'mongoose'
 import crypto from 'crypto'
 
+// Ensure Agent model is loaded for population to work
+import('./Agent.js')
+
 const agentAssignmentSchema = new mongoose.Schema({
   agentId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -9,7 +12,7 @@ const agentAssignmentSchema = new mongoose.Schema({
   },
   agentType: {
     type: String,
-    enum: ['pre-process', 'analytics', 'moderation', 'routing', 'post-process'],
+    enum: ['pre-process', 'analytics', 'moderation', 'routing', 'post-process', 'workflow'],
     required: true
   },
   name: {

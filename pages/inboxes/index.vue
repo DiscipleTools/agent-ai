@@ -6,18 +6,7 @@
         <h1 class="text-2xl font-bold text-gray-900">Inboxes</h1>
         <p class="text-gray-600 mt-1">Manage your Chatwoot inboxes and agent assignments</p>
       </div>
-      
-      <div class="flex items-center space-x-3">
-        <button
-          @click="handleSync"
-          :disabled="syncLoading"
-          class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
-        >
-          {{ syncLoading ? 'Syncing...' : 'Sync with Chatwoot' }}
-        </button>
-      </div>
     </div>
-
 
 
     <!-- Inboxes Grid -->
@@ -71,8 +60,6 @@
             v-for="inbox in accountInboxes"
             :key="inbox._id"
             :inbox="inbox"
-            @manage-agents="manageAgents"
-            @configure-chatwoot="configureChatwoot"
             @view-details="viewDetails"
             @create-agent="createAgentForInbox"
             @edit-agent="editAgent"
@@ -129,10 +116,9 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { computed, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useInboxesStore } from '~/stores/inboxes'
-import { useAgentsStore } from '~/stores/agents'
 import { useAuthStore } from '~/stores/auth'
 import InboxCard from '~/components/Inbox/InboxCard.vue'
 import { useToast } from 'vue-toastification'
@@ -147,7 +133,6 @@ definePageMeta({
 })
 
 const inboxesStore = useInboxesStore()
-const agentsStore = useAgentsStore()
 const authStore = useAuthStore()
 const router = useRouter()
 const toast = useToast()
@@ -160,13 +145,6 @@ const {
   pagination
 } = storeToRefs(inboxesStore)
 
-// Local state
-const syncLoading = ref(false)
-
-const syncForm = ref({
-  accountId: null,
-  apiKey: ''
-})
 
 
 
@@ -231,13 +209,6 @@ const changePage = async (page) => {
 // Note: Inbox editing/deletion is not supported
 // Inboxes are managed through Chatwoot only
 
-const manageAgents = (inbox) => {
-  router.push(`/inboxes/${inbox._id}/agents`)
-}
-
-const configureChatwoot = (inbox) => {
-  router.push(`/inboxes/${inbox._id}/configure`)
-}
 
 
 
@@ -275,26 +246,6 @@ const enableAiConnection = async (inbox) => {
 
 
 
-const handleSync = async () => {
-  syncLoading.value = true
-  
-  try {
-    const result = await inboxesStore.syncWithChatwoot(
-      syncForm.value.accountId,
-      syncForm.value.apiKey || null
-    )
-    
-    showSyncModal.value = false
-    syncForm.value = { accountId: null, apiKey: '' }
-    
-    toast(`Sync completed! Created: ${result.results.created.length}, Updated: ${result.results.updated.length}, Errors: ${result.results.errors.length}`, { type: 'success' })
-  } catch (error) {
-    console.error('Sync failed:', error)
-    toast('Sync failed. Please check your credentials and try again.', { type: 'error' })
-  } finally {
-    syncLoading.value = false
-  }
-}
 
 // Lifecycle
 onMounted(async () => {

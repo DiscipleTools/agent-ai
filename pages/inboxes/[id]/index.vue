@@ -38,229 +38,166 @@
           </button>
           <div>
             <h1 class="text-2xl font-bold text-gray-900">{{ currentInbox.name }}</h1>
-            <div class="flex items-center space-x-4 mt-1">
-              <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
-                    :class="channelTypeClass">
-                {{ formatChannelType(currentInbox.channelType) }}
-              </span>
-              <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
-                    :class="statusClass">
-                {{ currentInbox.isActive ? 'Active' : 'Inactive' }}
-              </span>
-              <SyncStatus :inbox="currentInbox" />
-            </div>
+            <p class="text-gray-600 mt-1">{{ formatChannelType(currentInbox.channelType) }}</p>
           </div>
         </div>
 
-        <div class="flex items-center space-x-3">
+        <div v-if="isBotSetup" class="flex items-center space-x-3">
           <button
-            @click="testWebhook"
-            :disabled="webhookTesting"
-            class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
-          >
-            {{ webhookTesting ? 'Testing...' : 'Test Webhook' }}
-          </button>
-          <button
-            @click="router.push(`/inboxes/${currentInbox._id}/agents`)"
+            @click="createAgent"
             class="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700"
           >
-            Manage Agents
+            Create New Agent
           </button>
           <button
-            @click="router.push(`/inboxes/${currentInbox._id}/configure`)"
+            @click="showSelectAgent"
             class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
           >
-            Configure
+            Select Existing Agent
           </button>
         </div>
       </div>
 
-      <!-- Stats Cards -->
-      <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-        <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-          <div class="flex items-center">
-            <div class="flex-shrink-0">
-              <div class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                <UserIcon class="w-5 h-5 text-blue-600" />
-              </div>
-            </div>
-            <div class="ml-3">
-              <p class="text-sm font-medium text-gray-500">Response Agent</p>
-              <p class="text-lg font-semibold text-gray-900">
-                {{ currentInbox.responseAgent?.agentId ? 'Assigned' : 'Not Assigned' }}
-              </p>
-            </div>
-          </div>
-        </div>
 
-        <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-          <div class="flex items-center">
-            <div class="flex-shrink-0">
-              <div class="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-                <CogIcon class="w-5 h-5 text-green-600" />
-              </div>
-            </div>
-            <div class="ml-3">
-              <p class="text-sm font-medium text-gray-500">Processing Agents</p>
-              <p class="text-lg font-semibold text-gray-900">{{ currentInbox.agents?.length || 0 }}</p>
-            </div>
+      <!-- Bot Setup Required -->
+      <div v-if="!isBotSetup" class="bg-white rounded-lg shadow-sm border border-gray-200 p-8">
+        <div class="text-center">
+          <div class="w-16 h-16 mx-auto bg-blue-100 rounded-full flex items-center justify-center mb-6">
+            <UserIcon class="w-8 h-8 text-blue-600" />
           </div>
-        </div>
-
-        <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-          <div class="flex items-center">
-            <div class="flex-shrink-0">
-              <div class="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
-                <CheckCircleIcon class="w-5 h-5 text-purple-600" />
-              </div>
-            </div>
-            <div class="ml-3">
-              <p class="text-sm font-medium text-gray-500">Active Agents</p>
-              <p class="text-lg font-semibold text-gray-900">
-                {{ activeAgentsCount }}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-          <div class="flex items-center">
-            <div class="flex-shrink-0">
-              <div class="w-8 h-8 bg-yellow-100 rounded-full flex items-center justify-center">
-                <GlobeAltIcon class="w-5 h-5 text-yellow-600" />
-              </div>
-            </div>
-            <div class="ml-3">
-              <p class="text-sm font-medium text-gray-500">Webhook Status</p>
-              <p class="text-lg font-semibold text-gray-900">
-                {{ currentInbox.webhookUrl ? 'Configured' : 'Not Set' }}
-              </p>
-            </div>
-          </div>
+          <h3 class="text-xl font-semibold text-gray-900 mb-3">Integration Setup Required</h3>
+          <p class="text-gray-600 mb-6 max-w-md mx-auto">
+            Before you can create agents, you need to set up the Chatwoot integration for this inbox.
+          </p>
+          <button
+            @click="setupIntegration"
+            :disabled="setupLoading"
+            class="px-6 py-3 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 disabled:opacity-50"
+          >
+            {{ setupLoading ? 'Setting up...' : 'Setup Integration to Build Agents' }}
+          </button>
         </div>
       </div>
 
-      <!-- Main Content -->
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <!-- Response Agent Section -->
-        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <h3 class="text-lg font-medium text-gray-900 mb-4">Response Agent</h3>
-          
-          <div v-if="currentInbox.responseAgent?.agentId" class="border border-gray-200 rounded-lg p-4">
-            <div class="flex items-center justify-between mb-3">
-              <div class="flex items-center space-x-3">
-                <div class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                  <UserIcon class="w-4 h-4 text-blue-600" />
-                </div>
-                <div>
-                  <p class="font-medium text-gray-900">{{ responseAgentName }}</p>
-                  <p class="text-sm text-gray-500">Response Agent</p>
-                </div>
+      <!-- Agents List -->
+      <div v-else class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <div class="flex items-center justify-between mb-6">
+          <h3 class="text-lg font-medium text-gray-900">Agents</h3>
+        </div>
+
+        <div v-if="allAgents.length > 0" class="space-y-3">
+          <div 
+            v-for="(agent, index) in allAgents" 
+            :key="agent.id"
+            :draggable="true"
+            @dragstart="onDragStart(index)"
+            @dragover.prevent
+            @drop="onDrop(index)"
+            class="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100 cursor-move transition-colors"
+          >
+            <div class="flex items-center space-x-3">
+              <div class="w-6 h-6 bg-gray-200 rounded-full flex items-center justify-center text-xs font-medium text-gray-600">
+                {{ index + 1 }}
               </div>
-              <div class="flex items-center space-x-2">
+              <div>
+                <p class="font-medium text-gray-900">{{ agent.name }}</p>
+                <p class="text-sm text-gray-500">{{ agent.type || 'Agent' }}</p>
+              </div>
+            </div>
+            <div class="flex items-center space-x-2">
+              <button
+                @click="editAgent(agent)"
+                class="text-blue-600 hover:text-blue-800 text-sm font-medium"
+              >
+                Edit
+              </button>
+              <button
+                @click="deleteAgent(agent)"
+                class="text-red-600 hover:text-red-800 text-sm font-medium"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div v-else class="text-center py-12">
+          <UserIcon class="mx-auto h-12 w-12 text-gray-400 mb-4" />
+          <p class="text-gray-500 mb-6">No agents configured for this inbox</p>
+          <div class="flex items-center justify-center space-x-4">
+            <button
+              @click="createAgent"
+              class="px-6 py-3 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700"
+            >
+              Create New Agent
+            </button>
+            <button
+              @click="showSelectAgent"
+              class="px-6 py-3 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded-md hover:bg-blue-100"
+            >
+              Select Existing Agent
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- Select Agent Modal -->
+  <div v-if="showAgentModal" class="fixed inset-0 z-50 overflow-y-auto">
+    <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+      <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" @click="hideSelectAgent"></div>
+      
+      <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+        <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+          <div class="sm:flex sm:items-start">
+            <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
+              <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">
+                Select an Existing Agent
+              </h3>
+              
+              <div v-if="agentsLoading" class="text-center py-4">
+                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                <p class="text-gray-500 mt-2">Loading agents...</p>
+              </div>
+              
+              <div v-else-if="availableAgents.length === 0" class="text-center py-6">
+                <UserIcon class="mx-auto h-12 w-12 text-gray-400 mb-3" />
+                <p class="text-gray-500 mb-4">No existing agents found</p>
                 <button
-                  @click="router.push(`/agents/${currentInbox.responseAgent.agentId._id}`)"
-                  class="text-blue-600 hover:text-blue-800"
+                  @click="hideSelectAgent(); createAgent()"
+                  class="px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded-md hover:bg-blue-100"
                 >
-                  <PencilIcon class="w-4 h-4" />
+                  Create Your First Agent
                 </button>
               </div>
-            </div>
-            <p class="text-sm text-gray-600 mb-3">
-              Assigned {{ formatDate(currentInbox.responseAgent.assignedAt) }}
-            </p>
-          </div>
-
-          <div v-else class="text-center py-8 border-2 border-dashed border-gray-200 rounded-lg">
-            <UserIcon class="mx-auto h-8 w-8 text-gray-400 mb-2" />
-            <p class="text-gray-500 mb-4">No response agent assigned</p>
-            <button
-              @click="router.push(`/inboxes/${currentInbox._id}/agents`)"
-              class="px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded-md hover:bg-blue-100"
-            >
-              Assign Response Agent
-            </button>
-          </div>
-        </div>
-
-        <!-- Processing Pipeline Section -->
-        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <div class="flex items-center justify-between mb-4">
-            <h3 class="text-lg font-medium text-gray-900">Processing Pipeline</h3>
-            <button
-              @click="router.push(`/inboxes/${currentInbox._id}/agents`)"
-              class="text-sm text-blue-600 hover:text-blue-800 font-medium"
-            >
-              Manage Pipeline
-            </button>
-          </div>
-
-          <div v-if="currentInbox.agents && currentInbox.agents.length > 0" class="space-y-3">
-            <div v-for="agent in sortedAgents" :key="agent.agentId" 
-                 class="border border-gray-200 rounded-lg p-3">
-              <div class="flex items-center justify-between">
-                <div class="flex items-center space-x-3">
-                  <div class="w-6 h-6 bg-gray-100 rounded-full flex items-center justify-center text-xs font-medium text-gray-600">
-                    {{ agent.priority }}
+              
+              <div v-else class="space-y-2 max-h-60 overflow-y-auto">
+                <div 
+                  v-for="agent in availableAgents" 
+                  :key="agent._id"
+                  @click="selectAgent(agent)"
+                  class="p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
+                >
+                  <div class="flex items-center justify-between">
+                    <div>
+                      <p class="font-medium text-gray-900">{{ agent.name }}</p>
+                      <p class="text-sm text-gray-500">{{ agent.agentType || 'Workflow Agent' }}</p>
+                      <p v-if="agent.description" class="text-xs text-gray-400 mt-1">{{ agent.description }}</p>
+                    </div>
                   </div>
-                  <div>
-                    <p class="font-medium text-gray-900">{{ agent.name }}</p>
-                    <p class="text-sm text-gray-500">{{ formatAgentType(agent.agentType) }}</p>
-                  </div>
-                </div>
-                <div class="flex items-center space-x-2">
-                  <span :class="agent.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'"
-                        class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium">
-                    {{ agent.isActive ? 'Active' : 'Inactive' }}
-                  </span>
                 </div>
               </div>
             </div>
           </div>
-
-          <div v-else class="text-center py-8 border-2 border-dashed border-gray-200 rounded-lg">
-            <CogIcon class="mx-auto h-8 w-8 text-gray-400 mb-2" />
-            <p class="text-gray-500 mb-4">No processing agents configured</p>
-            <button
-              @click="router.push(`/inboxes/${currentInbox._id}/agents`)"
-              class="px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded-md hover:bg-blue-100"
-            >
-              Add Processing Agents
-            </button>
-          </div>
         </div>
-
-        <!-- Webhook Configuration -->
-        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <WebhookConfig :inbox="currentInbox" @test-webhook="testWebhook" />
-        </div>
-
-        <!-- Inbox Information -->
-        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <h3 class="text-lg font-medium text-gray-900 mb-4">Inbox Information</h3>
-          
-          <dl class="space-y-4">
-            <div>
-              <dt class="text-sm font-medium text-gray-500">Account ID</dt>
-              <dd class="text-sm text-gray-900">{{ currentInbox.accountId }}</dd>
-            </div>
-            <div>
-              <dt class="text-sm font-medium text-gray-500">Inbox ID</dt>
-              <dd class="text-sm text-gray-900">{{ currentInbox.inboxId }}</dd>
-            </div>
-            <div>
-              <dt class="text-sm font-medium text-gray-500">Channel Type</dt>
-              <dd class="text-sm text-gray-900">{{ formatChannelType(currentInbox.channelType) }}</dd>
-            </div>
-            <div v-if="currentInbox.chatwoot?.botId">
-              <dt class="text-sm font-medium text-gray-500">Bot ID</dt>
-              <dd class="text-sm text-gray-900">{{ currentInbox.chatwoot.botId }}</dd>
-            </div>
-            <div v-if="currentInbox.chatwoot?.lastSync">
-              <dt class="text-sm font-medium text-gray-500">Last Sync</dt>
-              <dd class="text-sm text-gray-900">{{ formatDate(currentInbox.chatwoot.lastSync) }}</dd>
-            </div>
-          </dl>
+        
+        <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+          <button
+            @click="hideSelectAgent"
+            class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 sm:mt-0 sm:w-auto sm:text-sm"
+          >
+            Cancel
+          </button>
         </div>
       </div>
     </div>
@@ -272,15 +209,10 @@ import { ref, computed, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useToast } from 'vue-toastification'
 import { useInboxesStore } from '~/stores/inboxes'
-import WebhookConfig from '~/components/Inbox/WebhookConfig.vue'
-import SyncStatus from '~/components/Inbox/SyncStatus.vue'
+import { useAgentsStore } from '~/stores/agents'
 import {
   ArrowLeftIcon,
   UserIcon,
-  CogIcon,
-  CheckCircleIcon,
-  GlobeAltIcon,
-  PencilIcon,
   ExclamationTriangleIcon
 } from '@heroicons/vue/24/outline'
 
@@ -295,51 +227,63 @@ const inboxId = route.params.id
 const toast = useToast()
 
 const inboxesStore = useInboxesStore()
+const agentsStore = useAgentsStore()
 const { currentInbox, loading, error } = storeToRefs(inboxesStore)
+const { agents } = storeToRefs(agentsStore)
 
-const webhookTesting = ref(false)
+const draggedIndex = ref(-1)
+const setupLoading = ref(false)
+const showAgentModal = ref(false)
+const agentsLoading = ref(false)
 
 // Computed properties
-const channelTypeClass = computed(() => {
-  const type = currentInbox.value?.channelType
-  const baseClasses = 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium'
+const isBotSetup = computed(() => {
+  return !!(currentInbox.value?.chatwoot?.botId && currentInbox.value?.chatwoot?.isConfigured)
+})
+const allAgents = computed(() => {
+  const agentsList = []
   
-  switch (type) {
-    case 'web_widget':
-      return `${baseClasses} bg-blue-100 text-blue-800`
-    case 'email':
-      return `${baseClasses} bg-green-100 text-green-800`
-    case 'whatsapp':
-      return `${baseClasses} bg-green-100 text-green-800`
-    case 'api':
-      return `${baseClasses} bg-purple-100 text-purple-800`
-    default:
-      return `${baseClasses} bg-gray-100 text-gray-800`
+  // Add response agent first if it exists
+  if (currentInbox.value?.responseAgent?.agentId) {
+    agentsList.push({
+      id: currentInbox.value.responseAgent.agentId._id || currentInbox.value.responseAgent.agentId,
+      name: currentInbox.value.responseAgent.agentId.name || 'Response Agent',
+      type: 'Response Agent'
+    })
   }
+  
+  // Add processing agents
+  if (currentInbox.value?.agents) {
+    currentInbox.value.agents.forEach(agent => {
+      agentsList.push({
+        id: agent.agentId,
+        name: agent.name || 'Processing Agent',
+        type: formatAgentType(agent.agentType),
+        priority: agent.priority
+      })
+    })
+  }
+  
+  return agentsList.sort((a, b) => (a.priority || 0) - (b.priority || 0))
 })
 
-const statusClass = computed(() => {
-  const isActive = currentInbox.value?.isActive
-  return isActive 
-    ? 'bg-green-100 text-green-800'
-    : 'bg-red-100 text-red-800'
-})
-
-const activeAgentsCount = computed(() => {
-  if (!currentInbox.value?.agents) return 0
-  let count = currentInbox.value.agents.filter(a => a.isActive).length
-  if (currentInbox.value.responseAgent?.agentId) count += 1
-  return count
-})
-
-const responseAgentName = computed(() => {
-  // This would need to be populated from agent data
-  return 'Response Agent' // Placeholder - should fetch actual agent name
-})
-
-const sortedAgents = computed(() => {
-  if (!currentInbox.value?.agents) return []
-  return [...currentInbox.value.agents].sort((a, b) => a.priority - b.priority)
+const availableAgents = computed(() => {
+  if (!agents.value) return []
+  
+  // Filter out agents that are already assigned to this inbox
+  const assignedAgentIds = new Set()
+  
+  if (currentInbox.value?.responseAgent?.agentId) {
+    assignedAgentIds.add(currentInbox.value.responseAgent.agentId._id || currentInbox.value.responseAgent.agentId)
+  }
+  
+  if (currentInbox.value?.agents) {
+    currentInbox.value.agents.forEach(agent => {
+      assignedAgentIds.add(agent.agentId)
+    })
+  }
+  
+  return agents.value.filter(agent => !assignedAgentIds.has(agent._id))
 })
 
 // Methods
@@ -351,23 +295,106 @@ const refreshInbox = async () => {
   }
 }
 
-const testWebhook = async () => {
-  webhookTesting.value = true
+const createAgent = () => {
+  router.push(`/agents/new?inboxId=${inboxId}`)
+}
+
+const editAgent = (agent) => {
+  router.push(`/agents/${agent.id}`)
+}
+
+const deleteAgent = async (agent) => {
+  if (!confirm(`Are you sure you want to delete agent "${agent.name}"?`)) {
+    return
+  }
+  
   try {
-    const result = await inboxesStore.testWebhook(inboxId)
+    // This would need to be implemented in the store
+    await inboxesStore.deleteAgent(inboxId, agent.id)
+    toast('Agent deleted successfully', { type: 'success' })
+    await refreshInbox()
+  } catch (error) {
+    console.error('Failed to delete agent:', error)
+    toast('Failed to delete agent', { type: 'error' })
+  }
+}
+
+// Drag and drop methods
+const onDragStart = (index) => {
+  draggedIndex.value = index
+}
+
+const onDrop = async (dropIndex) => {
+  if (draggedIndex.value === -1 || draggedIndex.value === dropIndex) {
+    return
+  }
+  
+  try {
+    // This would need to be implemented in the store to reorder agents
+    await inboxesStore.reorderAgents(inboxId, draggedIndex.value, dropIndex)
+    toast('Agents reordered successfully', { type: 'success' })
+    await refreshInbox()
+  } catch (error) {
+    console.error('Failed to reorder agents:', error)
+    toast('Failed to reorder agents', { type: 'error' })
+  } finally {
+    draggedIndex.value = -1
+  }
+}
+
+const setupIntegration = async () => {
+  setupLoading.value = true
+  
+  try {
+    const result = await inboxesStore.createBot(inboxId)
     
-    if (result.success) {
-      toast('Webhook test successful!', { type: 'success' })
+    toast(`Integration setup successfully! Bot "${result.bot.botName}" has been created.`, { type: 'success' })
+    
+    // Refresh the inbox to show updated status
+    await refreshInbox()
+  } catch (error) {
+    console.error('Failed to setup integration:', error)
+    toast(`Failed to setup integration: ${error.message}`, { type: 'error' })
+  } finally {
+    setupLoading.value = false
+  }
+}
+
+const showSelectAgent = async () => {
+  showAgentModal.value = true
+  agentsLoading.value = true
+  
+  try {
+    await agentsStore.fetchAgents()
+  } catch (error) {
+    console.error('Failed to fetch agents:', error)
+    toast('Failed to load agents', { type: 'error' })
+  } finally {
+    agentsLoading.value = false
+  }
+}
+
+const hideSelectAgent = () => {
+  showAgentModal.value = false
+}
+
+const selectAgent = async (agent) => {
+  try {
+    if (agent.agentType === 'response') {
+      // Assign as response agent
+      await inboxesStore.assignResponseAgent(inboxId, agent._id)
+      toast(`Response agent "${agent.name}" assigned successfully`, { type: 'success' })
     } else {
-      toast('Webhook test failed. Check the console for details.', { type: 'error' })
+      // Add to processing pipeline
+      await inboxesStore.addAgent(inboxId, agent._id)
+      toast(`Processing agent "${agent.name}" added successfully`, { type: 'success' })
     }
     
-    console.log('Webhook test result:', result)
+    hideSelectAgent()
+    await refreshInbox()
   } catch (error) {
-    console.error('Webhook test error:', error)
-    toast('Webhook test failed with an error.', { type: 'error' })
-  } finally {
-    webhookTesting.value = false
+    console.error('Failed to assign agent:', error)
+    toast(`Failed to assign agent: ${error.message}`, { type: 'error' })
   }
 }
 

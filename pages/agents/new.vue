@@ -42,14 +42,37 @@ definePageMeta({
 })
 
 const router = useRouter()
+const route = useRoute()
 const agentsStore = useAgentsStore()
+const { useInboxesStore } = await import('~/stores/inboxes')
+const inboxesStore = useInboxesStore()
 const toast = useToast()
 
 const handleSubmit = async (agentData) => {
   try {
-    await agentsStore.createAgent(agentData)
-    toast.success('Agent created successfully!')
-    router.push('/agents')
+    const newAgent = await agentsStore.createAgent(agentData)
+    const inboxId = route.query.inboxId
+    
+    if (inboxId) {
+      // Auto-assign the agent to the inbox
+      try {
+        if (newAgent.agentType === 'response') {
+          await inboxesStore.assignResponseAgent(inboxId, newAgent._id)
+          toast.success('Agent created and assigned as response agent!')
+        } else {
+          await inboxesStore.addAgent(inboxId, newAgent._id)
+          toast.success('Agent created and added to processing pipeline!')
+        }
+      } catch (assignError) {
+        console.error('Error assigning agent to inbox:', assignError)
+        toast.success('Agent created successfully!')
+        toast.warning('Please manually assign the agent to the inbox')
+      }
+      router.push(`/inboxes/${inboxId}`)
+    } else {
+      toast.success('Agent created successfully!')
+      router.push('/agents')
+    }
   } catch (error) {
     console.error('Error creating agent:', error)
     toast.error('Failed to create agent: ' + error.message)
