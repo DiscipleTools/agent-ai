@@ -1,79 +1,18 @@
 /**
- * Agent Creation API Endpoint
- * 
+ * Create a new agent
  * POST /api/agents
- * 
- * Creates a new AI agent with the provided configuration.
- * Validates and sanitizes all user inputs to prevent XSS, injection attacks,
- * and other security vulnerabilities. Grants appropriate access permissions
- * to the creating user.
  */
-
 import { connectDB } from '~/server/utils/db'
-import { chatwootAuthMiddleware, validateInboxPermissions } from '~/server/utils/auth'
+import { chatwootAuthMiddleware } from '~/server/utils/auth'
 import Agent from '~/server/models/Agent'
-// User model removed - using Chatwoot authentication
-import { sanitizeText, sanitizeContent, sanitizeNumber, sanitizeObjectId } from '~/utils/sanitize'
-import chatwootService from '~/server/services/chatwootService'
+import { 
+  sanitizeText, 
+  sanitizeObject, 
+  sanitizeContent,
+  schemas,
+  validators 
+} from '~/utils/sanitize'
 
-interface AgentSettings {
-  temperature?: number | string
-  maxTokens?: number | string
-  responseDelay?: number | string
-  connectionId?: string
-  modelId?: string
-}
-
-interface AgentRequestBody {
-  name?: string
-  description?: string
-  prompt?: string
-  agentType?: string
-  settings?: AgentSettings
-  inboxes?: Array<{
-    accountId: number
-    inboxId: number
-    accountName?: string
-    inboxName?: string
-    channelType?: string
-  }>
-}
-
-// Helper function to extract Chatwoot session data from event
-function extractUserSessionData(event: any): { 'access-token': string; client: string; uid: string; expiry?: string } | null {
-  try {
-    const sessionCookie = getCookie(event, 'cw_d_session_info')
-    
-    if (!sessionCookie) {
-      return null
-    }
-
-    let sessionData
-    if (typeof sessionCookie === 'object') {
-      sessionData = sessionCookie
-    } else if (typeof sessionCookie === 'string') {
-      try {
-        const decodedCookie = decodeURIComponent(sessionCookie)
-        sessionData = JSON.parse(decodedCookie)
-      } catch (parseError) {
-        sessionData = sessionCookie
-      }
-    } else {
-      return null
-    }
-
-    const { 'access-token': accessToken, client, uid, expiry } = sessionData
-    
-    if (!accessToken || !client || !uid) {
-      return null
-    }
-
-    return { 'access-token': accessToken, client, uid, expiry }
-  } catch (error) {
-    console.error('Error extracting user session data:', error)
-    return null
-  }
-}
 
 export default chatwootAuthMiddleware.auth(async (event, checker) => {
   try {
@@ -83,163 +22,171 @@ export default chatwootAuthMiddleware.auth(async (event, checker) => {
     // Get user from checker
     const user = checker.user
 
-    // Get request body
-    const body = await readBody(event) as AgentRequestBody
-
-    // Sanitize individual fields with proper typing
-    const sanitizedBody = {
-      name: sanitizeText(body.name),
-      description: sanitizeContent(body.description),
-      prompt: sanitizeContent(body.prompt),
-      agentType: sanitizeText(body.agentType) || 'response'
+    // Get and validate request body
+    const body = await readBody(event)
+    
+    if (!body) {
+      throw createError({
+        statusCode: 400,
+        statusMessage: 'Request body is required'
+      })
     }
 
-    // Enhanced validation with sanitized inputs
-    const errors = []
+    // Validate required fields
+    const errors: string[] = []
 
-    // Validate name
-    if (!sanitizedBody.name || !sanitizedBody.name.trim()) {
-      errors.push('Agent name is required')
-    } else if (sanitizedBody.name.length > 100) {
-      errors.push('Agent name cannot exceed 100 characters')
+    if (!validators.textLength(body.name, 2, 100)) {
+      errors.push('Agent name must be between 2 and 100 characters')
     }
 
-    // Validate prompt
-    if (!sanitizedBody.prompt || !sanitizedBody.prompt.trim()) {
-      errors.push('System prompt is required')
-    } else if (sanitizedBody.prompt.length < 10) {
-      errors.push('Prompt must be at least 10 characters long')
-    } else if (sanitizedBody.prompt.length > 2000) {
-      errors.push('Prompt cannot exceed 2000 characters')
-    }
 
-    // Validate description
-    if (sanitizedBody.description && sanitizedBody.description.length > 500) {
+    if (body.description && !validators.textLength(body.description, 0, 500)) {
       errors.push('Description cannot exceed 500 characters')
     }
 
-    // Validate agent type
-    const validAgentTypes = ['response', 'pre-process', 'analytics', 'moderation', 'routing', 'post-process']
-    if (!validAgentTypes.includes(sanitizedBody.agentType)) {
-      errors.push(`Invalid agent type. Must be: ${validAgentTypes.join(', ')}`)
+    if (!body.workflow?.triggers || !Array.isArray(body.workflow.triggers) || body.workflow.triggers.length === 0) {
+      errors.push('At least one trigger is required')
     }
 
-
-
-    // Validate settings with additional sanitization
-    const sanitizedSettings: {
-      temperature?: number
-      maxTokens?: number
-      responseDelay?: number
-      connectionId?: string | null
-      modelId?: string | null
-    } = {}
-
-    if (body.settings) {
-      // Sanitize and validate temperature
-      if (body.settings.temperature !== undefined) {
-        const temp = sanitizeNumber(body.settings.temperature)
-        if (temp < 0 || temp > 1) {
-          errors.push('Temperature must be between 0 and 1')
-        }
-        sanitizedSettings.temperature = temp
-      }
-
-      // Sanitize and validate maxTokens
-      if (body.settings.maxTokens !== undefined) {
-        const tokens = sanitizeNumber(body.settings.maxTokens)
-        if (tokens < 1 || tokens > 2000) {
-          errors.push('Max tokens must be between 1 and 2000')
-        }
-        sanitizedSettings.maxTokens = Math.floor(tokens) // Ensure integer
-      }
-
-      // Sanitize and validate responseDelay
-      if (body.settings.responseDelay !== undefined) {
-        const delay = sanitizeNumber(body.settings.responseDelay)
-        if (delay < 0 || delay > 30) {
-          errors.push('Response delay must be between 0 and 30 seconds')
-        }
-        sanitizedSettings.responseDelay = delay
-      }
-
-      // Sanitize and validate connectionId
-      if (body.settings.connectionId) {
-        const sanitizedConnectionId = sanitizeObjectId(body.settings.connectionId)
-        if (!sanitizedConnectionId) {
-          errors.push('Invalid connection ID format')
-        } else {
-          sanitizedSettings.connectionId = sanitizedConnectionId
-        }
-      }
-
-      // Sanitize modelId (text field)
-      if (body.settings.modelId) {
-        sanitizedSettings.modelId = sanitizeText(body.settings.modelId)
-        if (sanitizedSettings.modelId.length > 100) {
-          errors.push('Model ID cannot exceed 100 characters')
-        }
-      }
-
-
+    if (!body.workflow?.actions || !Array.isArray(body.workflow.actions) || body.workflow.actions.length === 0) {
+      errors.push('At least one action is required')
     }
-
-
 
     if (errors.length > 0) {
       throw createError({
         statusCode: 400,
-        statusMessage: errors.join(', ')
+        statusMessage: errors.join('; ')
       })
     }
 
-    // Create agent data with sanitized inputs
+    // Sanitize and structure agent data
     const agentData = {
-      name: sanitizedBody.name.trim(),
-      description: sanitizedBody.description?.trim() || '',
-      prompt: sanitizedBody.prompt.trim(),
-      agentType: sanitizedBody.agentType,
+      name: sanitizeText(body.name),
+      description: sanitizeText(body.description || ''),
+      prompt: body.prompt || '', // Only set if provided, no default needed for workflow agents
+      agentType: 'workflow', // Agents with triggers/actions are workflow agents
+      createdBy: user.id,
+      
+      // AI settings
       settings: {
-        temperature: sanitizedSettings.temperature !== undefined ? sanitizedSettings.temperature : 0.3,
-        maxTokens: sanitizedSettings.maxTokens !== undefined ? sanitizedSettings.maxTokens : 500,
-        responseDelay: sanitizedSettings.responseDelay !== undefined ? sanitizedSettings.responseDelay : 0,
-        connectionId: sanitizedSettings.connectionId || null,
-        modelId: sanitizedSettings.modelId || null
+        temperature: body.settings?.temperature || 0.3,
+        maxTokens: body.settings?.maxTokens || 500,
+        responseDelay: body.settings?.responseDelay || 0,
+        connectionId: body.settings?.connectionId || null,
+        modelId: body.settings?.modelId || null
       },
-      createdBy: user._id,
-      isActive: true
+      
+      workflow: {
+        triggers: body.workflow.triggers.map((trigger: any) => ({
+          type: sanitizeText(trigger.type),
+          conditions: (trigger.conditions || []).map((condition: any) => ({
+            type: sanitizeText(condition.type),
+            operator: sanitizeText(condition.operator || 'equals'),
+            value: condition.value,
+            logicalOperator: sanitizeText(condition.logicalOperator || 'AND')
+          })),
+          isActive: trigger.isActive !== false
+        })),
+        
+        actions: body.workflow.actions.map((action: any, index: number) => ({
+          type: sanitizeText(action.type),
+          parameters: sanitizeObject(action.parameters || {}, {
+            // Allow mixed content for parameters
+            '*': 'mixed'
+          }),
+          order: action.order || (index + 1),
+          continueOnFailure: action.continueOnFailure !== false,
+          delay: Math.max(0, action.delay || 0)
+        })),
+        
+        isActive: body.workflow.isActive !== false
+      },
+      
+      // Initialize analytics
+      analytics: {
+        executionCount: 0,
+        successCount: 0,
+        failureCount: 0,
+        avgExecutionTime: 0
+      },
+      
+      isActive: body.isActive !== false
     }
 
-    // Create agent
+    // Validate trigger and action types
+    const validTriggerTypes = [
+      'conversation_created', 'conversation_status_changed',
+      'conversation_assigned', 'message_created',
+    ]
+
+    const validActionTypes = [
+      'ai_response', 'ai_summarize', 'ai_categorize', 'ai_sentiment_analysis',
+      'change_status', 'assign_agent', 'add_private_note', 'add_public_note',
+      'set_priority', 'set_custom_attribute', 'update_contact_attribute',
+      'wait', 'stop_workflow'
+    ]
+
+    // Validate all trigger types
+    for (const trigger of agentData.workflow.triggers) {
+      if (!validTriggerTypes.includes(trigger.type)) {
+        throw createError({
+          statusCode: 400,
+          statusMessage: `Invalid trigger type: ${trigger.type}`
+        })
+      }
+    }
+
+    // Validate all action types
+    for (const action of agentData.workflow.actions) {
+      if (!validActionTypes.includes(action.type)) {
+        throw createError({
+          statusCode: 400,
+          statusMessage: `Invalid action type: ${action.type}`
+        })
+      }
+    }
+
+    // Create the agent
     const agent = new Agent(agentData)
     await agent.save()
 
-
-
-    // Note: With Chatwoot authentication, user management is handled by Chatwoot
-    // No need to update Agent AI User model since we're using Chatwoot users
-
-    // Note: createdBy is now a simple ID (not ObjectId) so no population needed
-
     return {
       success: true,
-      data: agent
+      message: 'Agent created successfully',
+      data: {
+        _id: agent._id,
+        name: agent.name,
+        description: agent.description,
+        prompt: agent.prompt,
+        agentType: agent.agentType,
+        settings: agent.settings,
+        workflow: agent.workflow,
+        analytics: agent.analytics,
+        isActive: agent.isActive,
+        createdAt: agent.createdAt,
+        updatedAt: agent.updatedAt
+      }
     }
+
   } catch (error: any) {
     console.error('Create agent error:', error)
     
-    // Handle mongoose validation errors
-    if (error.name === 'ValidationError') {
-      const validationErrors = Object.values(error.errors).map((err: any) => err.message)
-      throw createError({
-        statusCode: 400,
-        statusMessage: validationErrors.join(', ')
-      })
+    if (error.statusCode) {
+      throw error
     }
 
+    // Handle MongoDB validation errors
+    if (error.name === 'ValidationError') {
+      const messages = Object.values(error.errors).map((err: any) => err.message)
+      throw createError({
+        statusCode: 400,
+        statusMessage: messages.join('; ')
+      })
+    }
+    
     throw createError({
-      statusCode: error.statusCode || 500,
-      statusMessage: error.statusMessage || error.message || 'Failed to create agent'
+      statusCode: 500,
+      statusMessage: 'Failed to create agent'
     })
   }
 }) 

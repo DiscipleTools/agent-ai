@@ -14,7 +14,7 @@
         Create New Agent
       </h1>
       <p class="mt-2 text-sm text-gray-700 dark:text-gray-300">
-        Create a new AI agent that can be assigned to inboxes
+        Configure your AI agent settings and behavior
       </p>
     </div>
 
@@ -24,7 +24,7 @@
     </div>
 
     <!-- Agent Form -->
-    <div v-else class="max-w-4xl">
+    <div v-else class="max-w-6xl">
       <AgentForm @submit="handleSubmit" @cancel="handleCancel" />
     </div>
   </div>

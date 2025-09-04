@@ -1,309 +1,182 @@
 /**
- * Agent Update API Endpoint
- * 
- * PUT /api/agents/[id]
- * 
- * Updates an existing agent's properties including name, description, prompt, 
- * active status, and AI connection settings. Validates user permissions through
- * middleware and sanitizes all user inputs to prevent XSS and injection attacks.
- * 
- * Security features:
- * - Agent access control via authMiddleware.agentAccess('write')
- * - Input sanitization for all user-provided fields
- * - ObjectId validation for connection references
- * - Bounded input lengths to prevent DoS attacks
+ * Update an agent
+ * PUT /api/agents/{id}
  */
-
 import { connectDB } from '~/server/utils/db'
-import { chatwootAuthMiddleware } from '~/server/utils/auth'
+import { chatwootAuthMiddleware, canAccessAgentResource } from '~/server/utils/auth'
 import Agent from '~/server/models/Agent'
-import Inbox from '~/server/models/Inbox'
-import mongoose from 'mongoose'
-import { sanitizeText, sanitizeContent, sanitizeObjectId, sanitizeNumber } from '~/utils/sanitize'
+import { 
+  sanitizeText, 
+  sanitizeObject,
+  validators 
+} from '~/utils/sanitize'
 
-export default chatwootAuthMiddleware.agentAccess('write')(async (event, checker, agentId) => {
+export default chatwootAuthMiddleware.auth(async (event, checker) => {
   try {
     // Connect to database
     await connectDB()
 
-    // Get request body
-    const body = await readBody(event)
+    // Get user from checker
+    const user = checker.user
 
-    // Validate and sanitize basic inputs
-    if (!body || typeof body !== 'object') {
+    const agentId = getRouterParam(event, 'id')
+    if (!agentId) {
       throw createError({
         statusCode: 400,
-        statusMessage: 'Invalid request body'
+        statusMessage: 'Agent ID is required'
       })
     }
 
-    // Find agent
-    const agent = await Agent.findById(agentId)
+    // Get and validate request body
+    const body = await readBody(event)
+    
+    if (!body) {
+      throw createError({
+        statusCode: 400,
+        statusMessage: 'Request body is required'
+      })
+    }
 
-    if (!agent) {
+    // Find existing agent
+    const existingAgent = await Agent.findById(agentId)
+
+    if (!existingAgent) {
       throw createError({
         statusCode: 404,
         statusMessage: 'Agent not found'
       })
     }
 
-    // Sanitize and validate individual fields
+    // Check if user can access this agent based on Chatwoot account administration
+    if (!canAccessAgentResource(user, existingAgent)) {
+      throw createError({
+        statusCode: 403,
+        statusMessage: 'Access denied'
+      })
+    }
+
+    // Validate fields if provided
+    const errors: string[] = []
+
+    if (body.name !== undefined && !validators.textLength(body.name, 2, 100)) {
+      errors.push('Agent name must be between 2 and 100 characters')
+    }
+
+    if (body.description !== undefined && !validators.textLength(body.description, 0, 500)) {
+      errors.push('Description cannot exceed 500 characters')
+    }
+
+    if (body.prompt !== undefined && !validators.textLength(body.prompt, 10, 2000)) {
+      errors.push('System prompt must be between 10 and 2000 characters')
+    }
+
+    if (errors.length > 0) {
+      throw createError({
+        statusCode: 400,
+        statusMessage: errors.join('; ')
+      })
+    }
+
+    // Prepare update data
+    const updateData: any = {}
+
     if (body.name !== undefined) {
-      const sanitizedName = sanitizeText(body.name)
-      if (!sanitizedName || sanitizedName.length === 0) {
-        throw createError({
-          statusCode: 400,
-          statusMessage: 'Agent name cannot be empty'
-        })
-      }
-      if (sanitizedName.length > 100) {
-        throw createError({
-          statusCode: 400,
-          statusMessage: 'Agent name must be 100 characters or less'
-        })
-      }
-      agent.name = sanitizedName
+      updateData.name = sanitizeText(body.name)
     }
 
     if (body.description !== undefined) {
-      const sanitizedDescription = sanitizeContent(body.description)
-      if (sanitizedDescription.length > 1000) {
-        throw createError({
-          statusCode: 400,
-          statusMessage: 'Agent description must be 1000 characters or less'
-        })
-      }
-      agent.description = sanitizedDescription
+      updateData.description = sanitizeText(body.description)
     }
 
     if (body.prompt !== undefined) {
-      const sanitizedPrompt = sanitizeContent(body.prompt)
-      if (sanitizedPrompt.length > 10000) {
-        throw createError({
-          statusCode: 400,
-          statusMessage: 'Agent prompt must be 10000 characters or less'
-        })
-      }
-      agent.prompt = sanitizedPrompt
+      updateData.prompt = sanitizeText(body.prompt)
     }
 
     if (body.isActive !== undefined) {
-      if (typeof body.isActive !== 'boolean') {
-        throw createError({
-          statusCode: 400,
-          statusMessage: 'isActive must be a boolean value'
-        })
-      }
-      agent.isActive = body.isActive
+      updateData.isActive = body.isActive
     }
 
-    // Validate and update agent type
-    if (body.agentType !== undefined) {
-      const sanitizedAgentType = sanitizeText(body.agentType)
-      const validAgentTypes = ['response', 'pre-process', 'analytics', 'moderation', 'routing', 'post-process']
-      if (!validAgentTypes.includes(sanitizedAgentType)) {
-        throw createError({
-          statusCode: 400,
-          statusMessage: `Invalid agent type. Must be one of: ${validAgentTypes.join(', ')}`
-        })
+    if (body.settings !== undefined) {
+      updateData.settings = {
+        temperature: body.settings.temperature || existingAgent.settings?.temperature || 0.3,
+        maxTokens: body.settings.maxTokens || existingAgent.settings?.maxTokens || 500,
+        responseDelay: body.settings.responseDelay || existingAgent.settings?.responseDelay || 0,
+        connectionId: body.settings.connectionId || existingAgent.settings?.connectionId || null,
+        modelId: body.settings.modelId || existingAgent.settings?.modelId || null
       }
-
-      // Check if agent type change would break existing assignments
-      const currentAgentType = agent.agentType
-      if (sanitizedAgentType !== currentAgentType) {
-        // Check if agent is assigned to any inboxes
-        const assignedInboxes = await Inbox.find({
-          $or: [
-            { 'responseAgent.agentId': agentId },
-            { 'agents.agentId': agentId }
-          ]
-        }).select('name responseAgent agents')
-
-        if (assignedInboxes.length > 0) {
-          // Check for specific constraint violations
-          if (currentAgentType === 'response' && sanitizedAgentType !== 'response') {
-            const responseInboxes = assignedInboxes.filter(inbox => 
-              inbox.responseAgent?.agentId?.toString() === agentId
-            )
-            if (responseInboxes.length > 0) {
-              throw createError({
-                statusCode: 400,
-                statusMessage: `Cannot change agent type from 'response' - agent is assigned as response agent to ${responseInboxes.length} inbox(es). Remove from response assignments first.`
-              })
-            }
-          }
-
-          if (currentAgentType !== 'response' && sanitizedAgentType === 'response') {
-            const processingInboxes = assignedInboxes.filter(inbox =>
-              inbox.agents?.some(a => a.agentId.toString() === agentId)
-            )
-            if (processingInboxes.length > 0) {
-              throw createError({
-                statusCode: 400,
-                statusMessage: `Cannot change agent type to 'response' - agent is assigned to processing pipeline of ${processingInboxes.length} inbox(es). Remove from processing assignments first.`
-              })
-            }
-          }
-        }
-      }
-
-      agent.agentType = sanitizedAgentType
     }
 
-    // Handle inbox updates with validation
-    if (body.inboxes !== undefined) {
-      const sanitizedInboxes = []
-      if (body.inboxes && Array.isArray(body.inboxes)) {
-        for (let i = 0; i < body.inboxes.length; i++) {
-          const inbox = body.inboxes[i]
-          
-          if (!inbox || typeof inbox !== 'object') {
-            throw createError({
-              statusCode: 400,
-              statusMessage: `Invalid inbox assignment at index ${i}`
-            })
-          }
-
-          const sanitizedInbox = {
-            accountId: sanitizeNumber(inbox.accountId),
-            inboxId: sanitizeNumber(inbox.inboxId),
-            accountName: sanitizeText(inbox.accountName) || '',
-            inboxName: sanitizeText(inbox.inboxName) || '',
-            channelType: sanitizeText(inbox.channelType) || ''
-          }
-
-          // Validate required fields
-          if (!sanitizedInbox.accountId || !sanitizedInbox.inboxId) {
-            throw createError({
-              statusCode: 400,
-              statusMessage: `Inbox assignment at index ${i} missing required accountId or inboxId`
-            })
-          }
-
-          sanitizedInboxes.push(sanitizedInbox)
-        }
+    if (body.workflow !== undefined) {
+      updateData.workflow = {
+        triggers: body.workflow.triggers?.map((trigger: any) => ({
+          type: sanitizeText(trigger.type),
+          conditions: (trigger.conditions || []).map((condition: any) => ({
+            type: sanitizeText(condition.type),
+            operator: sanitizeText(condition.operator || 'equals'),
+            value: condition.value,
+            logicalOperator: sanitizeText(condition.logicalOperator || 'AND')
+          })),
+          isActive: trigger.isActive !== false
+        })) || existingAgent.workflow?.triggers || [],
+        
+        actions: body.workflow.actions?.map((action: any, index: number) => ({
+          type: sanitizeText(action.type),
+          parameters: sanitizeObject(action.parameters || {}, {
+            '*': 'mixed'
+          }),
+          order: action.order || (index + 1),
+          continueOnFailure: action.continueOnFailure !== false,
+          delay: Math.max(0, action.delay || 0)
+        })) || existingAgent.workflow?.actions || [],
+        
+        isActive: body.workflow.isActive !== false
       }
-
-      // Validate response agent inbox constraints if this is a response agent
-      const currentAgentType = (agent as any).agentType || 'response'
-      if (currentAgentType === 'response' && sanitizedInboxes.length > 0) {
-        const responseAgentValidation = await (Agent as any).validateResponseAgentInboxes(sanitizedInboxes, agent._id)
-        if (!responseAgentValidation.isValid) {
-          const conflictMessages = responseAgentValidation.conflicts.map((conflict: any) => 
-            `Inbox "${conflict.inboxName}" already has response agent "${conflict.existingAgentName}"`
-          )
-          throw createError({
-            statusCode: 400,
-            statusMessage: conflictMessages.join(', ')
-          })
-        }
-      }
-
-      ;(agent as any).inboxes = sanitizedInboxes
-    }
-    
-    // Update settings with proper sanitization
-    if (body.settings && typeof body.settings === 'object') {
-      const currentSettings = (agent as any).settings || {}
-      
-      // Sanitize and validate individual settings
-      if (body.settings.connectionId !== undefined) {
-        if (body.settings.connectionId === null || body.settings.connectionId === '') {
-          // Allow clearing the connection
-          currentSettings.connectionId = null
-        } else {
-          const sanitizedConnectionId = sanitizeObjectId(body.settings.connectionId)
-          if (!sanitizedConnectionId) {
-            throw createError({
-              statusCode: 400,
-              statusMessage: 'Invalid connection ID format'
-            })
-          }
-          if (!mongoose.Types.ObjectId.isValid(sanitizedConnectionId)) {
-            throw createError({
-              statusCode: 400,
-              statusMessage: 'Invalid connection ID format'
-            })
-          }
-          currentSettings.connectionId = sanitizedConnectionId
-        }
-      }
-
-      // Sanitize other numeric settings
-      if (body.settings.temperature !== undefined) {
-        const sanitizedTemp = sanitizeNumber(body.settings.temperature)
-        if (sanitizedTemp < 0 || sanitizedTemp > 2) {
-          throw createError({
-            statusCode: 400,
-            statusMessage: 'Temperature must be between 0 and 2'
-          })
-        }
-        currentSettings.temperature = sanitizedTemp
-      }
-
-      if (body.settings.maxTokens !== undefined) {
-        const sanitizedMaxTokens = sanitizeNumber(body.settings.maxTokens)
-        if (sanitizedMaxTokens < 1 || sanitizedMaxTokens > 100000) {
-          throw createError({
-            statusCode: 400,
-            statusMessage: 'Max tokens must be between 1 and 100000'
-          })
-        }
-        currentSettings.maxTokens = sanitizedMaxTokens
-      }
-
-      if (body.settings.responseDelay !== undefined) {
-        const sanitizedDelay = sanitizeNumber(body.settings.responseDelay)
-        if (sanitizedDelay < 0 || sanitizedDelay > 60000) {
-          throw createError({
-            statusCode: 400,
-            statusMessage: 'Response delay must be between 0 and 60000 milliseconds'
-          })
-        }
-        currentSettings.responseDelay = sanitizedDelay
-      }
-
-      // Sanitize text-based settings
-      if (body.settings.modelId !== undefined) {
-        const sanitizedModelId = sanitizeText(body.settings.modelId)
-        if (sanitizedModelId && sanitizedModelId.length > 100) {
-          throw createError({
-            statusCode: 400,
-            statusMessage: 'Model ID must be 100 characters or less'
-          })
-        }
-        currentSettings.modelId = sanitizedModelId || null
-      }
-
-      if (body.settings.chatwootApiKey !== undefined) {
-        const sanitizedApiKey = sanitizeText(body.settings.chatwootApiKey)
-        if (sanitizedApiKey && sanitizedApiKey.length > 200) {
-          throw createError({
-            statusCode: 400,
-            statusMessage: 'Chatwoot API key must be 200 characters or less'
-          })
-        }
-        currentSettings.chatwootApiKey = sanitizedApiKey || null
-      }
-      
-      ;(agent as any).settings = currentSettings
     }
 
-    // Save agent
-    await agent.save()
-
-    // Populate createdBy field for response
-    await agent.populate('createdBy', 'name email')
+    // Update the agent
+    const updatedAgent = await Agent.findByIdAndUpdate(
+      agentId,
+      { $set: updateData },
+      { new: true, runValidators: true }
+    ).lean()
 
     return {
       success: true,
-      data: agent
+      message: 'Agent updated successfully',
+      data: {
+        _id: updatedAgent._id,
+        name: updatedAgent.name,
+        description: updatedAgent.description,
+        prompt: updatedAgent.prompt,
+        agentType: updatedAgent.agentType,
+        settings: updatedAgent.settings,
+        workflow: updatedAgent.workflow,
+        analytics: updatedAgent.analytics,
+        isActive: updatedAgent.isActive,
+        createdAt: updatedAgent.createdAt,
+        updatedAt: updatedAgent.updatedAt
+      }
     }
+
   } catch (error: any) {
     console.error('Update agent error:', error)
+    
+    if (error.statusCode) {
+      throw error
+    }
+
+    // Handle MongoDB validation errors
+    if (error.name === 'ValidationError') {
+      const messages = Object.values(error.errors).map((err: any) => err.message)
+      throw createError({
+        statusCode: 400,
+        statusMessage: messages.join('; ')
+      })
+    }
+    
     throw createError({
-      statusCode: error.statusCode || 500,
-      statusMessage: error.message || 'Failed to update agent'
+      statusCode: 500,
+      statusMessage: 'Failed to update agent'
     })
   }
 }) 

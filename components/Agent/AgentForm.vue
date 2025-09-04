@@ -1,19 +1,160 @@
 <template>
   <form @submit.prevent="handleSubmit" class="space-y-8">
     <!-- Basic Information -->
-    <BasicInfo 
-      :form="form" 
-      :errors="errors" 
-    />
+    <div class="card">
+      <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-4">
+        Basic Information
+      </h3>
+      
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div>
+          <label for="name" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            Agent Name *
+          </label>
+          <input
+            id="name"
+            v-model="form.name"
+            type="text"
+            required
+            placeholder="Customer Support Agent"
+            class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            :class="{ 'border-red-500': errors.name }"
+          />
+          <p v-if="errors.name" class="mt-1 text-sm text-red-600 dark:text-red-400">
+            {{ errors.name }}
+          </p>
+        </div>
+        
+        <div>
+          <label for="isActive" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            Status
+          </label>
+          <select
+            id="isActive"
+            v-model="form.isActive"
+            class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500"
+          >
+            <option :value="true">Active</option>
+            <option :value="false">Inactive</option>
+          </select>
+        </div>
+      </div>
+      
+      <div class="mt-4">
+        <label for="description" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+          Description
+        </label>
+        <textarea
+          id="description"
+          v-model="form.description"
+          rows="3"
+          placeholder="Describe what this agent does..."
+          class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+          :class="{ 'border-red-500': errors.description }"
+        ></textarea>
+        <p v-if="errors.description" class="mt-1 text-sm text-red-600 dark:text-red-400">
+          {{ errors.description }}
+        </p>
+      </div>
+      
+    </div>
 
-    <!-- Webhook Configuration (if editing) -->
-    <WebhookConfig 
-      v-if="agent && agent._id" 
-      :agent="agent" 
-    />
+    <!-- Triggers Section -->
+    <div class="card">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="text-lg font-medium text-gray-900 dark:text-white">
+          Triggers
+        </h3>
+        <button
+          type="button"
+          @click="addTrigger"
+          class="btn-secondary text-sm"
+        >
+          Add Trigger
+        </button>
+      </div>
+      
+      <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
+        Define when this agent should activate. At least one trigger is required.
+      </p>
+      
+      <div v-if="form.workflow.triggers.length === 0" class="text-center py-8 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg">
+        <p class="text-gray-500 dark:text-gray-400 mb-4">No triggers configured</p>
+        <button
+          type="button"
+          @click="addTrigger"
+          class="btn-primary"
+        >
+          Add Your First Trigger
+        </button>
+      </div>
+      
+      <div v-else class="space-y-4">
+        <TriggerBuilder
+          v-for="(trigger, index) in form.workflow.triggers"
+          :key="`trigger-${index}`"
+          :trigger="trigger"
+          :metadata="metadata"
+          :index="index"
+          @update="updateTrigger(index, $event)"
+          @remove="removeTrigger(index)"
+        />
+      </div>
+      
+      <p v-if="errors.triggers" class="mt-2 text-sm text-red-600 dark:text-red-400">
+        {{ errors.triggers }}
+      </p>
+    </div>
 
-    <!-- AI Settings -->
-    <AISettings :form="form" />
+    <!-- Actions Section -->
+    <div class="card">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="text-lg font-medium text-gray-900 dark:text-white">
+          Actions
+        </h3>
+        <button
+          type="button"
+          @click="addAction"
+          class="btn-secondary text-sm"
+        >
+          Add Action
+        </button>
+      </div>
+      
+      <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
+        Define what happens when the agent is triggered. Actions run in order.
+      </p>
+      
+      <div v-if="form.workflow.actions.length === 0" class="text-center py-8 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg">
+        <p class="text-gray-500 dark:text-gray-400 mb-4">No actions configured</p>
+        <button
+          type="button"
+          @click="addAction"
+          class="btn-primary"
+        >
+          Add Your First Action
+        </button>
+      </div>
+      
+      <div v-else class="space-y-4">
+        <ActionBuilder
+          v-for="(action, index) in form.workflow.actions"
+          :key="`action-${index}`"
+          :action="action"
+          :metadata="metadata"
+          :index="index"
+          @update="updateAction(index, $event)"
+          @remove="removeAction(index)"
+          @move-up="moveAction(index, index - 1)"
+          @move-down="moveAction(index, index + 1)"
+        />
+      </div>
+      
+      <p v-if="errors.actions" class="mt-2 text-sm text-red-600 dark:text-red-400">
+        {{ errors.actions }}
+      </p>
+    </div>
+
 
     <!-- Context Documents (if editing) -->
     <ContextDocuments
@@ -56,23 +197,12 @@
 </template>
 
 <script setup>
-import BasicInfo from '~/components/Agent/BasicInfo.vue'
-import WebhookConfig from '~/components/Agent/WebhookConfig.vue'
-import AISettings from '~/components/Agent/AISettings.vue'
 import ContextDocuments from '~/components/Agent/ContextDocuments.vue'
+import TriggerBuilder from '~/components/Workflow/TriggerBuilder.vue'
+import ActionBuilder from '~/components/Workflow/ActionBuilder.vue'
 import { useAgentsStore } from '~/stores/agents'
 import { useToast } from 'vue-toastification'
-import { 
-  sanitizeText, 
-  sanitizeNumber, 
-  sanitizeUrl, 
-  sanitizeFilename, 
-  sanitizeContent,
-  sanitizeObject,
-  schemas,
-  validators
-} from '~/utils/sanitize'
-import { useCsrf } from '~/composables/useCsrf'
+import { validators } from '~/utils/sanitize'
 
 const props = defineProps({
   agent: {
@@ -81,57 +211,147 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['submit', 'cancel', 'agentUpdated'])
+const emit = defineEmits(['submit', 'cancel'])
 
-// Stores
 const agentsStore = useAgentsStore()
 const toast = useToast()
-const { csrfRequest, addCsrfToForm } = useCsrf()
 
-// Form state - don't sanitize on initialization to allow proper editing
+// Form state
 const form = reactive({
   name: props.agent?.name || '',
   description: props.agent?.description || '',
-  prompt: props.agent?.prompt || '',
-  agentType: props.agent?.agentType || 'response',
+  prompt: '', // No default prompt needed for workflow agents
+  isActive: props.agent?.isActive !== false,
   settings: {
-    temperature: sanitizeNumber(props.agent?.settings?.temperature || 0.3),
-    maxTokens: sanitizeNumber(props.agent?.settings?.maxTokens || 500),
-    responseDelay: sanitizeNumber(props.agent?.settings?.responseDelay || 0),
+    temperature: props.agent?.settings?.temperature || 0.3,
+    maxTokens: props.agent?.settings?.maxTokens || 500,
+    responseDelay: props.agent?.settings?.responseDelay || 0,
     connectionId: props.agent?.settings?.connectionId || '',
-    modelId: props.agent?.settings?.modelId || '',
+    modelId: props.agent?.settings?.modelId || ''
   },
-  inboxes: props.agent?.inboxes || []
+  workflow: {
+    triggers: props.agent?.workflow?.triggers || [],
+    actions: props.agent?.workflow?.actions || [],
+    isActive: props.agent?.workflow?.isActive !== false
+  }
 })
 
 const errors = reactive({})
 const isSubmitting = ref(false)
 
-// Check for inbox query parameters when creating a new agent
-const route = useRoute()
-if (!props.agent && route.query.inboxId) {
-  // Populate inbox assignment from query parameters
-  const inboxData = {
-    accountId: sanitizeNumber(route.query.accountId),
-    inboxId: sanitizeNumber(route.query.inboxId),
-    accountName: sanitizeText(route.query.accountName),
-    inboxName: sanitizeText(route.query.inboxName),
-    channelType: sanitizeText(route.query.channelType)
-  }
-  
-  // Only add if all required fields are present
-  if (inboxData.accountId && inboxData.inboxId) {
-    form.inboxes.push(inboxData)
-  }
-}
+// Workflow metadata for the builder components
+const metadata = ref({
+  triggers: [
+    // Conversation Events - NOT FUNCTIONAL (webhook only processes message_created)
+    { type: 'conversation_created', name: 'New conversation started', description: 'Triggers when a new conversation is created', category: 'conversation', disabled: true, disabledReason: 'Not processed by webhook - only message_created events work' },
+    { type: 'conversation_status_changed', name: 'Conversation status changed', description: 'Triggers when conversation status changes (open, resolved, pending, snoozed)', category: 'conversation', disabled: true, disabledReason: 'Not processed by webhook - only message_created events work' },
+    { type: 'conversation_assigned', name: 'Conversation assigned', description: 'Triggers when conversation is assigned to an agent', category: 'conversation', disabled: true, disabledReason: 'Not processed by webhook - only message_created events work' },
+    
+    // Message Events - ONLY THIS ONE WORKS
+    { type: 'message_created', name: 'New message received', description: 'Triggers when a new message is received (incoming or outgoing)', category: 'message' },
+    
+    
+    // Contact Events
+  ],
+  actions: [
+    // AI-Powered Actions - ONLY ai_response WORKS
+    { type: 'ai_response', name: 'Generate AI Response', description: 'Generate and send AI response based on conversation context', category: 'ai', parameters: [
+      { name: 'prompt', label: 'System Prompt', type: 'textarea', placeholder: 'You are a helpful customer service assistant. Always be polite and professional...', required: true },
+      { name: 'includeHistory', label: 'Include message history', type: 'checkbox', default: true, required: false }
+    ]},
+    { type: 'ai_summarize', name: 'Summarize Conversation', description: 'Create a summary of the conversation', category: 'ai', disabled: true, disabledReason: 'Not implemented - no execution logic exists', parameters: [
+      { name: 'maxLength', label: 'Maximum length (words)', type: 'number', default: 100, min: 50, max: 500, required: false }
+    ]},
+    { type: 'ai_categorize', name: 'Categorize Conversation', description: 'Auto-categorize the conversation based on content', category: 'ai', disabled: true, disabledReason: 'Not implemented - no execution logic exists', parameters: []},
+    { type: 'ai_sentiment_analysis', name: 'Analyze Sentiment', description: 'Analyze the sentiment of messages', category: 'ai', disabled: true, disabledReason: 'Not implemented - no execution logic exists', parameters: []},
+    
+    // Conversation Management - ONLY change_status WORKS
+    { type: 'change_status', name: 'Change Status', description: 'Update conversation status', category: 'conversation', parameters: [
+      { name: 'status', label: 'New Status', type: 'select', required: true, options: [
+        { value: 'open', label: 'Open' },
+        { value: 'resolved', label: 'Resolved' },
+        { value: 'pending', label: 'Pending' },
+        { value: 'snoozed', label: 'Snoozed' }
+      ]}
+    ]},
+    { type: 'assign_agent', name: 'Assign Agent', description: 'Assign conversation to specific agent or team', category: 'conversation', disabled: true, disabledReason: 'Placeholder only - returns fake data, does not actually assign', parameters: [
+      { name: 'agentId', label: 'Agent ID', type: 'text', placeholder: 'Enter agent ID', required: true }
+    ]},
+    { type: 'add_private_note', name: 'Add Private Note', description: 'Add internal note to conversation', category: 'conversation', disabled: true, disabledReason: 'Partially implemented - sends as regular message, not private note', parameters: [
+      { name: 'note', label: 'Note Content', type: 'textarea', placeholder: 'Enter private note...', required: true }
+    ]},
+    { type: 'add_public_note', name: 'Add Public Note', description: 'Add customer-visible note', category: 'conversation', disabled: true, disabledReason: 'Partially implemented - sends as regular message, same as private note', parameters: [
+      { name: 'note', label: 'Note Content', type: 'textarea', placeholder: 'Enter public note...', required: true }
+    ]},
+    { type: 'set_priority', name: 'Set Priority', description: 'Set conversation priority level', category: 'conversation', disabled: true, disabledReason: 'Placeholder only - returns fake data, does not actually set priority', parameters: [
+      { name: 'priority', label: 'Priority Level', type: 'select', required: true, options: [
+        { value: 'low', label: 'Low' },
+        { value: 'medium', label: 'Medium' },
+        { value: 'high', label: 'High' },
+        { value: 'urgent', label: 'Urgent' }
+      ]}
+    ]},
+    
+    // Flow Control Actions
+    { type: 'wait', name: 'Wait', description: 'Pause workflow execution for specified duration', category: 'flow', parameters: [
+      { name: 'duration', label: 'Duration (milliseconds)', type: 'number', default: 1000, min: 100, max: 30000, required: true }
+    ]},
+    { type: 'set_custom_attribute', name: 'Set Custom Attribute', description: 'Set conversation custom attributes', category: 'conversation', disabled: true, disabledReason: 'Placeholder only - returns fake data, does not actually set attributes', parameters: [
+      { name: 'attributeName', label: 'Attribute Name', type: 'text', placeholder: 'attribute_name', required: true },
+      { name: 'attributeValue', label: 'Attribute Value', type: 'text', placeholder: 'attribute_value', required: true }
+    ]},
+    { type: 'update_contact_attribute', name: 'Update Contact Attribute', description: 'Modify contact custom attributes', category: 'conversation', disabled: true, disabledReason: 'Not implemented - no execution logic exists', parameters: [
+      { name: 'attributeName', label: 'Attribute Name', type: 'text', placeholder: 'attribute_name', required: true },
+      { name: 'attributeValue', label: 'Attribute Value', type: 'text', placeholder: 'attribute_value', required: true }
+    ]},
+    { type: 'stop_workflow', name: 'Stop Workflow', description: 'Stop workflow execution', category: 'flow', disabled: true, disabledReason: 'Not implemented - no execution logic exists', parameters: []},
+  ],
+  conditions: [
+    // Message Content - ONLY message_contains WORKS
+    { type: 'message_contains', name: 'Message contains text', description: 'Check if message contains specific text', category: 'message', valueType: 'text', operators: ['contains', 'not_contains', 'equals', 'not_equals'] },
+    { type: 'message_length', name: 'Message length', description: 'Check message character length', category: 'message', valueType: 'number', operators: ['greater_than', 'less_than', 'equals'], disabled: true, disabledReason: 'Partially implemented - only hardcoded variants exist in evaluation logic' },
+    { type: 'message_language', name: 'Message language', description: 'Detect message language', category: 'message', valueType: 'select', disabled: true, disabledReason: 'Not implemented - no evaluation logic exists', operators: ['equals', 'not_equals'], options: [
+      { value: 'en', label: 'English' },
+      { value: 'es', label: 'Spanish' },
+      { value: 'fr', label: 'French' },
+      { value: 'de', label: 'German' }
+    ]},
+    
+    // Contact Properties - NOT IMPLEMENTED
+    { type: 'contact_attribute', name: 'Contact attribute', description: 'Check contact custom attribute value', category: 'contact', valueType: 'text', disabled: true, disabledReason: 'Not implemented - no evaluation logic exists', operators: ['equals', 'not_equals', 'contains', 'not_contains'] },
+    { type: 'contact_email', name: 'Contact email', description: 'Check contact email address', category: 'contact', valueType: 'email', disabled: true, disabledReason: 'Not implemented - no evaluation logic exists', operators: ['equals', 'not_equals', 'contains', 'not_contains'] },
+    
+    // Conversation Properties - PARTIALLY IMPLEMENTED
+    { type: 'conversation_status', name: 'Conversation status', description: 'Check current conversation status', category: 'conversation', valueType: 'select', disabled: true, disabledReason: 'Partially implemented - only hardcoded conversation_status_equals exists', operators: ['equals', 'not_equals'], options: [
+      { value: 'open', label: 'Open' },
+      { value: 'resolved', label: 'Resolved' },
+      { value: 'pending', label: 'Pending' },
+      { value: 'snoozed', label: 'Snoozed' }
+    ]},
+    { type: 'conversation_message_count', name: 'Message count', description: 'Check number of messages in conversation', category: 'conversation', valueType: 'number', disabled: true, disabledReason: 'Not implemented - no evaluation logic exists', operators: ['greater_than', 'less_than', 'equals'] },
+    
+    // AI-Evaluated Conditions - NOT IMPLEMENTED  
+    { type: 'ai_evaluation', name: 'AI Evaluation', description: 'Use AI to evaluate custom conditions', category: 'ai', valueType: 'text', disabled: true, disabledReason: 'Not implemented - no evaluation logic exists', operators: ['equals', 'not_equals'] },
+  ],
+  operators: [
+    { value: 'equals', label: 'equals' },
+    { value: 'not_equals', label: 'does not equal' },
+    { value: 'contains', label: 'contains' },
+    { value: 'not_contains', label: 'does not contain' },
+    { value: 'greater_than', label: 'is greater than' },
+    { value: 'less_than', label: 'is less than' },
+    { value: 'exists', label: 'exists' },
+    { value: 'not_exists', label: 'does not exist' }
+  ]
+})
 
-// Context documents state
+// Context documents state (for editing)
 const contextDocuments = ref([])
 const refreshingDocs = ref(new Set())
 const deletingDocs = ref(new Set())
 const ragSummary = ref(null)
 
-// Add reactive variables for re-crawl progress tracking
+// Re-crawl progress tracking
 const reCrawlingProgress = reactive({
   isActive: false,
   phase: '',
@@ -143,38 +363,25 @@ const reCrawlingProgress = reactive({
   docId: null
 })
 
-// Helper function to reload agent data (including context documents)
-const reloadAgentData = async () => {
-  if (!props.agent?._id) return
-  
-  try {
-    const updatedAgent = await agentsStore.fetchAgent(props.agent._id)
-    // Update the reactive references with new data
-    contextDocuments.value = updatedAgent.contextDocuments || []
-    ragSummary.value = updatedAgent.ragSummary || null
-    
-    // Emit to parent to update the agent prop
-    emit('agentUpdated', updatedAgent)
-  } catch (error) {
-    console.error('Failed to reload agent data:', error.message)
-    toast('Failed to reload agent data', { type: 'error' })
-  }
-}
-
-// Watch for prop changes (when editing) - don't sanitize on prop updates
+// Watch for prop changes (when editing)
 watch(() => props.agent, (newAgent) => {
   if (newAgent) {
     form.name = newAgent.name || ''
     form.description = newAgent.description || ''
-    form.prompt = newAgent.prompt || ''
+    form.prompt = newAgent.prompt || '' // No default prompt needed
+    form.isActive = newAgent.isActive !== false
     form.settings = {
-      temperature: sanitizeNumber(newAgent.settings?.temperature || 0.3),
-      maxTokens: sanitizeNumber(newAgent.settings?.maxTokens || 500),
-      responseDelay: sanitizeNumber(newAgent.settings?.responseDelay || 0),
+      temperature: newAgent.settings?.temperature || 0.3,
+      maxTokens: newAgent.settings?.maxTokens || 500,
+      responseDelay: newAgent.settings?.responseDelay || 0,
       connectionId: newAgent.settings?.connectionId || '',
       modelId: newAgent.settings?.modelId || ''
     }
-    form.inboxes = newAgent.inboxes || []
+    form.workflow = {
+      triggers: newAgent.workflow?.triggers || [],
+      actions: newAgent.workflow?.actions || [],
+      isActive: newAgent.workflow?.isActive !== false
+    }
     
     // Load context documents from agent prop if editing
     if (newAgent._id && newAgent.contextDocuments) {
@@ -184,50 +391,91 @@ watch(() => props.agent, (newAgent) => {
   }
 }, { immediate: true })
 
-// Validation using the sanitization library
+// Trigger management
+const addTrigger = () => {
+  form.workflow.triggers.push({
+    type: '',
+    conditions: [],
+    isActive: true
+  })
+}
+
+const updateTrigger = (index, updatedTrigger) => {
+  form.workflow.triggers[index] = { ...updatedTrigger }
+}
+
+const removeTrigger = (index) => {
+  form.workflow.triggers.splice(index, 1)
+}
+
+// Action management
+const addAction = () => {
+  form.workflow.actions.push({
+    type: '',
+    parameters: {},
+    order: form.workflow.actions.length + 1,
+    continueOnFailure: true,
+    delay: 0
+  })
+}
+
+const updateAction = (index, updatedAction) => {
+  form.workflow.actions[index] = { ...updatedAction }
+}
+
+const removeAction = (index) => {
+  form.workflow.actions.splice(index, 1)
+  // Reorder remaining actions
+  form.workflow.actions.forEach((action, i) => {
+    action.order = i + 1
+  })
+}
+
+const moveAction = (fromIndex, toIndex) => {
+  if (toIndex < 0 || toIndex >= form.workflow.actions.length) return
+  
+  const actions = [...form.workflow.actions]
+  const [movedAction] = actions.splice(fromIndex, 1)
+  actions.splice(toIndex, 0, movedAction)
+  
+  // Update order numbers
+  actions.forEach((action, i) => {
+    action.order = i + 1
+  })
+  
+  form.workflow.actions = actions
+}
+
+// Validation
 const validateForm = () => {
   const newErrors = {}
 
-  // Validate name using validators
   if (!validators.textLength(form.name, 2, 100)) {
-    const sanitizedName = sanitizeText(form.name)
-    if (!sanitizedName) {
-      newErrors.name = 'Agent name is required'
-    } else if (sanitizedName.length < 2) {
-      newErrors.name = 'Agent name must be at least 2 characters long'
-    } else if (sanitizedName.length > 100) {
-      newErrors.name = 'Agent name cannot exceed 100 characters'
-    }
+    newErrors.name = 'Agent name must be between 2 and 100 characters'
   }
 
-  // Validate prompt using validators
-  if (!validators.textLength(form.prompt, 10, 2000)) {
-    const sanitizedPrompt = sanitizeContent(form.prompt)
-    if (!sanitizedPrompt) {
-      newErrors.prompt = 'System prompt is required'
-    } else if (sanitizedPrompt.length < 10) {
-      newErrors.prompt = 'Prompt must be at least 10 characters long'
-    } else if (sanitizedPrompt.length > 2000) {
-      newErrors.prompt = 'Prompt cannot exceed 2000 characters'
-    }
-  }
-
-  // Validate description using validators
   if (form.description && !validators.textLength(form.description, 0, 500)) {
     newErrors.description = 'Description cannot exceed 500 characters'
   }
 
-  // Validate numeric settings using validators
-  if (!validators.numberRange(form.settings.temperature, 0, 1)) {
-    newErrors.temperature = 'Temperature must be between 0 and 1'
+  if (form.workflow.triggers.length === 0) {
+    newErrors.triggers = 'At least one trigger is required'
+  } else {
+    // Validate that all triggers have a type
+    const invalidTriggers = form.workflow.triggers.some(trigger => !trigger.type)
+    if (invalidTriggers) {
+      newErrors.triggers = 'All triggers must have a type selected'
+    }
   }
 
-  if (!validators.numberRange(form.settings.maxTokens, 1, 2000)) {
-    newErrors.maxTokens = 'Max tokens must be between 1 and 2000'
-  }
-
-  if (!validators.numberRange(form.settings.responseDelay, 0, 30)) {
-    newErrors.responseDelay = 'Response delay must be between 0 and 30 seconds'
+  if (form.workflow.actions.length === 0) {
+    newErrors.actions = 'At least one action is required'
+  } else {
+    // Validate that all actions have a type
+    const invalidActions = form.workflow.actions.some(action => !action.type)
+    if (invalidActions) {
+      newErrors.actions = 'All actions must have a type selected'
+    }
   }
 
   // Clear previous errors and set new ones
@@ -245,41 +493,42 @@ const handleSubmit = async () => {
   isSubmitting.value = true
 
   try {
-    // Use sanitizeObject with predefined schema for agent data
+    // Clean up the form data
     const agentData = {
-      ...sanitizeObject(form, schemas.agent),
+      name: form.name,
+      description: form.description,
+      isActive: form.isActive,
       settings: {
-        ...sanitizeObject(form.settings, {
-          temperature: 'number',
-          maxTokens: 'number',
-          responseDelay: 'number',
-          connectionId: 'text',
-          modelId: 'text'
-        })
+        ...form.settings,
+        connectionId: form.settings.connectionId || null,
+        modelId: form.settings.modelId || null
       },
-      inboxes: form.inboxes || []
+      workflow: {
+        ...form.workflow,
+        triggers: form.workflow.triggers.filter(t => t.type),
+        actions: form.workflow.actions.filter(a => a.type)
+      }
     }
-    
-    // Clean up null/empty values
-    if (!agentData.settings.connectionId) agentData.settings.connectionId = null
-    if (!agentData.settings.modelId) agentData.settings.modelId = null
 
     emit('submit', agentData)
   } catch (error) {
     console.error('Form submission error:', error)
-    
-    // Handle different types of errors with specific messages
-    if (error.statusCode === 401) {
-      toast('Authentication required. Please log in again.', { type: 'error' })
-    } else if (error.statusCode === 403 && error.statusMessage?.includes('CSRF')) {
-      toast('Security token expired. Please refresh the page.', { type: 'error' })
-    } else if (error.message === 'Could not obtain CSRF token') {
-      toast('Authentication issue. Please try logging out and logging back in.', { type: 'error' })
-    } else {
-      toast(error.message || 'Failed to submit form', { type: 'error' })
-    }
   } finally {
     isSubmitting.value = false
+  }
+}
+
+// Helper function to reload agent data (including context documents)
+const reloadAgentData = async () => {
+  if (!props.agent?._id) return
+  
+  try {
+    const updatedAgent = await agentsStore.fetchAgent(props.agent._id)
+    contextDocuments.value = updatedAgent.contextDocuments || []
+    ragSummary.value = updatedAgent.ragSummary || null
+  } catch (error) {
+    console.error('Failed to reload agent data:', error.message)
+    toast('Failed to reload agent data', { type: 'error' })
   }
 }
 
@@ -311,8 +560,6 @@ const addContextWebsite = async ({ url, options, progressCallback }) => {
       )
     } catch (progressError) {
       console.warn('Progress version failed, falling back to standard method:', progressError.message)
-      
-      // Fallback to original method
       await agentsStore.addContextWebsite(props.agent._id, url, options)
     }
     
@@ -380,31 +627,18 @@ const refreshContextDocument = async (docId) => {
           (progress) => {
             // Update re-crawl progress state
             Object.assign(reCrawlingProgress, {
-              phase: sanitizeText(progress.phase || ''),
-              message: sanitizeText(progress.message || ''),
-              currentPage: sanitizeNumber(progress.currentPage || 0),
-              totalPages: sanitizeNumber(progress.totalPages || doc.metadata?.crawlOptions?.maxPages || 10),
-              percentage: sanitizeNumber(progress.percentage || 0),
-              currentUrl: sanitizeUrl(progress.currentUrl || ''),
-              docId: sanitizeText(docId)
+              phase: progress.phase || '',
+              message: progress.message || '',
+              currentPage: progress.currentPage || 0,
+              totalPages: progress.totalPages || doc.metadata?.crawlOptions?.maxPages || 10,
+              percentage: progress.percentage || 0,
+              currentUrl: progress.currentUrl || '',
+              docId: docId
             })
           }
         )
       } catch (progressError) {
         console.warn('Progress version failed for website re-crawl, falling back to standard method:', progressError.message)
-        
-        // Update progress to show fallback
-        Object.assign(reCrawlingProgress, {
-          phase: 'crawling',
-          message: 'Re-crawling website (progress not available)...',
-          currentPage: 0,
-          totalPages: doc.metadata?.crawlOptions?.maxPages || 10,
-          percentage: 50, // Show indeterminate progress
-          currentUrl: '',
-          docId: docId
-        })
-        
-        // Fallback to original method
         result = await agentsStore.refreshContextDocument(props.agent._id, docId)
       }
     } else {

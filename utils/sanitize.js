@@ -377,22 +377,30 @@ export const sanitizeObject = (obj, schema) => {
   
   const sanitized = {}
   
-  for (const [key, sanitizer] of Object.entries(schema)) {
-    if (obj.hasOwnProperty(key)) {
+  // Check if there's a wildcard rule
+  const wildcardRule = schema['*']
+  
+  for (const [key, value] of Object.entries(obj)) {
+    let sanitizer = schema[key] || wildcardRule
+    
+    if (sanitizer) {
       if (typeof sanitizer === 'function') {
-        sanitized[key] = sanitizer(obj[key])
+        sanitized[key] = sanitizer(value)
       } else if (sanitizer === 'text') {
-        sanitized[key] = sanitizeText(obj[key])
+        sanitized[key] = sanitizeText(value)
       } else if (sanitizer === 'number') {
-        sanitized[key] = sanitizeNumber(obj[key])
+        sanitized[key] = sanitizeNumber(value)
       } else if (sanitizer === 'url') {
-        sanitized[key] = sanitizeUrl(obj[key])
+        sanitized[key] = sanitizeUrl(value)
       } else if (sanitizer === 'email') {
-        sanitized[key] = sanitizeEmail(obj[key])
+        sanitized[key] = sanitizeEmail(value)
       } else if (sanitizer === 'content') {
-        sanitized[key] = sanitizeContent(obj[key])
+        sanitized[key] = sanitizeContent(value)
       } else if (sanitizer === 'filename') {
-        sanitized[key] = sanitizeFilename(obj[key])
+        sanitized[key] = sanitizeFilename(value)
+      } else if (sanitizer === 'mixed') {
+        // For mixed content, pass through as-is (for action parameters)
+        sanitized[key] = value
       }
     }
   }

@@ -51,15 +51,15 @@
             type="text"
             readonly
             class="input-field bg-gray-50 dark:bg-gray-700 cursor-not-allowed"
-            value="response"
+            value="workflow"
           />
           <div class="absolute inset-y-0 right-0 flex items-center pr-3">
             <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
             </svg>
           </div>
         </div>
-        <p class="text-xs text-gray-500 mt-1">All agents are currently response agents. Only one response agent per inbox is allowed.</p>
+        <p class="text-xs text-gray-500 mt-1">Agents are now workflow-based and can be configured with custom triggers and actions.</p>
       </div>
 
       <div>

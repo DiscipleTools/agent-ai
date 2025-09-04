@@ -580,7 +580,7 @@ const AGENT_TYPES = {
   response: {
     maxPerInbox: 1,
     assignmentField: 'responseAgent',  // Separate field, not in agents array
-    canProcess: ['message_created', 'message_updated']
+    canProcess: ['message_created']
   },
   'pre-process': {
     maxPerInbox: undefined,
