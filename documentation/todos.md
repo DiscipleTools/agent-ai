@@ -153,12 +153,12 @@
   - [ ] Agent templates and cloning
   - [ ] Bulk operations (enable/disable multiple agents)
   - [ ] Agent versioning and rollback
-  - [ ] A/B testing for agent prompts
+  - [ ] A/B testing for action prompts
 
 - [ ] **Multi-language Support**
   - [ ] Internationalization (i18n) setup
   - [ ] Multi-language UI
-  - [ ] Language-specific agent prompts
+  - [ ] Language-specific response prompts
   - [ ] Automatic language detection
 
 ### 8. Integration Enhancements

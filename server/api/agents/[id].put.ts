@@ -66,9 +66,6 @@ export default chatwootAuthMiddleware.auth(async (event, checker) => {
       errors.push('Description cannot exceed 500 characters')
     }
 
-    if (body.prompt !== undefined && !validators.textLength(body.prompt, 10, 2000)) {
-      errors.push('System prompt must be between 10 and 2000 characters')
-    }
 
     if (errors.length > 0) {
       throw createError({
@@ -88,9 +85,6 @@ export default chatwootAuthMiddleware.auth(async (event, checker) => {
       updateData.description = sanitizeText(body.description)
     }
 
-    if (body.prompt !== undefined) {
-      updateData.prompt = sanitizeText(body.prompt)
-    }
 
     if (body.isActive !== undefined) {
       updateData.isActive = body.isActive

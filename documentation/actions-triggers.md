@@ -133,7 +133,7 @@ Actions define what happens when a workflow is triggered and conditions are met.
 - **Description**: Generate and send AI response based on conversation context
 - **Implementation**: 
   - Gets conversation history (last 10 messages)
-  - Uses aiService to generate response with agent's prompt and context documents
+  - Uses aiService to generate response with action's prompt and context documents
   - Sends response via chatwootService.sendMessage()
   - Supports custom prompts, temperature, max tokens, and model settings
   - **This action works end-to-end**

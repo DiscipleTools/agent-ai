@@ -1,6 +1,5 @@
 import { connectDB } from '~/server/utils/db'
 import Inbox from '~/server/models/Inbox'
-import Agent from '~/server/models/Agent'
 import { requireChatwootAuth } from '~/server/utils/auth'
 
 export default defineEventHandler(async (event) => {

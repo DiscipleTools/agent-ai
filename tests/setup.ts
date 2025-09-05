@@ -56,7 +56,6 @@ export const testAgents = {
     _id: new mongoose.Types.ObjectId('507f1f77bcf86cd799439014'),
     name: 'Public Agent',
     description: 'Test agent accessible to admin only',
-    prompt: 'You are a test agent for admin users',
     isActive: true,
     createdBy: testUsers.admin._id
   },
@@ -64,7 +63,6 @@ export const testAgents = {
     _id: new mongoose.Types.ObjectId('507f1f77bcf86cd799439015'),
     name: 'User Agent',
     description: 'Test agent for user',
-    prompt: 'You are a test agent for regular users',
     isActive: true,
     createdBy: testUsers.user._id
   }
@@ -116,9 +114,8 @@ async function cleanTestData() {
       testUsers.inactive._id
     ]
     
-    const deletedUsers = await User.deleteMany({
-      _id: { $in: testUserIds }
-    })
+    // Users are now managed by Chatwoot - no cleanup needed
+    const deletedUsers = { deletedCount: 0 }
     
     // Only delete test agents by their specific IDs
     const testAgentIds = [
@@ -153,12 +150,8 @@ async function cleanTestData() {
 // Helper function to seed test data
 async function seedTestData() {
   try {
-    // Create test users with plain passwords (will be hashed by pre-save middleware)
-    const users = await User.create([
-      testUsers.admin,
-      testUsers.user,
-      testUsers.inactive
-    ])
+    // Users are now managed by Chatwoot - no seeding needed
+    const users: any[] = []
     
     // Create test agents
     const agents = await Agent.create([
