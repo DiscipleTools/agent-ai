@@ -40,27 +40,6 @@
         </div>
       </div>
 
-      <div>
-        <label for="agentType" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-          Agent Type
-        </label>
-        <div class="relative">
-          <input
-            id="agentType"
-            v-model="form.agentType"
-            type="text"
-            readonly
-            class="input-field bg-gray-50 dark:bg-gray-700 cursor-not-allowed"
-            value="workflow"
-          />
-          <div class="absolute inset-y-0 right-0 flex items-center pr-3">
-            <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
-            </svg>
-          </div>
-        </div>
-        <p class="text-xs text-gray-500 mt-1">Agents are now workflow-based and can be configured with custom triggers and actions.</p>
-      </div>
 
       <div>
         <label for="prompt" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">

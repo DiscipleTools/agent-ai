@@ -144,7 +144,6 @@ class WorkflowEngine {
   private async getAgentsAssignedToInbox(inboxId: string): Promise<string[]> {
     try {
       const inbox = await Inbox.findById(inboxId)
-        .populate('responseAgent.agentId')
         .populate('agents.agentId')
       
       if (!inbox) {
@@ -153,14 +152,9 @@ class WorkflowEngine {
       
       const agentIds: string[] = []
       
-      // Add response agent if it's a workflow agent
-      if (inbox.responseAgent?.agentId && inbox.responseAgent.agentId.agentType === 'workflow') {
-        agentIds.push(inbox.responseAgent.agentId._id.toString())
-      }
-      
-      // Add other assigned workflow agents
+      // Add other assigned agents
       inbox.agents?.forEach(assignment => {
-        if (assignment.agentId && assignment.agentId.agentType === 'workflow' && assignment.isActive) {
+        if (assignment.agentId && assignment.isActive) {
           agentIds.push(assignment.agentId._id.toString())
         }
       })
@@ -535,7 +529,7 @@ class WorkflowEngine {
     }
     
     // Generate AI response
-    const prompt = action.parameters?.customPrompt || agent.prompt || 'You are a helpful assistant.'
+    const prompt = action.parameters?.prompt || 'You are a helpful assistant.'
     const response = await aiService.generateResponse(
       agent._id,
       prompt,

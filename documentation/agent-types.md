@@ -1,17 +1,34 @@
-# Agent Types
+# Agents
 
-## Response Agents
-- **Purpose**: Handle customer conversations and provide responses
-- **Limitation**: Each Chatwoot inbox can only be associated with one response agent
-- **Default**: All new agents are created as response agents
+Agents are unified workflow automation units that can perform various actions based on triggers and conditions.
 
-## Future Agent Types
-The following agent types are planned for future releases:
-- **Analytics**: Analyze conversation data and provide insights
-- **Moderation**: Monitor conversations for policy violations
-- **Routing**: Route conversations to appropriate agents or departments
+## Single Agent Type
+All agents now use the same unified type with configurable workflows instead of separate agent types.
+
+## Action Types
+Agents can perform different actions through their workflow configuration:
+
+### AI-Powered Actions
+- **ai_response**: Generate automated responses to messages
+- **ai_summarize**: Create intelligent summaries of conversations
+- **ai_categorize**: Automatically categorize conversations
+- **ai_sentiment_analysis**: Analyze sentiment of messages
+
+### Conversation Management Actions
+- **change_status**: Change conversation status
+- **assign_agent**: Assign conversations to specific agents
+- **add_private_note**: Add internal notes
+- **add_public_note**: Add customer-visible notes
+- **set_priority**: Set conversation priority
+- **set_custom_attribute**: Set custom attributes
+- **update_contact_attribute**: Update contact information
+
+### Flow Control Actions
+- **wait**: Add delays in workflow execution
+- **stop_workflow**: Halt workflow execution
 
 ## Inbox Assignment Rules
+- Agents can be assigned to inboxes as either response agents or processing pipeline agents
 - Only one response agent per inbox is allowed
-- When creating/updating a response agent, the system validates that no other response agent is already assigned to the same inbox
-- If an inbox already has a response agent, you must remove it before assigning a new one 
+- Multiple processing agents can be assigned with different priorities
+- Processing pipeline executes in order: pre-process → response → main-process → post-process 

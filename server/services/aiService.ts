@@ -162,6 +162,8 @@ class AIService {
       messageCount: messages.length
     })
 
+    console.log('messages', messages)
+
     const response = await fetch(`${aiConfig.endpoint}/chat/completions`, {
       method: 'POST',
       headers: {

@@ -56,13 +56,8 @@ const handleSubmit = async (agentData) => {
     if (inboxId) {
       // Auto-assign the agent to the inbox
       try {
-        if (newAgent.agentType === 'response') {
-          await inboxesStore.assignResponseAgent(inboxId, newAgent._id)
-          toast.success('Agent created and assigned as response agent!')
-        } else {
-          await inboxesStore.addAgent(inboxId, newAgent._id)
-          toast.success('Agent created and added to processing pipeline!')
-        }
+        await inboxesStore.addAgent(inboxId, newAgent._id)
+        toast.success('Agent created and added to processing pipeline!')
       } catch (assignError) {
         console.error('Error assigning agent to inbox:', assignError)
         toast.success('Agent created successfully!')

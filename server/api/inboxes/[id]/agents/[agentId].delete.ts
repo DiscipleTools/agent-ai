@@ -47,7 +47,6 @@ export default defineEventHandler(async (event) => {
     const removedAgent = {
       agentId: agentAssignment.agentId,
       name: agentAssignment.name,
-      agentType: agentAssignment.agentType,
       priority: agentAssignment.priority,
       assignedAt: agentAssignment.assignedAt
     }

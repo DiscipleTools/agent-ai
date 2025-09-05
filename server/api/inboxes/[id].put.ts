@@ -70,8 +70,7 @@ export default defineEventHandler(async (event) => {
 
     // Populate agent references before returning
     await inbox.populate([
-      { path: 'responseAgent.agentId', select: 'name agentType' },
-      { path: 'agents.agentId', select: 'name agentType' }
+      { path: 'agents.agentId', select: 'name description' }
     ])
 
     return {

@@ -77,7 +77,7 @@ export default defineEventHandler(async (event) => {
     await inbox.save()
 
     // Populate agent details for response
-    await inbox.populate('agents.agentId', 'name agentType description')
+    await inbox.populate('agents.agentId', 'name description')
 
     const updatedAgent = inbox.agents.find(a => a.agentId._id.toString() === agentId)
 
@@ -92,7 +92,6 @@ export default defineEventHandler(async (event) => {
         updatedAgent: {
           agentId: updatedAgent.agentId._id,
           name: updatedAgent.name,
-          agentType: updatedAgent.agentType,
           priority: updatedAgent.priority,
           isActive: updatedAgent.isActive,
           assignedAt: updatedAgent.assignedAt,

@@ -10,11 +10,6 @@ const agentAssignmentSchema = new mongoose.Schema({
     ref: 'Agent',
     required: true
   },
-  agentType: {
-    type: String,
-    enum: ['pre-process', 'analytics', 'moderation', 'routing', 'post-process', 'workflow'],
-    required: true
-  },
   name: {
     type: String,
     required: true
@@ -97,24 +92,7 @@ const inboxSchema = new mongoose.Schema({
     }
   },
   
-  // Response Agent (Constraint: Only ONE allowed)
-  responseAgent: {
-    agentId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Agent',
-      required: false
-    },
-    assignedAt: {
-      type: Date,
-      required: false
-    },
-    config: {
-      type: mongoose.Schema.Types.Mixed,
-      default: {}
-    }
-  },
-  
-  // Additional Agents (Multiple allowed)
+  // Agents (Multiple allowed)
   agents: [agentAssignmentSchema],
   
   // Settings
@@ -148,10 +126,6 @@ const inboxSchema = new mongoose.Schema({
   timestamps: true,
   toJSON: {
     transform: function(doc, ret) {
-      // Ensure responseAgent field is always present
-      if (!ret.responseAgent) {
-        ret.responseAgent = null;
-      }
       return ret;
     }
   }
@@ -159,7 +133,6 @@ const inboxSchema = new mongoose.Schema({
 
 // Indexes for better performance
 inboxSchema.index({ accountId: 1, inboxId: 1 }, { unique: true })
-inboxSchema.index({ 'responseAgent.agentId': 1 })
 inboxSchema.index({ 'agents.agentId': 1 })
 inboxSchema.index({ isActive: 1 })
 inboxSchema.index({ createdBy: 1 })
@@ -196,7 +169,7 @@ inboxSchema.statics.findByChatwootId = function(accountId, inboxId) {
 }
 
 // Instance method to add agent to agents array
-inboxSchema.methods.addAgent = function(agentId, agentType, name, priority = 100, config = {}) {
+inboxSchema.methods.addAgent = function(agentId, name, priority = 100, config = {}) {
   // Check if agent is already assigned
   const existingAgent = this.agents.find(a => a.agentId.toString() === agentId.toString())
   if (existingAgent) {
@@ -205,7 +178,6 @@ inboxSchema.methods.addAgent = function(agentId, agentType, name, priority = 100
   
   this.agents.push({
     agentId,
-    agentType,
     name,
     priority,
     isActive: true,
@@ -241,27 +213,6 @@ inboxSchema.methods.updateAgentConfig = function(agentId, config) {
   return this
 }
 
-// Instance method to assign response agent (validates single agent constraint)
-inboxSchema.methods.assignResponseAgent = function(agentId, config = {}) {
-  this.responseAgent = {
-    agentId,
-    assignedAt: new Date(),
-    config
-  }
-  
-  return this
-}
-
-// Instance method to remove response agent
-inboxSchema.methods.removeResponseAgent = function() {
-  this.responseAgent = {
-    agentId: undefined,
-    assignedAt: undefined,
-    config: {}
-  }
-  
-  return this
-}
 
 // Instance method to get all agents sorted by priority
 inboxSchema.methods.getActiveAgentsSorted = function() {
@@ -292,7 +243,6 @@ inboxSchema.virtual('info').get(function() {
     webhookUrl: this.webhookUrl,
     isActive: this.isActive,
     createdAt: this.createdAt,
-    responseAgentAssigned: !!this.responseAgent?.agentId,
     agentCount: this.agents.length,
     activeAgentCount: this.agents.filter(a => a.isActive).length
   }

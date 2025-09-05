@@ -23,8 +23,6 @@ export default defineEventHandler(async (event) => {
       _id: inboxId,
       createdBy: user.id || user._id
     })
-      .populate('responseAgent.agentId', 'name agentType description prompt settings')
-      .populate('agents.agentId', 'name agentType description prompt settings')
       .lean()
 
     if (!inbox) {

@@ -46,15 +46,15 @@ export const useInboxesStore = defineStore('inboxes', () => {
     const total = inboxes.value.length
     const active = inboxes.value.filter(i => i.isActive).length
     const configured = inboxes.value.filter(i => i.chatwoot?.isConfigured).length
-    const withResponseAgent = inboxes.value.filter(i => i.responseAgent?.agentId).length
+    const withAgents = inboxes.value.filter(i => i.agents && i.agents.length > 0).length
 
     return {
       total,
       active,
       inactive: total - active,
       configured,
-      withResponseAgent,
-      withoutResponseAgent: total - withResponseAgent
+      withAgents,
+      withoutAgents: total - withAgents
     }
   })
 
@@ -327,91 +327,6 @@ export const useInboxesStore = defineStore('inboxes', () => {
     }
   }
 
-  /**
-   * Assign response agent to inbox
-   */
-  async function assignResponseAgent(inboxId, agentId, config = {}) {
-    loading.value = true
-    error.value = null
-
-    try {
-      const csrfToken = await getCsrfToken()
-
-      const response = await $fetch(`/api/inboxes/${inboxId}/agents/response`, {
-        method: 'PUT',
-        headers: {
-          'x-csrf-token': csrfToken
-        },
-        body: {
-          agentId,
-          config
-        }
-      })
-
-      if (response.success) {
-        // Update the inbox in the store
-        const inbox = inboxes.value.find(i => i._id === inboxId)
-        if (inbox) {
-          inbox.responseAgent = response.data.responseAgent
-        }
-        
-        if (currentInbox.value?._id === inboxId) {
-          currentInbox.value.responseAgent = response.data.responseAgent
-        }
-        
-        return response.data
-      }
-
-      throw new Error(response.message || 'Failed to assign response agent')
-    } catch (err) {
-      console.error('Error assigning response agent:', err)
-      error.value = err.message || 'Failed to assign response agent'
-      throw err
-    } finally {
-      loading.value = false
-    }
-  }
-
-  /**
-   * Remove response agent from inbox
-   */
-  async function removeResponseAgent(inboxId) {
-    loading.value = true
-    error.value = null
-
-    try {
-      const csrfToken = await getCsrfToken()
-
-      const response = await $fetch(`/api/inboxes/${inboxId}/agents/response`, {
-        method: 'DELETE',
-        headers: {
-          'x-csrf-token': csrfToken
-        }
-      })
-
-      if (response.success) {
-        // Update the inbox in the store
-        const inbox = inboxes.value.find(i => i._id === inboxId)
-        if (inbox) {
-          inbox.responseAgent = null
-        }
-        
-        if (currentInbox.value?._id === inboxId) {
-          currentInbox.value.responseAgent = null
-        }
-        
-        return response.data
-      }
-
-      throw new Error(response.message || 'Failed to remove response agent')
-    } catch (err) {
-      console.error('Error removing response agent:', err)
-      error.value = err.message || 'Failed to remove response agent'
-      throw err
-    } finally {
-      loading.value = false
-    }
-  }
 
   /**
    * Add agent to processing pipeline
@@ -612,8 +527,6 @@ export const useInboxesStore = defineStore('inboxes', () => {
     
     // Agent actions
     getInboxAgents,
-    assignResponseAgent,
-    removeResponseAgent,
     addAgent,
     removeAgent,
     updateAgent,

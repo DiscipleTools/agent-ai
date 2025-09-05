@@ -58,19 +58,39 @@ class InboxService {
         ?.filter((account: any) => account.role === 'administrator')
         ?.map((account: any) => account.id) || []
 
+      let inboxes
       // For super admins, return all inboxes
       if (user.superadmin) {
-        return await Inbox.find().populate('responseAgent.agentId agents.agentId')
+        inboxes = await Inbox.find().populate('agents.agentId')
+      } else {
+        // For regular users, return only inboxes from accounts they administer
+        if (adminAccountIds.length === 0) {
+          return []
+        }
+
+        inboxes = await Inbox.find({
+          accountId: { $in: adminAccountIds }
+        }).populate('agents.agentId')
       }
 
-      // For regular users, return only inboxes from accounts they administer
-      if (adminAccountIds.length === 0) {
-        return []
-      }
-
-      return await Inbox.find({
-        accountId: { $in: adminAccountIds }
-      }).populate('responseAgent.agentId agents.agentId')
+      // Transform the response to include agentID with actual ID values
+      return inboxes.map(inbox => {
+        const inboxObj = inbox.toJSON()
+        
+        // Fix agents array: agentId -> agentID  
+        if (inboxObj.agents && Array.isArray(inboxObj.agents)) {
+          inboxObj.agents = inboxObj.agents.map((agent: any) => ({
+            ...agent,
+            agentID: agent.agentId._id || agent.agentId
+          }))
+          // Remove the old agentId field from each agent
+          inboxObj.agents.forEach((agent: any) => {
+            delete agent.agentId
+          })
+        }
+        
+        return inboxObj
+      })
     } catch (error) {
       console.error('Error getting inboxes for user:', error)
       throw error
@@ -288,8 +308,7 @@ class InboxService {
       
       // Populate agent references
       await inbox.populate([
-        { path: 'responseAgent.agentId', select: 'name agentType description' },
-        { path: 'agents.agentId', select: 'name agentType description' }
+        { path: 'agents.agentId', select: 'name description' }
       ])
       
       return inbox
@@ -325,8 +344,7 @@ class InboxService {
   async getInbox(id: string) {
     try {
       const inbox = await Inbox.findById(id)
-        .populate('responseAgent.agentId', 'name agentType description settings')
-        .populate('agents.agentId', 'name agentType description settings')
+        .populate('agents.agentId', 'name description settings')
 
       if (!inbox) {
         throw new Error('Inbox not found')
@@ -350,8 +368,7 @@ class InboxService {
       const query = { createdBy, ...filters }
       
       const inboxes = await Inbox.find(query)
-        .populate('responseAgent.agentId', 'name agentType description')
-        .populate('agents.agentId', 'name agentType description')
+        .populate('agents.agentId', 'name description')
         .sort({ createdAt: -1 })
       
       return inboxes
@@ -565,75 +582,6 @@ class InboxService {
     }
   }
 
-  // ==================== RESPONSE AGENT MANAGEMENT ====================
-
-  /**
-   * Assign response agent to inbox (enforces single agent constraint)
-   * @param inboxId - Inbox ID
-   * @param agentId - Agent ID
-   * @param config - Agent configuration overrides
-   * @returns Promise<Inbox>
-   */
-  async assignResponseAgent(inboxId: string, agentId: string, config: any = {}) {
-    try {
-      const agent = await Agent.findById(agentId)
-      if (!agent) {
-        throw new Error('Agent not found')
-      }
-
-      if (agent.agentType !== 'response') {
-        throw new Error('Only response agents can be assigned as response agent')
-      }
-
-      const inbox = await Inbox.findById(inboxId)
-      if (!inbox) {
-        throw new Error('Inbox not found')
-      }
-
-      // Check if agent is already in agents array
-      const existingInAgentsArray = inbox.agents.find(a => a.agentId.toString() === agentId)
-      if (existingInAgentsArray) {
-        throw new Error('Response agent cannot be in both response agent and agents array')
-      }
-
-      inbox.assignResponseAgent(agentId, config)
-      await inbox.save()
-
-      // Populate agent details
-      await inbox.populate('responseAgent.agentId', 'name agentType description')
-
-      return inbox
-    } catch (error) {
-      console.error('Error assigning response agent:', error)
-      throw error
-    }
-  }
-
-  /**
-   * Remove response agent from inbox
-   * @param inboxId - Inbox ID
-   * @returns Promise<Inbox>
-   */
-  async removeResponseAgent(inboxId: string) {
-    try {
-      const inbox = await Inbox.findById(inboxId)
-      if (!inbox) {
-        throw new Error('Inbox not found')
-      }
-
-      if (!inbox.responseAgent?.agentId) {
-        throw new Error('No response agent is currently assigned')
-      }
-
-      inbox.removeResponseAgent()
-      await inbox.save()
-
-      return inbox
-    } catch (error) {
-      console.error('Error removing response agent:', error)
-      throw error
-    }
-  }
 
   // ==================== AGENTS ARRAY MANAGEMENT ====================
 
@@ -652,25 +600,17 @@ class InboxService {
         throw new Error('Agent not found')
       }
 
-      if (agent.agentType === 'response') {
-        throw new Error('Response agents must be assigned as response agent, not in agents array')
-      }
 
       const inbox = await Inbox.findById(inboxId)
       if (!inbox) {
         throw new Error('Inbox not found')
       }
 
-      // Check if agent is already assigned as response agent
-      if (inbox.responseAgent?.agentId?.toString() === agentId) {
-        throw new Error('Agent is already assigned as response agent')
-      }
-
-      inbox.addAgent(agentId, agent.agentType, agent.name, priority, config)
+      inbox.addAgent(agentId, agent.name, priority, config)
       await inbox.save()
 
       // Populate agent details
-      await inbox.populate('agents.agentId', 'name agentType description')
+      await inbox.populate('agents.agentId', 'name description')
 
       return inbox
     } catch (error) {
@@ -742,7 +682,7 @@ class InboxService {
       await inbox.save()
 
       // Populate agent details
-      await inbox.populate('agents.agentId', 'name agentType description')
+      await inbox.populate('agents.agentId', 'name description')
 
       return inbox
     } catch (error) {
@@ -786,7 +726,6 @@ class InboxService {
   async routeToAgents(inboxId: string, message: any) {
     try {
       const inbox = await Inbox.findById(inboxId)
-        .populate('responseAgent.agentId')
         .populate('agents.agentId')
 
       if (!inbox || !inbox.isActive) {
@@ -804,7 +743,6 @@ class InboxService {
           name: inbox.name
         },
         processing: {
-          responseAgent: inbox.responseAgent?.agentId || null,
           preProcessAgents: sortedAgents.filter(a => a.priority < 100),
           mainProcessAgents: sortedAgents.filter(a => a.priority >= 100 && a.priority < 200),
           postProcessAgents: sortedAgents.filter(a => a.priority >= 200)

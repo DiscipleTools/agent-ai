@@ -4,9 +4,8 @@
 Build a new inbox-centric architecture where Chatwoot inboxes are the primary entities, with agents operating based on inbox configurations. This is a greenfield implementation with no migration or backwards compatibility requirements.
 
 ### Key Design Decisions
-- **One Response Agent per Inbox**: Maintains the constraint that only one response agent can be assigned to an inbox
-- **Simple Agents Array**: Single array for all non-response agents, processed by priority
-- **Agent Reusability**: A single agent can be assigned to multiple inboxes (both as response or in agents array)
+- **Simple Agents Array**: Single array for all agents, processed by priority
+- **Agent Reusability**: A single agent can be assigned to multiple inboxes
 - **Priority-Based Processing**: All agents processed based on priority field
 - **No Migration Needed**: Fresh implementation without data migration concerns
 - **No Backwards Compatibility**: Clean break from current architecture
@@ -26,15 +25,14 @@ Build a new inbox-centric architecture where Chatwoot inboxes are the primary en
 - **Inbox Source**: All inboxes are created in Chatwoot first, then automatically synced to Agent AI
 - **User Access Control**: Users can only see and manage inboxes they have access to in Chatwoot
 - **Constraints**: 
-  - One response agent per inbox (maintained)
-  - Multiple additional agents allowed
+  - Multiple agents allowed per inbox
   - Agents can be assigned to multiple inboxes
   - Users cannot manually create inboxes in Agent AI
 - **Data Model**: Inbox owns webhook config; agents can be assigned to multiple inboxes
 
 ### Core Benefits
 1. **Decoupling**: Inbox webhook independent of specific agents
-2. **Simplified Processing**: Single agents array for all non-response agents
+2. **Simplified Processing**: Single agents array for all agents
 3. **Agent reusability**: One agent can serve multiple inboxes
 4. **Simplified bot management**: One bot per inbox
 5. **Flexible pipeline**: Priority-based agent processing
@@ -66,12 +64,7 @@ Build a new inbox-centric architecture where Chatwoot inboxes are the primary en
     lastSync: Date
   },
   
-  // Response Agent (Constraint: Only ONE allowed)
-  responseAgent: {
-    agentId: ObjectId,      // Reference to Agent model
-    assignedAt: Date,
-    config: Object         // Inbox-specific config overrides
-  },
+  // Response agent functionality removed
   
   // Additional Agents (Multiple allowed)
   agents: [{
@@ -98,7 +91,6 @@ Build a new inbox-centric architecture where Chatwoot inboxes are the primary en
 
 // Indexes
 inboxSchema.index({ accountId: 1, inboxId: 1 }, { unique: true })
-inboxSchema.index({ 'responseAgent.agentId': 1 })
 inboxSchema.index({ 'agents.agentId': 1 })
 ```
 
@@ -109,7 +101,6 @@ inboxSchema.index({ 'agents.agentId': 1 })
   // Core fields (unchanged)
   name: String,
   description: String,
-  prompt: String,
   agentType: String,        // response, pre-process, analytics, moderation, routing, post-process
   contextDocuments: Array,
   settings: Object,
@@ -126,10 +117,7 @@ inboxSchema.index({ 'agents.agentId': 1 })
 agentSchema.statics.getAssignedInboxes = async function(agentId) {
   const Inbox = mongoose.model('Inbox')
   return await Inbox.find({
-    $or: [
-      { 'responseAgent.agentId': agentId },
-      { 'agents.agentId': agentId }
-    ]
+    'agents.agentId': agentId
   })
 }
 
@@ -155,7 +143,7 @@ export default defineEventHandler(async (event) => {
   const payload = await readBody(event)
   
   // Load inbox with agents
-  const inbox = await Inbox.findById(inboxId).populate(['responseAgent.agentId', 'agents.agentId'])
+  const inbox = await Inbox.findById(inboxId).populate('agents.agentId')
   
   if (payload.event === 'message_created') {
     // Sort agents by priority
@@ -169,11 +157,7 @@ export default defineEventHandler(async (event) => {
       await processWithAgent(agent.agentId, payload, agent.config)
     }
     
-    // 2. Response agent (if configured)
-    if (inbox.responseAgent?.agentId) {
-      const response = await processWithAgent(inbox.responseAgent.agentId, payload, inbox.responseAgent.config)
-      await chatwootService.sendMessage(response)
-    }
+    // 2. Response agent functionality removed
     
     // 3. Main processing agents (priority 100-199, parallel)
     const mainAgents = sortedAgents
@@ -225,16 +209,14 @@ class InboxService {
     }
     
     const inbox = await Inbox.findById(inboxId)
-    inbox.responseAgent = { agentId, assignedAt: new Date(), config }
+    // Response agent functionality removed - use regular agent assignment
     return await inbox.save()
   }
   
   // Agents array management
   async addAgent(inboxId, agentId, config) {
     const agent = await Agent.findById(agentId)
-    if (agent.agentType === 'response') {
-      throw new Error('Response agents must be assigned as responseAgent, not in agents array')
-    }
+    // All agents are now processing agents
     
     const inbox = await Inbox.findById(inboxId)
     inbox.agents.push({
@@ -299,13 +281,7 @@ class AgentProcessingEngine {
   <div>
     <!-- Response Agent Section (Single) -->
     <div class="response-agent">
-      <h3>Response Agent</h3>
-      <select v-model="inbox.responseAgent.agentId">
-        <option value="">No response agent</option>
-        <option v-for="agent in responseAgents" :value="agent._id">
-          {{ agent.name }}
-        </option>
-      </select>
+      <!-- Response agent functionality removed -->
     </div>
     
     <!-- Additional Agents Section (Multiple) -->
@@ -511,7 +487,6 @@ erDiagram
         Number accountId
         Number inboxId
         String webhookUrl
-        Object responseAgent
         Array agents
         Object chatwoot
         Object settings
@@ -556,7 +531,6 @@ erDiagram
 // Suggested Priority Ranges
 const PRIORITY_RANGES = {
   preProcessAgents: '1-99',        // Sequential execution before response
-  responseAgent: 'N/A',            // Always runs after pre-process
   mainProcessAgents: '100-199',    // Parallel execution (analytics, moderation, routing)
   postProcessAgents: '200+',       // Sequential execution after main processing
 }
@@ -579,7 +553,7 @@ inbox.agents = [
 const AGENT_TYPES = {
   response: {
     maxPerInbox: 1,
-    assignmentField: 'responseAgent',  // Separate field, not in agents array
+    // Response agent functionality removed
     canProcess: ['message_created']
   },
   'pre-process': {

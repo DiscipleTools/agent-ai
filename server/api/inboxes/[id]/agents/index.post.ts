@@ -51,21 +51,9 @@ export default defineEventHandler(async (event) => {
       })
     }
 
-    // Validate that response agents cannot be added to agents array
-    if (agent.agentType === 'response') {
-      throw createError({
-        statusCode: 400,
-        statusMessage: 'Response agents must be assigned as response agent, not in processing pipeline'
-      })
-    }
+    // Note: With unified agent type system, any agent can be added to processing pipeline
 
-    // Check if agent is already assigned as response agent
-    if (inbox.responseAgent?.agentId?.toString() === agentId) {
-      throw createError({
-        statusCode: 400,
-        statusMessage: 'Agent is already assigned as response agent. Cannot add to processing pipeline.'
-      })
-    }
+    // Response agent functionality removed
 
     // Check if agent is already in agents array
     const existingAgent = inbox.agents.find(a => a.agentId.toString() === agentId)
@@ -77,14 +65,14 @@ export default defineEventHandler(async (event) => {
     }
 
     // Add agent to agents array
-    inbox.addAgent(agentId, agent.agentType, agent.name, priority, config)
+    inbox.addAgent(agentId, agent.name, priority, config)
     await inbox.save()
 
     // Get the newly added agent assignment for response
     const addedAgent = inbox.agents.find(a => a.agentId.toString() === agentId)
     
     // Populate agent details
-    await inbox.populate('agents.agentId', 'name agentType description')
+    await inbox.populate('agents.agentId', 'name description')
 
     return {
       success: true,
@@ -97,7 +85,6 @@ export default defineEventHandler(async (event) => {
         addedAgent: {
           agentId: addedAgent.agentId,
           name: addedAgent.name,
-          agentType: addedAgent.agentType,
           priority: addedAgent.priority,
           isActive: addedAgent.isActive,
           assignedAt: addedAgent.assignedAt,

@@ -1,5 +1,4 @@
 import Inbox from '~/server/models/Inbox'
-import agentProcessingEngine from '~/server/services/agentProcessingEngine'
 import workflowEngine from '~/server/services/workflowEngine'
 import chatwootService from '~/server/services/chatwootService'
 import * as crypto from 'crypto'
@@ -44,7 +43,6 @@ export default defineEventHandler(async (event) => {
 
     // Load inbox with populated agents
     const inbox = await Inbox.findById(inboxId)
-      .populate('responseAgent.agentId')
       .populate('agents.agentId')
 
     if (!inbox || !inbox.isActive) {
@@ -148,56 +146,40 @@ export default defineEventHandler(async (event) => {
       timestamp: new Date().toISOString()
     }
 
-    // Process with both legacy and new workflow systems
-    const [legacyPipelineResult, workflowResults] = await Promise.allSettled([
-      // Legacy agent processing (for existing response/analytics/etc agents)
-      agentProcessingEngine.executeCompletePipeline(inboxId, processingContext),
-      
-      // New workflow system processing
-      workflowEngine.processEvent({
-        type: payload.event,
-        data: {
-          message: payload.content,
-          message_id: payload.id,
-          message_type: payload.message_type,
-          conversation_id: payload.conversation?.id,
-          account_id: payload.account?.id || payload.conversation?.account_id,
-          sender: payload.sender,
-          conversation: payload.conversation,
-          account: payload.account,
-          inbox: payload.inbox,
-          contact: payload.contact,
-          assignee: payload.assignee,
-          timestamp: new Date().toISOString()
-        },
-        metadata: {
-          inboxId,
-          source: 'webhook'
-        }
-      }, inboxId)
-    ])
+    // Process with workflow system
+    const workflowResults = await workflowEngine.processEvent({
+      type: payload.event,
+      data: {
+        message: payload.content,
+        message_id: payload.id,
+        message_type: payload.message_type,
+        conversation_id: payload.conversation?.id,
+        account_id: payload.account?.id || payload.conversation?.account_id,
+        sender: payload.sender,
+        conversation: payload.conversation,
+        account: payload.account,
+        inbox: payload.inbox,
+        contact: payload.contact,
+        assignee: payload.assignee,
+        timestamp: new Date().toISOString()
+      },
+      metadata: {
+        inboxId,
+        source: 'webhook'
+      }
+    }, inboxId)
 
-    // Combine results
-    const combinedResult = {
+    return {
       success: true,
       message: 'Webhook processed successfully',
       data: {
-        legacy: legacyPipelineResult.status === 'fulfilled' ? legacyPipelineResult.value : {
-          success: false,
-          error: legacyPipelineResult.reason?.message || 'Legacy pipeline failed'
-        },
-        workflows: workflowResults.status === 'fulfilled' ? workflowResults.value : [],
+        workflows: workflowResults,
         summary: {
-          legacySuccess: legacyPipelineResult.status === 'fulfilled',
-          workflowsExecuted: workflowResults.status === 'fulfilled' ? workflowResults.value.length : 0,
-          workflowsSuccessful: workflowResults.status === 'fulfilled' 
-            ? workflowResults.value.filter(w => w.success).length 
-            : 0
+          workflowsExecuted: workflowResults.length,
+          workflowsSuccessful: workflowResults.filter(w => w.success).length
         }
       }
     }
-
-    return combinedResult
 
   } catch (error: any) {
     console.error('Webhook processing error:', error)

@@ -63,8 +63,6 @@ export default chatwootAuthMiddleware.auth(async (event, checker) => {
     const agentData = {
       name: sanitizeText(body.name),
       description: sanitizeText(body.description || ''),
-      prompt: body.prompt || '', // Only set if provided, no default needed for workflow agents
-      agentType: 'workflow', // Agents with triggers/actions are workflow agents
       createdBy: user.id,
       
       // AI settings
@@ -157,8 +155,6 @@ export default chatwootAuthMiddleware.auth(async (event, checker) => {
         _id: agent._id,
         name: agent.name,
         description: agent.description,
-        prompt: agent.prompt,
-        agentType: agent.agentType,
         settings: agent.settings,
         workflow: agent.workflow,
         analytics: agent.analytics,

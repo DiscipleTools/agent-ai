@@ -112,26 +112,6 @@ class AgentService {
     }
   }
 
-  /**
-   * Get agents by type
-   * @param agentType - Agent type
-   * @param createdBy - Optional creator filter
-   * @returns Promise<Agent[]>
-   */
-  async getAgentsByType(agentType: string, createdBy?: any) {
-    try {
-      const query: any = { agentType, isActive: true }
-      if (createdBy) {
-        query.createdBy = createdBy
-      }
-      
-      const agents = await Agent.find(query).sort({ createdAt: -1 })
-      return agents
-    } catch (error) {
-      console.error('Error getting agents by type:', error)
-      throw error
-    }
-  }
 
   // ==================== INBOX ASSIGNMENT QUERIES ====================
 
@@ -143,10 +123,7 @@ class AgentService {
   async getAssignedInboxes(agentId: string) {
     try {
       const inboxes = await Inbox.find({
-        $or: [
-          { 'responseAgent.agentId': agentId },
-          { 'agents.agentId': agentId }
-        ]
+        'agents.agentId': agentId
       })
       
       return inboxes
@@ -164,30 +141,15 @@ class AgentService {
   async getAgentAssignments(agentId: string) {
     try {
       const inboxes = await Inbox.find({
-        $or: [
-          { 'responseAgent.agentId': agentId },
-          { 'agents.agentId': agentId }
-        ]
-      }).select('name channelType responseAgent agents accountId inboxId')
+        'agents.agentId': agentId
+      }).select('name channelType agents accountId inboxId')
 
       const assignments = {
-        responseAgent: [] as any[],
         processingPipeline: [] as any[]
       }
 
       for (const inbox of inboxes) {
-        // Check if agent is response agent
-        if (inbox.responseAgent?.agentId?.toString() === agentId) {
-          assignments.responseAgent.push({
-            inboxId: inbox._id,
-            name: inbox.name,
-            channelType: inbox.channelType,
-            accountId: inbox.accountId,
-            chatwootInboxId: inbox.inboxId,
-            assignedAt: inbox.responseAgent.assignedAt,
-            config: inbox.responseAgent.config
-          })
-        }
+        // Response agent functionality removed
 
         // Check if agent is in processing pipeline
         const agentInPipeline = inbox.agents.find(a => a.agentId.toString() === agentId)
@@ -246,26 +208,15 @@ class AgentService {
         return { isValid: false, reason: 'Inbox is not active' }
       }
 
-      // Validate assignment type constraints
+      // Check if agent is already assigned in any capacity
       if (assignmentType === 'response') {
-        if (agent.agentType !== 'response') {
-          return { isValid: false, reason: 'Only response agents can be assigned as response agent' }
-        }
-
         // Check if agent is already in processing pipeline
         const existingInPipeline = inbox.agents.find(a => a.agentId.toString() === agentId)
         if (existingInPipeline) {
           return { isValid: false, reason: 'Agent is already in processing pipeline' }
         }
       } else if (assignmentType === 'processing') {
-        if (agent.agentType === 'response') {
-          return { isValid: false, reason: 'Response agents must be assigned as response agent' }
-        }
-
-        // Check if agent is already response agent
-        if (inbox.responseAgent?.agentId?.toString() === agentId) {
-          return { isValid: false, reason: 'Agent is already assigned as response agent' }
-        }
+        // Response agent functionality removed
 
         // Check if agent is already in processing pipeline
         const existingInPipeline = inbox.agents.find(a => a.agentId.toString() === agentId)
@@ -300,7 +251,6 @@ class AgentService {
       return {
         agentId,
         name: agent.name,
-        agentType: agent.agentType,
         isActive: agent.isActive,
         createdAt: agent.createdAt,
         assignments: assignments.assignments,
@@ -327,17 +277,8 @@ class AgentService {
         throw new Error('Inbox not found')
       }
 
-      // Get appropriate agent types based on assignment type
-      let agentTypeFilter: any
-      if (assignmentType === 'response') {
-        agentTypeFilter = { agentType: 'response' }
-      } else {
-        agentTypeFilter = { agentType: { $ne: 'response' } } // All non-response types
-      }
-
-      // Get all agents of the correct type
+      // Get all agents
       const agents = await Agent.find({
-        ...agentTypeFilter,
         createdBy,
         isActive: true
       })
@@ -347,15 +288,13 @@ class AgentService {
         const agentId = agent._id.toString()
 
         if (assignmentType === 'response') {
-          // Check if already response agent or in processing pipeline
-          const isResponseAgent = inbox.responseAgent?.agentId?.toString() === agentId
+          // Check if already in processing pipeline
           const isInPipeline = inbox.agents.some(a => a.agentId.toString() === agentId)
-          return !isResponseAgent && !isInPipeline
+          return !isInPipeline
         } else {
-          // Check if already in processing pipeline or is response agent
-          const isResponseAgent = inbox.responseAgent?.agentId?.toString() === agentId
+          // Check if already in processing pipeline
           const isInPipeline = inbox.agents.some(a => a.agentId.toString() === agentId)
-          return !isResponseAgent && !isInPipeline
+          return !isInPipeline
         }
       })
 

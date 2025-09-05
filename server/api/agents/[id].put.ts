@@ -147,8 +147,6 @@ export default chatwootAuthMiddleware.auth(async (event, checker) => {
         _id: updatedAgent._id,
         name: updatedAgent.name,
         description: updatedAgent.description,
-        prompt: updatedAgent.prompt,
-        agentType: updatedAgent.agentType,
         settings: updatedAgent.settings,
         workflow: updatedAgent.workflow,
         analytics: updatedAgent.analytics,

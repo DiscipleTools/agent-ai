@@ -49,15 +49,13 @@
         
         <div v-if="hasAgents" class="space-y-2">
           <div 
-            v-if="inbox.responseAgent?.agentId"
-            @click="$emit('edit-agent', inbox.responseAgent.agentId)"
+            v-for="agent in inbox.agents"
+            :key="agent.agentId"
             class="flex items-center justify-between p-2 bg-gray-50 rounded-md hover:bg-gray-100 cursor-pointer"
           >
-            <span class="text-sm text-gray-900">{{ inbox.responseAgent.agentId.name || 'Response Agent' }}</span>
+            <span class="text-sm text-gray-900">{{ agent.name || 'Processing Agent' }}</span>
             <span class="text-xs text-gray-500">Response</span>
           </div>
-          
-          <!-- Additional pipeline agents would go here -->
         </div>
         
         <div v-else class="text-center py-6">
@@ -162,7 +160,7 @@ const channelIcon = computed(() => {
 
 // Check if inbox has any agents configured
 const hasAgents = computed(() => {
-  return !!(props.inbox.responseAgent?.agentId || (props.inbox.agentCount && props.inbox.agentCount > 0))
+  return !!(props.inbox.agents.length && props.inbox.agents.length > 0)
 })
 
 // Chatwoot integration status

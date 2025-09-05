@@ -181,7 +181,7 @@
                   <div class="flex items-center justify-between">
                     <div>
                       <p class="font-medium text-gray-900">{{ agent.name }}</p>
-                      <p class="text-sm text-gray-500">{{ agent.agentType || 'Workflow Agent' }}</p>
+                      <p class="text-sm text-gray-500">Workflow Agent</p>
                       <p v-if="agent.description" class="text-xs text-gray-400 mt-1">{{ agent.description }}</p>
                     </div>
                   </div>
@@ -243,14 +243,7 @@ const isBotSetup = computed(() => {
 const allAgents = computed(() => {
   const agentsList = []
   
-  // Add response agent first if it exists
-  if (currentInbox.value?.responseAgent?.agentId) {
-    agentsList.push({
-      id: currentInbox.value.responseAgent.agentId._id || currentInbox.value.responseAgent.agentId,
-      name: currentInbox.value.responseAgent.agentId.name || 'Response Agent',
-      type: 'Response Agent'
-    })
-  }
+  // Response agent functionality removed
   
   // Add processing agents
   if (currentInbox.value?.agents) {
@@ -258,7 +251,7 @@ const allAgents = computed(() => {
       agentsList.push({
         id: agent.agentId,
         name: agent.name || 'Processing Agent',
-        type: formatAgentType(agent.agentType),
+        type: 'Processing Agent',
         priority: agent.priority
       })
     })
@@ -273,9 +266,7 @@ const availableAgents = computed(() => {
   // Filter out agents that are already assigned to this inbox
   const assignedAgentIds = new Set()
   
-  if (currentInbox.value?.responseAgent?.agentId) {
-    assignedAgentIds.add(currentInbox.value.responseAgent.agentId._id || currentInbox.value.responseAgent.agentId)
-  }
+  // Response agent functionality removed
   
   if (currentInbox.value?.agents) {
     currentInbox.value.agents.forEach(agent => {
@@ -380,15 +371,9 @@ const hideSelectAgent = () => {
 
 const selectAgent = async (agent) => {
   try {
-    if (agent.agentType === 'response') {
-      // Assign as response agent
-      await inboxesStore.assignResponseAgent(inboxId, agent._id)
-      toast(`Response agent "${agent.name}" assigned successfully`, { type: 'success' })
-    } else {
-      // Add to processing pipeline
-      await inboxesStore.addAgent(inboxId, agent._id)
-      toast(`Processing agent "${agent.name}" added successfully`, { type: 'success' })
-    }
+    // All agents can now be assigned to processing pipeline
+    await inboxesStore.addAgent(inboxId, agent._id)
+    toast(`Agent "${agent.name}" added successfully`, { type: 'success' })
     
     hideSelectAgent()
     await refreshInbox()
@@ -414,27 +399,6 @@ const formatChannelType = (type) => {
   return types[type] || type
 }
 
-const formatAgentType = (type) => {
-  const types = {
-    'pre-process': 'Pre-process',
-    'analytics': 'Analytics',
-    'moderation': 'Moderation',
-    'routing': 'Routing',
-    'post-process': 'Post-process'
-  }
-  return types[type] || type
-}
-
-const formatDate = (date) => {
-  if (!date) return 'Unknown'
-  return new Date(date).toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  })
-}
 
 // Lifecycle
 onMounted(async () => {

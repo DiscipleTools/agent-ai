@@ -60,24 +60,20 @@ export default chatwootAuthMiddleware.agentAccess('read')(async (event, checker,
 
     // Get inbox assignments for this agent
     const inboxAssignments = await Inbox.find({
-      $or: [
-        { 'responseAgent.agentId': agentId },
-        { 'agents.agentId': agentId }
-      ]
-    }).select('name channelType responseAgent agents').lean()
+      'agents.agentId': agentId
+    }).select('name channelType agents').lean()
 
     const assignments = inboxAssignments.map(inbox => {
-      const isResponseAgent = inbox.responseAgent?.agentId?.toString() === agentId
       const processingAgent = inbox.agents?.find(a => a.agentId.toString() === agentId)
       
       return {
         inboxId: inbox._id,
         inboxName: inbox.name,
         channelType: inbox.channelType,
-        assignmentType: isResponseAgent ? 'response' : 'processing',
-        priority: isResponseAgent ? null : processingAgent?.priority,
-        isActive: isResponseAgent ? true : processingAgent?.isActive,
-        config: isResponseAgent ? inbox.responseAgent.config : processingAgent?.config
+        assignmentType: 'processing',
+        priority: processingAgent?.priority,
+        isActive: processingAgent?.isActive,
+        config: processingAgent?.config
       }
     })
 
@@ -93,8 +89,8 @@ export default chatwootAuthMiddleware.agentAccess('read')(async (event, checker,
       assignments: {
         inboxes: assignments,
         totalInboxes: assignments.length,
-        responseInboxes: assignments.filter(a => a.assignmentType === 'response').length,
-        processingInboxes: assignments.filter(a => a.assignmentType === 'processing').length
+        responseInboxes: 0,
+        processingInboxes: assignments.length
       }
     }
 

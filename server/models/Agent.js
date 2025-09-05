@@ -36,11 +36,6 @@ const agentSchema = new mongoose.Schema({
     trim: true,
     maxlength: [500, 'Description cannot exceed 500 characters']
   },
-  prompt: {
-    type: String,
-    required: false, // Not required since prompts are now in action parameters
-    maxlength: [2000, 'Prompt cannot exceed 2000 characters']
-  },
   contextDocuments: [contextDocumentSchema],
   settings: {
     temperature: {
@@ -73,12 +68,6 @@ const agentSchema = new mongoose.Schema({
   createdBy: {
     type: mongoose.Schema.Types.Mixed, // Support both ObjectId and simple IDs for Chatwoot users
     required: true
-  },
-  agentType: {
-    type: String,
-    enum: ['response', 'pre-process', 'analytics', 'moderation', 'routing', 'post-process', 'workflow'],
-    default: 'workflow',
-    required: [true, 'Agent type is required']
   },
   
   // Workflow system fields (new structure)
@@ -247,7 +236,6 @@ const agentSchema = new mongoose.Schema({
 // Indexes for better performance
 agentSchema.index({ isActive: 1 })
 agentSchema.index({ createdBy: 1 })
-agentSchema.index({ agentType: 1 })
 agentSchema.index({ 'workflow.triggers.type': 1 })
 agentSchema.index({ 'workflow.isActive': 1 })
 agentSchema.index({ priority: 1 })
@@ -264,10 +252,9 @@ agentSchema.statics.findByCreator = function(userId) {
   return this.find({ createdBy: userId, isActive: true })
 }
 
-// Static method to find workflow agents by trigger type
+// Static method to find agents by trigger type
 agentSchema.statics.findByTriggerType = function(triggerType, inboxIds = []) {
   const query = {
-    agentType: 'workflow',
     isActive: true,
     'workflow.isActive': true,
     'workflow.triggers': {
@@ -287,10 +274,9 @@ agentSchema.statics.findByTriggerType = function(triggerType, inboxIds = []) {
   return this.find(query).sort({ priority: 1 })
 }
 
-// Static method to find all workflow agents
-agentSchema.statics.findWorkflowAgents = function(userId = null) {
+// Static method to find all agents
+agentSchema.statics.findAllAgents = function(userId = null) {
   const query = {
-    agentType: 'workflow',
     isActive: true
   }
   
@@ -328,41 +314,16 @@ agentSchema.methods.updateAnalytics = function(executionTime, success = true) {
 agentSchema.statics.getAssignedInboxes = async function(agentId) {
   const Inbox = mongoose.model('Inbox')
   return await Inbox.find({
-    $or: [
-      { 'responseAgent.agentId': agentId },
-      { 'agents.agentId': agentId }
-    ]
+    'agents.agentId': agentId
   })
 }
 
-// Static method to validate response agent inbox constraints
+// Static method to validate response agent inbox constraints (removed - responseAgent functionality removed)
 agentSchema.statics.validateResponseAgentInboxes = async function(inboxIds, excludeAgentId = null) {
-  const Inbox = mongoose.model('Inbox')
-  
-  const conflicts = []
-  
-  // Check each inbox for existing response agents
-  for (const inboxId of inboxIds) {
-    const inbox = await Inbox.findById(inboxId).populate('responseAgent.agentId')
-    
-    if (inbox && inbox.responseAgent && inbox.responseAgent.agentId) {
-      // Skip if it's the same agent being updated
-      if (excludeAgentId && inbox.responseAgent.agentId._id.toString() === excludeAgentId.toString()) {
-        continue
-      }
-      
-      conflicts.push({
-        inboxId: inbox._id,
-        inboxName: inbox.name,
-        existingAgentId: inbox.responseAgent.agentId._id,
-        existingAgentName: inbox.responseAgent.agentId.name
-      })
-    }
-  }
-  
+  // Response agent functionality removed
   return {
-    isValid: conflicts.length === 0,
-    conflicts
+    isValid: true,
+    conflicts: []
   }
 }
 
@@ -372,7 +333,6 @@ agentSchema.virtual('info').get(function() {
     id: this._id,
     name: this.name,
     description: this.description,
-    agentType: this.agentType,
     isActive: this.isActive,
     createdAt: this.createdAt
   }

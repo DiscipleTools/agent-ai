@@ -6,7 +6,7 @@
           {{ sanitizeText(agent.name) }}
         </h3>
         <span class="inline-block px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 rounded-full mt-1">
-          {{ agent.agentType || 'response' }} agent
+          Workflow Agent
         </span>
       </div>
       <span 
