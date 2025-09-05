@@ -288,12 +288,6 @@ class RAGService {
     return text.replace(/\s+/g, ' ').trim()
   }
 
-  /**
-   * Escape special regex characters
-   */
-  private escapeRegex(string: string): string {
-    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  }
 
   async processDocument(agentId: string, documentId: string, content: string, metadata: {
     type: 'file' | 'url' | 'website'

@@ -365,9 +365,6 @@ class AIService {
     return systemPrompt
   }
 
-  delay(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms))
-  }
 
   // Method to get available models for a specific connection
   async getAvailableModels(connectionId?: string): Promise<string[]> {

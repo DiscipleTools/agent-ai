@@ -143,29 +143,6 @@ export const sanitizeEmail = (input) => {
     .substring(0, 254) // RFC 5321 limit
 }
 
-/**
- * Sanitize HTML content by allowing only safe tags and attributes
- * @param {string|any} input - The HTML content to sanitize
- * @param {Object} options - Options for allowed tags and attributes
- * @returns {string} - Sanitized HTML
- */
-export const sanitizeHtml = (input, options = {}) => {
-  if (!input || typeof input !== 'string') return ''
-  
-  const defaultOptions = {
-    allowedTags: ['p', 'br', 'strong', 'em', 'u', 'b', 'i'],
-    allowedAttributes: {},
-    ...options
-  }
-  
-  // For now, just strip all HTML - can be enhanced with a proper HTML sanitizer library
-  if (defaultOptions.allowedTags.length === 0) {
-    return input.replace(/<[^>]*>/g, '').trim()
-  }
-  
-  // This is a basic implementation - for production, consider using DOMPurify or similar
-  return input.trim()
-}
 
 /**
  * Sanitize search query input
@@ -233,16 +210,6 @@ export const sanitizeModelId = (input) => {
   return input.replace(/[^\w\s\-./:]/g, '').trim()
 }
 
-/**
- * Sanitize password input. It only ensures it's a string.
- * It does not remove characters, as that could invalidate a correct password.
- * @param {any} input - The password to sanitize
- * @returns {string} - Sanitized password
- */
-export const sanitizePassword = (input) => {
-  if (typeof input !== 'string') return ''
-  return input
-}
 
 /**
  * Sanitize a string to contain only alphanumeric characters.
@@ -600,75 +567,7 @@ export const sanitizeScrapedHtml = (html) => {
     .trim()
 }
 
-/**
- * Sanitize URL query parameters to prevent injection attacks
- * @param {string|any} queryString - The query string to sanitize
- * @returns {string} - Sanitized query string
- */
-export const sanitizeUrlQuery = (queryString) => {
-  if (!queryString || typeof queryString !== 'string') return ''
-  
-  try {
-    const params = new URLSearchParams(queryString)
-    const sanitizedParams = new URLSearchParams()
-    
-    for (const [key, value] of params) {
-      // Sanitize parameter names and values
-      const cleanKey = key
-        .replace(/[<>"'&]/g, '') // Remove dangerous characters
-        .replace(/[^\w\-_.]/g, '') // Only allow word characters, hyphens, underscores, dots
-        .substring(0, 100) // Limit length
-      
-      const cleanValue = value
-        .replace(/[<>"']/g, '') // Remove dangerous characters
-        .replace(/javascript:/gi, '') // Remove javascript protocol
-        .replace(/data:/gi, '') // Remove data protocol
-        .substring(0, 500) // Limit length
-      
-      if (cleanKey && cleanValue) {
-        sanitizedParams.append(cleanKey, cleanValue)
-      }
-    }
-    
-    return sanitizedParams.toString()
-  } catch (error) {
-    return ''
-  }
-}
 
-/**
- * Sanitize HTTP headers to prevent header injection attacks
- * @param {Object|any} headers - The headers object to sanitize
- * @returns {Object} - Sanitized headers object
- */
-export const sanitizeHttpHeaders = (headers) => {
-  if (!headers || typeof headers !== 'object') return {}
-  
-  const sanitizedHeaders = {}
-  const allowedHeaders = [
-    'accept', 'accept-language', 'accept-encoding', 'user-agent',
-    'cache-control', 'content-type', 'content-length', 'referer',
-    'dnt', 'connection', 'upgrade-insecure-requests'
-  ]
-  
-  for (const [key, value] of Object.entries(headers)) {
-    const lowerKey = key.toLowerCase()
-    
-    // Only allow known safe headers
-    if (allowedHeaders.includes(lowerKey)) {
-      const sanitizedValue = String(value)
-        .replace(/[\r\n]/g, '') // Remove line breaks (header injection)
-        .replace(/[^\x20-\x7E]/g, '') // Remove non-printable characters
-        .substring(0, 500) // Limit length
-      
-      if (sanitizedValue) {
-        sanitizedHeaders[key] = sanitizedValue
-      }
-    }
-  }
-  
-  return sanitizedHeaders
-}
 
 /**
  * Sanitize extracted text content to remove potential security issues
