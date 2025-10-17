@@ -435,15 +435,31 @@ class WebScrapingService {
         throw new Error('Operation aborted')
       }
 
-      // Use article-extractor for content extraction
+      let extractedContent: string = ''
+      let extractedTitle: string | undefined
+
+      // Try article-extractor first
       const articleResult = await this.tryArticleExtractor(normalizedUrl, signal)
-      
-      if (!articleResult || !articleResult.content) {
-        throw new Error('Failed to extract content from URL using article-extractor')
+
+      if (articleResult && articleResult.content) {
+        extractedContent = articleResult.content
+        extractedTitle = articleResult.title
+      } else {
+        // Fallback: fetch HTML and extract text manually
+        console.log('Article-extractor failed, falling back to manual HTML parsing')
+        const { content: htmlContent } = await this.fetchContent(normalizedUrl, mergedOptions, signal)
+
+        // Extract title from HTML
+        const titleMatch = htmlContent.match(/<title[^>]*>([^<]+)<\/title>/i)
+        extractedTitle = titleMatch ? titleMatch[1].trim() : undefined
+
+        // Convert full HTML to text
+        extractedContent = this.htmlToText(htmlContent)
+        console.log(`✓ Content extracted using fallback HTML parser (${extractedContent.length} chars)`)
       }
 
       // Sanitize content using the enhanced text sanitization
-      const sanitizedContent = sanitizeExtractedText(articleResult.content)
+      const sanitizedContent = sanitizeExtractedText(extractedContent)
 
       if (!sanitizedContent || sanitizedContent.length < 10) {
         throw new Error('Insufficient content extracted from URL')
@@ -451,7 +467,7 @@ class WebScrapingService {
 
       // Truncate content if it's too large (instead of failing)
       let finalContent = sanitizedContent
-      
+
       if (sanitizedContent.length > mergedOptions.maxContentLength!) {
         finalContent = sanitizedContent.substring(0, mergedOptions.maxContentLength!) + '\n\n[Content truncated due to size limit]'
         console.warn(`Content truncated for ${normalizedUrl}: ${sanitizedContent.length} chars -> ${finalContent.length} chars`)
@@ -459,7 +475,7 @@ class WebScrapingService {
 
       return {
         content: finalContent,
-        title: articleResult.title,
+        title: extractedTitle,
         url: normalizedUrl,
         contentType: 'text/plain',
         scrapedAt: new Date()
@@ -757,10 +773,10 @@ class WebScrapingService {
                 `Link extraction for ${url}`
               )
               console.log(`  ✓ Links extracted in ${Date.now() - linkStartTime}ms`)
-              
+
               const links = this.extractLinks(content, url)
               const filteredLinks = this.filterUrls(links, normalizedBaseUrl, mergedOptions)
-              console.log(`  → Found ${filteredLinks.length} new links to crawl`)
+              console.log(`  → Found ${filteredLinks.length} links to crawl`)
               
               // Add new URLs to visit
               for (const link of filteredLinks) {
