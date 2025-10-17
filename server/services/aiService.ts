@@ -129,8 +129,6 @@ class AIService {
     settings: { temperature?: number, max_tokens?: number },
     agentId?: string
   ): Promise<string> {
-    const maxTokensValue = settings.max_tokens || 500
-
     // Determine if this is OpenAI API and model type
     const isOpenAI = aiConfig.endpoint.includes('api.openai.com')
     const isReasoningModel = isOpenAI && (
@@ -138,6 +136,12 @@ class AIService {
       aiConfig.model.includes('o1') ||
       aiConfig.model.includes('o3')
     )
+
+    // Reasoning models need more tokens (for internal reasoning + response)
+    // Default to 4000 for reasoning models, 500 for others
+    const defaultTokens = isReasoningModel ? 4000 : 500
+    const maxTokensValue = settings.max_tokens || defaultTokens
+
     const usesMaxCompletionTokens = isOpenAI && (
       aiConfig.model.includes('gpt-5') ||
       aiConfig.model.includes('gpt-4o') ||
