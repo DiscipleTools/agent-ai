@@ -18,16 +18,19 @@ import { sanitizeToken, sanitizeObjectId } from '~/utils/sanitize.js'
  */
 class CSRFService {
   private readonly secret: string
+  private readonly jwtSecret: string
   private readonly tokenExpiry: string = '1h' // CSRF tokens expire in 1 hour
 
   constructor() {
-    const envSecret = process.env.CSRF_SECRET || process.env.JWT_SECRET
-    
-    if (!envSecret) {
-      throw new Error('CSRF_SECRET or JWT_SECRET must be configured for CSRF protection')
+    // Use separate secret for CSRF tokens if available
+    const csrfSecret = process.env.CSRF_SECRET || process.env.JWT_SECRET
+
+    if (!csrfSecret || !process.env.JWT_SECRET) {
+      throw new Error('JWT_SECRET must be configured for CSRF protection')
     }
-    
-    this.secret = envSecret
+
+    this.secret = csrfSecret
+    this.jwtSecret = process.env.JWT_SECRET // Always use JWT_SECRET to verify access tokens
   }
 
   /**
@@ -109,9 +112,10 @@ class CSRFService {
         return null
       }
 
-      // Use jwt.verify instead of jwt.decode for security
-      const decoded = jwt.verify(sanitizedToken, this.secret) as any
-      
+      // IMPORTANT: Use jwtSecret (not this.secret) to verify access tokens
+      // Access tokens are signed with JWT_SECRET, not CSRF_SECRET
+      const decoded = jwt.verify(sanitizedToken, this.jwtSecret) as any
+
       // For our JWT tokens, we'll use the issued at time + user ID as session identifier
       // This ensures CSRF tokens are tied to specific login sessions
       if (decoded && decoded.userId && decoded.iat) {
@@ -120,9 +124,9 @@ class CSRFService {
           return `${sanitizedUserId}-${decoded.iat}`
         }
       }
-      
+
       return null
-    } catch (error) {
+    } catch (error: any) {
       // Invalid token
       return null
     }
@@ -143,18 +147,19 @@ class CSRFService {
         return null
       }
 
-      const accessToken = getCookie(event, 'access-token') || 
+      const accessToken = getCookie(event, 'access-token') ||
                          getHeader(event, 'authorization')?.replace('Bearer ', '')
 
-      if (accessToken) {
-        const sessionId = this.extractSessionId(accessToken)
-        if (sessionId) {
-          return this.generateToken(sanitizedUserId, sessionId)
-        }
+      if (!accessToken) {
+        return null
       }
 
-      // No session ID available - cannot generate CSRF token
-      return null
+      const sessionId = this.extractSessionId(accessToken)
+      if (!sessionId) {
+        return null
+      }
+
+      return this.generateToken(sanitizedUserId, sessionId)
     } catch (error) {
       // Error generating token
       return null
@@ -176,18 +181,19 @@ class CSRFService {
         return false
       }
 
-      const accessToken = getCookie(event, 'access-token') || 
+      const accessToken = getCookie(event, 'access-token') ||
                          getHeader(event, 'authorization')?.replace('Bearer ', '')
-      
-      if (accessToken) {
-        const sessionId = this.extractSessionId(accessToken)
-        if (sessionId) {
-          return this.validateToken(token, sanitizedUserId, sessionId)
-        }
+
+      if (!accessToken) {
+        return false
       }
 
-      // No session ID available - cannot validate CSRF token
-      return false
+      const sessionId = this.extractSessionId(accessToken)
+      if (!sessionId) {
+        return false
+      }
+
+      return this.validateToken(token, sanitizedUserId, sessionId)
     } catch (error) {
       // Error validating token
       return false
