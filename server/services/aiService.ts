@@ -83,14 +83,14 @@ class AIService {
 
       // Use RAG to find relevant context instead of using all documents
       const systemPrompt = await this.buildSystemPromptWithRAG(agentId, prompt, sanitizedUserMessage, contextDocuments)
-      
+
       const messages: OpenAIMessage[] = [
         { role: 'system', content: systemPrompt },
         ...sanitizedConversationHistory,
         { role: 'user', content: sanitizedUserMessage }
       ]
 
-      const generatedContent = await this.executeAICall(aiConfig, messages, settings)
+      const generatedContent = await this.executeAICall(aiConfig, messages, settings, agentId)
 
       if (!generatedContent || generatedContent.trim().length === 0) {
         throw new Error('Empty response content from AI API')
@@ -126,12 +126,18 @@ class AIService {
   private async executeAICall(
     aiConfig: { apiKey: string; endpoint: string; model: string },
     messages: OpenAIMessage[],
-    settings: { temperature?: number, max_tokens?: number }
+    settings: { temperature?: number, max_tokens?: number },
+    agentId?: string
   ): Promise<string> {
     const maxTokensValue = settings.max_tokens || 500
 
-    // Determine if this is OpenAI API and if model supports max_completion_tokens
+    // Determine if this is OpenAI API and model type
     const isOpenAI = aiConfig.endpoint.includes('api.openai.com')
+    const isReasoningModel = isOpenAI && (
+      aiConfig.model.includes('gpt-5') ||
+      aiConfig.model.includes('o1') ||
+      aiConfig.model.includes('o3')
+    )
     const usesMaxCompletionTokens = isOpenAI && (
       aiConfig.model.includes('gpt-5') ||
       aiConfig.model.includes('gpt-4o') ||
@@ -139,10 +145,36 @@ class AIService {
       aiConfig.model.includes('o3')
     )
 
+    // For reasoning models, convert system messages to user messages
+    let processedMessages = messages
+    if (isReasoningModel) {
+      processedMessages = messages.reduce((acc: OpenAIMessage[], msg, index) => {
+        if (msg.role === 'system') {
+          // Convert system message to a user message with developer instructions
+          if (index === 0 && messages[1]?.role === 'user') {
+            // Prepend system content to first user message
+            return acc
+          } else {
+            // Convert standalone system message to user message
+            return [...acc, { role: 'user', content: `[SYSTEM INSTRUCTIONS]\n${msg.content}` }]
+          }
+        } else if (msg.role === 'user' && index === 1 && messages[0]?.role === 'system') {
+          // This is the first user message after a system message, prepend the system content
+          return [...acc, { role: 'user', content: `${messages[0].content}\n\n---\n\n${msg.content}` }]
+        } else {
+          return [...acc, msg]
+        }
+      }, [])
+    }
+
     const requestBody: any = {
       model: aiConfig.model,
-      messages,
-      temperature: settings.temperature || 0.3
+      messages: processedMessages
+    }
+
+    // Reasoning models (gpt-5, o1, o3) don't support custom temperature
+    if (!isReasoningModel) {
+      requestBody.temperature = settings.temperature || 0.3
     }
 
     // Use appropriate token parameter based on model
@@ -155,9 +187,10 @@ class AIService {
     console.log('Sending request to AI service:', {
       endpoint: `${aiConfig.endpoint}/chat/completions`,
       model: requestBody.model,
-      temperature: requestBody.temperature,
+      temperature: requestBody.temperature || 'default',
       max_tokens: maxTokensValue,
       tokenParam: usesMaxCompletionTokens ? 'max_completion_tokens' : 'max_tokens',
+      isReasoningModel,
       messageCount: messages.length
     })
 
