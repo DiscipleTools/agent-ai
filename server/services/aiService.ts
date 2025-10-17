@@ -128,18 +128,36 @@ class AIService {
     messages: OpenAIMessage[],
     settings: { temperature?: number, max_tokens?: number }
   ): Promise<string> {
-    const requestBody = {
+    const maxTokensValue = settings.max_tokens || 500
+
+    // Determine if this is OpenAI API and if model supports max_completion_tokens
+    const isOpenAI = aiConfig.endpoint.includes('api.openai.com')
+    const usesMaxCompletionTokens = isOpenAI && (
+      aiConfig.model.includes('gpt-5') ||
+      aiConfig.model.includes('gpt-4o') ||
+      aiConfig.model.includes('o1') ||
+      aiConfig.model.includes('o3')
+    )
+
+    const requestBody: any = {
       model: aiConfig.model,
       messages,
-      temperature: settings.temperature || 0.3,
-      max_tokens: settings.max_tokens || 500
+      temperature: settings.temperature || 0.3
+    }
+
+    // Use appropriate token parameter based on model
+    if (usesMaxCompletionTokens) {
+      requestBody.max_completion_tokens = maxTokensValue
+    } else {
+      requestBody.max_tokens = maxTokensValue
     }
 
     console.log('Sending request to AI service:', {
       endpoint: `${aiConfig.endpoint}/chat/completions`,
       model: requestBody.model,
       temperature: requestBody.temperature,
-      max_tokens: requestBody.max_tokens,
+      max_tokens: maxTokensValue,
+      tokenParam: usesMaxCompletionTokens ? 'max_completion_tokens' : 'max_tokens',
       messageCount: messages.length
     })
 
