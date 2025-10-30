@@ -107,20 +107,20 @@ export default defineEventHandler(async (event) => {
       }
     }
 
-    // Check if this is a new conversation and mark as open if needed
+    // Check if this is a new conversation (first message from contact) and mark as open if needed
     if (payload.conversation?.id && payload.account?.id) {
       try {
-        // Check if this is a new conversation by getting conversation details
-        const conversationData = await chatwootService.getConversation(
-          payload.account.id,
-          payload.conversation.id,
-          inbox.chatwoot?.apiKey
-        )
-        
-        // Mark conversation as open if it's not already open
+        // Check if this is a new conversation using the webhook payload
+        // For new conversations: created_at === timestamp (first message)
+        // For existing conversations: created_at < timestamp (subsequent messages)
+        const createdAt = payload.conversation.created_at
+        const timestamp = payload.conversation.timestamp
+        const isNewConversation = createdAt === timestamp
+
+        // Only mark as open if it's a new conversation AND not already open
         // Chatwoot conversations can be: open, resolved, pending, snoozed
-        if (conversationData && conversationData.status !== 'open') {
-          console.log(`Marking conversation ${payload.conversation.id} as open`)
+        if (isNewConversation && payload.conversation.status !== 'open') {
+          console.log(`Marking new conversation ${payload.conversation.id} as open (created_at: ${createdAt}, timestamp: ${timestamp})`)
           await chatwootService.updateConversationStatus(
             payload.account.id,
             payload.conversation.id,
