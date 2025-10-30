@@ -46,39 +46,6 @@
       </p>
     </div>
 
-    <!-- Conditions Section -->
-    <div v-if="localTrigger.type" class="mb-4">
-      <div class="flex justify-between items-center mb-2">
-        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-          Additional Conditions (optional)
-        </label>
-        <button
-          type="button"
-          @click="addCondition"
-          class="text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-200"
-        >
-          Add Condition
-        </button>
-      </div>
-
-      <div v-if="localTrigger.conditions.length === 0" class="text-sm text-gray-500 dark:text-gray-400 italic">
-        No additional conditions - trigger will fire for all {{ selectedTriggerMeta?.name }} events
-      </div>
-
-      <div v-else class="space-y-3">
-        <ConditionBuilder
-          v-for="(condition, condIndex) in localTrigger.conditions"
-          :key="`condition-${condIndex}`"
-          :condition="condition"
-          :metadata="metadata"
-          :index="condIndex"
-          :show-logical-operator="condIndex > 0"
-          @update="updateCondition(condIndex, $event)"
-          @remove="removeCondition(condIndex)"
-        />
-      </div>
-    </div>
-
     <!-- Active Toggle -->
     <div class="flex items-center">
       <input
@@ -97,7 +64,6 @@
 
 <script setup>
 import { XMarkIcon } from '@heroicons/vue/24/outline'
-import ConditionBuilder from './ConditionBuilder.vue'
 
 const props = defineProps({
   trigger: {
@@ -157,29 +123,6 @@ const updateTrigger = (updatedTrigger) => {
 
 const updateTriggerType = (newType) => {
   localTrigger.type = newType
-  // Clear conditions when trigger type changes
-  localTrigger.conditions = []
-  updateTrigger(localTrigger)
-}
-
-// Condition management
-const addCondition = () => {
-  localTrigger.conditions.push({
-    type: '',
-    operator: 'equals',
-    value: '',
-    logicalOperator: 'AND'
-  })
-  updateTrigger(localTrigger)
-}
-
-const updateCondition = (index, updatedCondition) => {
-  localTrigger.conditions[index] = updatedCondition
-  updateTrigger(localTrigger)
-}
-
-const removeCondition = (index) => {
-  localTrigger.conditions.splice(index, 1)
   updateTrigger(localTrigger)
 }
 </script>

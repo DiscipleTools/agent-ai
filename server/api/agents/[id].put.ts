@@ -104,15 +104,17 @@ export default chatwootAuthMiddleware.auth(async (event, checker) => {
       updateData.workflow = {
         triggers: body.workflow.triggers?.map((trigger: any) => ({
           type: sanitizeText(trigger.type),
-          conditions: (trigger.conditions || []).map((condition: any) => ({
-            type: sanitizeText(condition.type),
-            operator: sanitizeText(condition.operator || 'equals'),
-            value: condition.value,
-            logicalOperator: sanitizeText(condition.logicalOperator || 'AND')
-          })),
           isActive: trigger.isActive !== false
         })) || existingAgent.workflow?.triggers || [],
-        
+
+        conditions: body.workflow.conditions?.map((condition: any) => ({
+          type: sanitizeText(condition.type),
+          operator: sanitizeText(condition.operator || 'equals'),
+          value: condition.value,
+          logicalOperator: sanitizeText(condition.logicalOperator || 'AND'),
+          examples: condition.examples || ''
+        })) || existingAgent.workflow?.conditions || [],
+
         actions: body.workflow.actions?.map((action: any, index: number) => ({
           type: sanitizeText(action.type),
           parameters: sanitizeObject(action.parameters || {}, {
@@ -122,7 +124,7 @@ export default chatwootAuthMiddleware.auth(async (event, checker) => {
           continueOnFailure: action.continueOnFailure !== false,
           delay: Math.max(0, action.delay || 0)
         })) || existingAgent.workflow?.actions || [],
-        
+
         isActive: body.workflow.isActive !== false
       }
     }

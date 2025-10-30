@@ -123,6 +123,23 @@
         {{ selectedConditionMeta.description }}
       </p>
     </div>
+
+    <!-- Examples Field (for toxicity condition) -->
+    <div v-if="selectedConditionMeta?.hasExamples" class="mt-3">
+      <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+        Toxic Message Examples
+      </label>
+      <textarea
+        :value="localCondition.examples"
+        @input="updateCondition({ ...localCondition, examples: $event.target.value })"
+        :placeholder="selectedConditionMeta.examplesPlaceholder"
+        rows="6"
+        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-primary-500 font-mono"
+      ></textarea>
+      <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+        Provide examples of toxic/hostile messages to help the AI classify similar content
+      </p>
+    </div>
   </div>
 </template>
 
@@ -207,20 +224,21 @@ const updateCondition = (updatedCondition) => {
 }
 
 const updateConditionType = (newType) => {
-  // Reset operator and value when type changes
+  // Reset operator and value when type changes, but preserve examples
   const newCondition = {
     ...localCondition,
     type: newType,
     operator: 'equals',
-    value: ''
+    value: '',
+    examples: localCondition.examples || ''
   }
-  
+
   // Set default operator for the new condition type
   const conditionMeta = props.metadata?.conditions?.find(c => c.type === newType)
   if (conditionMeta && conditionMeta.operators && conditionMeta.operators.length > 0) {
     newCondition.operator = conditionMeta.operators[0]
   }
-  
+
   updateCondition(newCondition)
 }
 

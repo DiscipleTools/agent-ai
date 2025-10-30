@@ -106,6 +106,50 @@
       </p>
     </div>
 
+    <!-- Conditions Section -->
+    <div class="card">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="text-lg font-medium text-gray-900 dark:text-white">
+          Conditions
+        </h3>
+        <button
+          type="button"
+          @click="addCondition"
+          class="btn-secondary text-sm"
+        >
+          Add Condition
+        </button>
+      </div>
+
+      <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
+        Define conditions that must be met for the agent to execute. All conditions must be satisfied.
+      </p>
+
+      <div v-if="form.workflow.conditions.length === 0" class="text-center py-8 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg">
+        <p class="text-gray-500 dark:text-gray-400 mb-4">No conditions configured</p>
+        <button
+          type="button"
+          @click="addCondition"
+          class="btn-primary"
+        >
+          Add Your First Condition
+        </button>
+      </div>
+
+      <div v-else class="space-y-4">
+        <ConditionBuilder
+          v-for="(condition, index) in form.workflow.conditions"
+          :key="`condition-${index}`"
+          :condition="condition"
+          :metadata="metadata"
+          :index="index"
+          :show-logical-operator="index > 0"
+          @update="updateCondition(index, $event)"
+          @remove="removeCondition(index)"
+        />
+      </div>
+    </div>
+
     <!-- Actions Section -->
     <div class="card">
       <div class="flex justify-between items-center mb-4">
@@ -200,6 +244,7 @@
 import ContextDocuments from '~/components/Agent/ContextDocuments.vue'
 import TriggerBuilder from '~/components/Workflow/TriggerBuilder.vue'
 import ActionBuilder from '~/components/Workflow/ActionBuilder.vue'
+import ConditionBuilder from '~/components/Workflow/ConditionBuilder.vue'
 import { useAgentsStore } from '~/stores/agents'
 import { useToast } from 'vue-toastification'
 import { validators } from '~/utils/sanitize'
@@ -222,16 +267,23 @@ const form = reactive({
   description: props.agent?.description || '',
   prompt: '', // No default prompt needed for workflow agents
   isActive: props.agent?.isActive !== false,
-  settings: {
-    temperature: props.agent?.settings?.temperature || 0.3,
-    maxTokens: props.agent?.settings?.maxTokens || 500,
-    responseDelay: props.agent?.settings?.responseDelay || 0,
-    connectionId: props.agent?.settings?.connectionId || '',
-    modelId: props.agent?.settings?.modelId || ''
+  settings: props.agent?.settings ? {
+    temperature: props.agent.settings.temperature || 0.3,
+    maxTokens: props.agent.settings.maxTokens || 500,
+    responseDelay: props.agent.settings.responseDelay || 0,
+    connectionId: props.agent.settings.connectionId || '',
+    modelId: props.agent.settings.modelId || ''
+  } : {
+    temperature: 0.3,
+    maxTokens: 500,
+    responseDelay: 0,
+    connectionId: '',
+    modelId: ''
   },
   workflow: {
-    triggers: props.agent?.workflow?.triggers || [],
-    actions: props.agent?.workflow?.actions || [],
+    triggers: props.agent?.workflow?.triggers ? [...props.agent.workflow.triggers.map(t => ({...t}))] : [],
+    conditions: props.agent?.workflow?.conditions ? [...props.agent.workflow.conditions.map(c => ({...c}))] : [],
+    actions: props.agent?.workflow?.actions ? [...props.agent.workflow.actions.map(a => ({...a}))] : [],
     isActive: props.agent?.workflow?.isActive !== false
   }
 })
@@ -307,31 +359,17 @@ const metadata = ref({
     { type: 'stop_workflow', name: 'Stop Workflow', description: 'Stop workflow execution', category: 'flow', disabled: true, disabledReason: 'Not implemented - no execution logic exists', parameters: []},
   ],
   conditions: [
-    // Message Content - ONLY message_contains WORKS
+    // Message Content
     { type: 'message_contains', name: 'Message contains text', description: 'Check if message contains specific text', category: 'message', valueType: 'text', operators: ['contains', 'not_contains', 'equals', 'not_equals'] },
-    { type: 'message_length', name: 'Message length', description: 'Check message character length', category: 'message', valueType: 'number', operators: ['greater_than', 'less_than', 'equals'], disabled: true, disabledReason: 'Partially implemented - only hardcoded variants exist in evaluation logic' },
-    { type: 'message_language', name: 'Message language', description: 'Detect message language', category: 'message', valueType: 'select', disabled: true, disabledReason: 'Not implemented - no evaluation logic exists', operators: ['equals', 'not_equals'], options: [
-      { value: 'en', label: 'English' },
-      { value: 'es', label: 'Spanish' },
-      { value: 'fr', label: 'French' },
-      { value: 'de', label: 'German' }
-    ]},
-    
-    // Contact Properties - NOT IMPLEMENTED
-    { type: 'contact_attribute', name: 'Contact attribute', description: 'Check contact custom attribute value', category: 'contact', valueType: 'text', disabled: true, disabledReason: 'Not implemented - no evaluation logic exists', operators: ['equals', 'not_equals', 'contains', 'not_contains'] },
-    { type: 'contact_email', name: 'Contact email', description: 'Check contact email address', category: 'contact', valueType: 'email', disabled: true, disabledReason: 'Not implemented - no evaluation logic exists', operators: ['equals', 'not_equals', 'contains', 'not_contains'] },
-    
-    // Conversation Properties - PARTIALLY IMPLEMENTED
-    { type: 'conversation_status', name: 'Conversation status', description: 'Check current conversation status', category: 'conversation', valueType: 'select', disabled: true, disabledReason: 'Partially implemented - only hardcoded conversation_status_equals exists', operators: ['equals', 'not_equals'], options: [
+    { type: 'message_is_toxic', name: 'Message is toxic', description: 'Check if message contains toxic or offensive content', category: 'message', valueType: 'boolean', operators: ['equals'], hasExamples: true, examplesPlaceholder: 'Enter examples of toxic/hostile messages (one per line):\n- Example toxic message 1\n- Example toxic message 2\n- Example toxic message 3' },
+
+    // Conversation Properties
+    { type: 'conversation_status', name: 'Conversation status', description: 'Check current conversation status', category: 'conversation', valueType: 'select', operators: ['equals', 'not_equals'], options: [
       { value: 'open', label: 'Open' },
       { value: 'resolved', label: 'Resolved' },
       { value: 'pending', label: 'Pending' },
       { value: 'snoozed', label: 'Snoozed' }
     ]},
-    { type: 'conversation_message_count', name: 'Message count', description: 'Check number of messages in conversation', category: 'conversation', valueType: 'number', disabled: true, disabledReason: 'Not implemented - no evaluation logic exists', operators: ['greater_than', 'less_than', 'equals'] },
-    
-    // AI-Evaluated Conditions - NOT IMPLEMENTED  
-    { type: 'ai_evaluation', name: 'AI Evaluation', description: 'Use AI to evaluate custom conditions', category: 'ai', valueType: 'text', disabled: true, disabledReason: 'Not implemented - no evaluation logic exists', operators: ['equals', 'not_equals'] },
   ],
   operators: [
     { value: 'equals', label: 'equals' },
@@ -368,20 +406,35 @@ watch(() => props.agent, (newAgent) => {
   if (newAgent) {
     form.name = newAgent.name || ''
     form.description = newAgent.description || ''
-    form.prompt = newAgent.prompt || '' // No default prompt needed
+    form.prompt = newAgent.prompt || ''
     form.isActive = newAgent.isActive !== false
-    form.settings = {
+
+    // Update settings
+    Object.assign(form.settings, {
       temperature: newAgent.settings?.temperature || 0.3,
       maxTokens: newAgent.settings?.maxTokens || 500,
       responseDelay: newAgent.settings?.responseDelay || 0,
       connectionId: newAgent.settings?.connectionId || '',
       modelId: newAgent.settings?.modelId || ''
+    })
+
+    // Update arrays by clearing and re-populating to maintain reactivity and avoid readonly props
+    form.workflow.triggers.length = 0
+    form.workflow.conditions.length = 0
+    form.workflow.actions.length = 0
+
+    // Push new items (creates fresh writable copies to avoid readonly props)
+    if (newAgent.workflow?.triggers) {
+      newAgent.workflow.triggers.forEach(t => form.workflow.triggers.push({...t}))
     }
-    form.workflow = {
-      triggers: newAgent.workflow?.triggers || [],
-      actions: newAgent.workflow?.actions || [],
-      isActive: newAgent.workflow?.isActive !== false
+    if (newAgent.workflow?.conditions) {
+      newAgent.workflow.conditions.forEach(c => form.workflow.conditions.push({...c}))
     }
+    if (newAgent.workflow?.actions) {
+      newAgent.workflow.actions.forEach(a => form.workflow.actions.push({...a}))
+    }
+
+    form.workflow.isActive = newAgent.workflow?.isActive !== false
     
     // Load context documents from agent prop if editing
     if (newAgent._id && newAgent.contextDocuments) {
@@ -389,13 +442,12 @@ watch(() => props.agent, (newAgent) => {
       ragSummary.value = newAgent.ragSummary || null
     }
   }
-}, { immediate: true })
+})
 
 // Trigger management
 const addTrigger = () => {
   form.workflow.triggers.push({
     type: '',
-    conditions: [],
     isActive: true
   })
 }
@@ -406,6 +458,25 @@ const updateTrigger = (index, updatedTrigger) => {
 
 const removeTrigger = (index) => {
   form.workflow.triggers.splice(index, 1)
+}
+
+// Condition management
+const addCondition = () => {
+  form.workflow.conditions.push({
+    type: '',
+    operator: 'equals',
+    value: '',
+    logicalOperator: 'AND',
+    examples: ''
+  })
+}
+
+const updateCondition = (index, updatedCondition) => {
+  form.workflow.conditions[index] = { ...updatedCondition }
+}
+
+const removeCondition = (index) => {
+  form.workflow.conditions.splice(index, 1)
 }
 
 // Action management
@@ -506,6 +577,7 @@ const handleSubmit = async () => {
       workflow: {
         ...form.workflow,
         triggers: form.workflow.triggers.filter(t => t.type),
+        conditions: form.workflow.conditions.filter(c => c.type),
         actions: form.workflow.actions.filter(a => a.type)
       }
     }

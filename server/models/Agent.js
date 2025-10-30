@@ -70,8 +70,9 @@ const agentSchema = new mongoose.Schema({
     required: true
   },
   
-  // Workflow system fields (new structure)
+  // Workflow system fields (3-section structure: triggers, conditions, actions)
   workflow: {
+    // Section 1: Triggers - Events that start the workflow
     triggers: [{
       type: {
         type: String,
@@ -80,54 +81,47 @@ const agentSchema = new mongoose.Schema({
           'conversation_created',
           'conversation_status_changed',
           'conversation_assigned',
-          
+
           // Message events
           'message_created',
-          
-          
-          
-        ]
+        ],
+        required: [true, 'Trigger type is required']
       },
-      conditions: [{
-        type: {
-          type: String,
-          enum: [
-            // Message content conditions
-            'message_contains',
-            'message_length',
-            'message_language',
-            
-            // Contact conditions
-            'contact_attribute',
-            'contact_email',
-            
-            // Conversation conditions
-            'conversation_status',
-            'conversation_message_count',
-            
-            
-            // AI-evaluated conditions
-            'ai_evaluation'
-          ]
-        },
-        operator: {
-          type: String,
-          enum: ['equals', 'not_equals', 'contains', 'not_contains', 'greater_than', 'less_than', 'exists', 'not_exists'],
-          default: 'equals'
-        },
-        value: mongoose.Schema.Types.Mixed,
-        logicalOperator: {
-          type: String,
-          enum: ['AND', 'OR'],
-          default: 'AND'
-        }
-      }],
       isActive: {
         type: Boolean,
         default: true
       }
     }],
-    
+
+    // Section 2: Conditions - Filters that must be met for workflow to execute
+    conditions: [{
+      type: {
+        type: String,
+        enum: [
+          'conversation_status',    // Check conversation status
+          'message_contains',       // Check if message contains text
+          'message_is_toxic'        // Check if message is toxic (async API call)
+        ],
+        required: [true, 'Condition type is required']
+      },
+      operator: {
+        type: String,
+        enum: ['equals', 'contains'],
+        default: 'equals'
+      },
+      value: mongoose.Schema.Types.Mixed,
+      logicalOperator: {
+        type: String,
+        enum: ['AND', 'OR'],
+        default: 'AND'
+      },
+      examples: {
+        type: String,
+        default: ''
+      }
+    }],
+
+    // Section 3: Actions - What to do when triggered and conditions met
     actions: [{
       type: {
         type: String,

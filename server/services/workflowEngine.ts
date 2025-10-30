@@ -9,6 +9,7 @@ import Agent from '~/server/models/Agent'
 import Inbox from '~/server/models/Inbox'
 import chatwootService from './chatwootService'
 import aiService from './aiService'
+import toxicityService from './toxicityService'
 
 interface WorkflowEvent {
   type: string
@@ -169,34 +170,35 @@ class WorkflowEngine {
 
   /**
    * Evaluate workflow conditions for an agent
+   * Conditions are now at the workflow level, not within triggers
    */
   private async evaluateWorkflowConditions(agent: any, event: WorkflowEvent): Promise<boolean> {
     try {
-      const trigger = agent.workflow?.triggers?.find((t: any) => t.type === event.type && t.isActive)
-      
-      if (!trigger || !trigger.conditions || trigger.conditions.length === 0) {
+      const conditions = agent.workflow?.conditions
+
+      if (!conditions || conditions.length === 0) {
         return true // No conditions = always match
       }
-      
-      // Evaluate all conditions
+
+      // Evaluate all conditions with AND/OR logic
       let result = true
       let currentLogical = 'AND' // Start with AND
-      
-      for (const condition of trigger.conditions) {
+
+      for (const condition of conditions) {
         const conditionResult = await this.evaluateCondition(condition, event)
-        
+
         if (currentLogical === 'AND') {
           result = result && conditionResult
         } else { // OR
           result = result || conditionResult
         }
-        
+
         // Set next logical operator
         currentLogical = condition.logicalOperator || 'AND'
       }
-      
+
       return result
-      
+
     } catch (error) {
       console.error('Error evaluating workflow conditions:', error)
       return false
@@ -205,108 +207,51 @@ class WorkflowEngine {
 
   /**
    * Evaluate a single condition
+   * Supports: conversation_status, message_contains, is_toxic
    */
   private async evaluateCondition(condition: any, event: WorkflowEvent): Promise<boolean> {
     try {
       const { type, operator, value } = condition
       const eventData = event.data
-      
+
       switch (type) {
-        // Message content conditions
+        case 'conversation_status':
+          // Check if conversation status equals the specified value(s)
+          const conversationStatus = eventData.conversation?.status || ''
+          if (operator === 'equals') {
+            // Support both single value and array of values
+            if (Array.isArray(value)) {
+              return value.includes(conversationStatus)
+            }
+            return conversationStatus === value
+          }
+          return false
+
         case 'message_contains':
-          return this.evaluateStringCondition(eventData.message || '', operator, value)
-        
-        case 'message_not_contains':
-          return !this.evaluateStringCondition(eventData.message || '', 'contains', value)
-        
-        case 'message_length_greater':
-          return this.evaluateNumberCondition((eventData.message || '').length, 'greater_than', value)
-        
-        case 'message_length_less':
-          return this.evaluateNumberCondition((eventData.message || '').length, 'less_than', value)
-        
-        // Conversation conditions
-        case 'conversation_status_equals':
-          return this.evaluateStringCondition(eventData.conversation?.status || '', operator, value)
-        
-        case 'conversation_unassigned':
-          return !eventData.conversation?.assignee_id
-        
-        case 'conversation_assignee_equals':
-          return this.evaluateNumberCondition(eventData.conversation?.assignee_id || 0, operator, value)
-        
-        // Contact conditions
-        case 'contact_is_new':
-          // This would require checking if this is the contact's first conversation
-          return eventData.conversation?.message_count === 1
-        
-        // Channel conditions  
-        case 'channel_type_equals':
-          return this.evaluateStringCondition(eventData.inbox?.channel_type || '', operator, value)
-        
-        case 'inbox_equals':
-          return this.evaluateNumberCondition(eventData.inbox?.id || 0, operator, value)
-        
-        
+          // Check if message contains specified text
+          const message = eventData.message || ''
+          if (operator === 'contains') {
+            return message.toLowerCase().includes((value || '').toLowerCase())
+          }
+          return false
+
+        case 'message_is_toxic':
+          // Check if message is toxic (async API call)
+          const messageContent = eventData.message || ''
+          const toxicityResult = await toxicityService.checkToxicity(messageContent)
+          // Return true if toxic, false if not
+          return toxicityResult.isToxic
+
         default:
           console.warn(`Unknown condition type: ${type}`)
-          return true
+          return false
       }
-      
+
     } catch (error) {
       console.error(`Error evaluating condition ${condition.type}:`, error)
       return false
     }
   }
-
-  /**
-   * Helper method to evaluate string conditions
-   */
-  private evaluateStringCondition(actual: string, operator: string, expected: any): boolean {
-    const actualLower = actual.toLowerCase()
-    const expectedLower = typeof expected === 'string' ? expected.toLowerCase() : ''
-    
-    switch (operator) {
-      case 'equals':
-        return actualLower === expectedLower
-      case 'not_equals':
-        return actualLower !== expectedLower
-      case 'contains':
-        return actualLower.includes(expectedLower)
-      case 'not_contains':
-        return !actualLower.includes(expectedLower)
-      case 'matches':
-        try {
-          return new RegExp(expected, 'i').test(actual)
-        } catch {
-          return false
-        }
-      default:
-        return false
-    }
-  }
-
-  /**
-   * Helper method to evaluate number conditions
-   */
-  private evaluateNumberCondition(actual: number, operator: string, expected: any): boolean {
-    const expectedNum = Number(expected)
-    if (isNaN(expectedNum)) return false
-    
-    switch (operator) {
-      case 'equals':
-        return actual === expectedNum
-      case 'not_equals':
-        return actual !== expectedNum
-      case 'greater_than':
-        return actual > expectedNum
-      case 'less_than':
-        return actual < expectedNum
-      default:
-        return false
-    }
-  }
-
 
   /**
    * Execute a workflow for a specific agent

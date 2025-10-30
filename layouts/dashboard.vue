@@ -14,9 +14,14 @@
     >
       <div class="flex flex-col h-full">
         <div class="flex items-center justify-between h-16 px-4 border-b border-gray-200 dark:border-gray-700">
-          <h1 class="text-xl font-bold text-gray-900 dark:text-white">
-            Agent AI
-          </h1>
+          <div class="flex items-baseline">
+            <h1 class="text-xl font-bold text-gray-900 dark:text-white">
+              Agent AI
+            </h1>
+            <span class="ml-2 text-xs text-gray-500 dark:text-gray-400 font-medium">
+              v{{ version }}
+            </span>
+          </div>
           <button
             @click="closeMobileMenu"
             class="p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700"
@@ -77,9 +82,14 @@
               <div class="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center">
                 <CpuChipIcon class="w-5 h-5 text-white" />
               </div>
-              <h1 class="ml-3 text-xl font-bold text-gray-900 dark:text-white">
-                Agent AI
-              </h1>
+              <div class="ml-3 flex items-baseline">
+                <h1 class="text-xl font-bold text-gray-900 dark:text-white">
+                  Agent AI
+                </h1>
+                <span class="ml-2 text-xs text-gray-500 dark:text-gray-400 font-medium">
+                  v{{ version }}
+                </span>
+              </div>
             </div>
           </div>
           
@@ -212,12 +222,14 @@ import {
   RocketLaunchIcon
 } from '@heroicons/vue/24/outline'
 import { sanitizeText, sanitizeEmail } from '~/utils/sanitize.js'
+import packageJson from '~/package.json'
 
 const authStore = useAuthStore()
 const colorMode = useColorMode()
 const route = useRoute()
 
 const mobileMenuOpen = ref(false)
+const version = packageJson.version
 
 // Sanitized user data for secure display
 const sanitizedUser = computed(() => {
