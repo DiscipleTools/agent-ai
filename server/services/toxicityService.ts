@@ -27,7 +27,7 @@ class ToxicityService {
     try {
       // Build the system prompt with examples
       const examplesText = options?.examples || 'No examples provided'
-      const systemPrompt = `You are a content moderation assistant. Analyze the following conversation and determine if it is hostile or contains aggressive, threatening, or harmful content. Respond with 'true' or 'false' and no other words.
+      const systemPrompt = `You are a content moderation assistant. Analyze the following message and determine if it is hostile or contains aggressive, threatening, or harmful content. Respond with 'true' or 'false' and no other words.
 
 Examples of aggressive/hostile messages:
 ${examplesText}`

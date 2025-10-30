@@ -140,6 +140,7 @@ const agentSchema = new mongoose.Schema({
           'set_priority',
           'set_custom_attribute',
           'update_contact_attribute',
+          'mark_contact_hostile',
           
           
           // Flow control

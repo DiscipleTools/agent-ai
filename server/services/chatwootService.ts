@@ -524,6 +524,233 @@ class ChatwootService {
       throw new Error(`Failed to delete agent bot from Chatwoot: ${error.message}`)
     }
   }
+
+  /**
+   * Block a contact in Chatwoot
+   * @param accountId - The Chatwoot account ID
+   * @param contactId - The contact ID to block
+   * @param customApiKey - Optional custom API key
+   */
+  async blockContact(accountId: number, contactId: number, customApiKey?: string): Promise<any> {
+    try {
+      // Get chatwoot configuration from environment
+      const config = this.getChatwootConfig()
+
+      // Use custom API key if provided, otherwise use configured token
+      const apiKey = customApiKey || config.apiToken
+
+      if (!config.url || !apiKey) {
+        console.warn('Chatwoot URL or API token not configured. Cannot block contact.')
+        return { success: false, message: 'Chatwoot not configured' }
+      }
+
+      // Use environment URL
+      const baseUrl = this.chatwootUrl
+      const url = `${baseUrl}/api/v1/accounts/${accountId}/contacts/${contactId}`
+
+      const requestBody = {
+        blocked: true
+      }
+
+      console.log('Blocking contact in Chatwoot:', {
+        url,
+        accountId,
+        contactId,
+        usingCustomApiKey: !!customApiKey
+      })
+
+      const response = await fetch(url, {
+        method: 'PUT',
+        headers: {
+          'api_access_token': apiKey,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(requestBody)
+      })
+
+      if (!response.ok) {
+        const errorData = await response.text()
+        console.error('Chatwoot API error blocking contact:', response.status, errorData)
+        throw new Error(`Chatwoot API error: ${response.status} ${response.statusText}`)
+      }
+
+      const data = await response.json()
+      console.log('Contact blocked successfully')
+
+      return data
+
+    } catch (error: any) {
+      console.error('Chatwoot Service Error blocking contact:', error)
+      throw new Error(`Failed to block contact in Chatwoot: ${error.message}`)
+    }
+  }
+
+  /**
+   * Create a label in Chatwoot account
+   * @param accountId - The Chatwoot account ID
+   * @param title - The label title
+   * @param description - Optional label description
+   * @param color - Optional label color (hex code)
+   * @param authHeaders - Either API token or user session headers
+   */
+  async createLabel(
+    accountId: number,
+    title: string,
+    description?: string,
+    color?: string,
+    authHeaders?: string | { 'access-token': string; client: string; uid: string; expiry?: string }
+  ): Promise<any> {
+    try {
+      // Get Chatwoot URL from environment
+      const baseUrl = this.chatwootUrl
+
+      if (!baseUrl) {
+        throw new Error('Chatwoot URL not configured')
+      }
+
+      const url = `${baseUrl.replace(/\/$/, '')}/api/v1/accounts/${accountId}/labels`
+
+      const requestBody = {
+        title: sanitizeText(title),
+        description: description ? sanitizeText(description) : '',
+        color: color || '#FF0000',
+        show_on_sidebar: true
+      }
+
+      // Determine auth headers based on input type
+      let headers: Record<string, string>
+      if (typeof authHeaders === 'object' && authHeaders !== null) {
+        // User session authentication
+        headers = {
+          'access-token': authHeaders['access-token'],
+          'client': authHeaders.client,
+          'uid': authHeaders.uid,
+          'Content-Type': 'application/json'
+        }
+        console.log('Creating label in Chatwoot with user session:', {
+          url,
+          accountId,
+          title,
+          uid: authHeaders.uid
+        })
+      } else {
+        // API key authentication
+        const config = this.getChatwootConfig()
+        const apiKey = typeof authHeaders === 'string' ? authHeaders : config.apiToken
+
+        if (!apiKey) {
+          throw new Error('Chatwoot API token not configured')
+        }
+
+        headers = {
+          'api_access_token': apiKey,
+          'Content-Type': 'application/json'
+        }
+        console.log('Creating label in Chatwoot with API key:', {
+          url,
+          accountId,
+          title,
+          usingCustomApiKey: typeof authHeaders === 'string'
+        })
+      }
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(requestBody)
+      })
+
+      if (!response.ok) {
+        const errorData = await response.text()
+        console.error('Chatwoot API error creating label:', response.status, errorData)
+
+        // If label already exists, that's okay - return success
+        if (response.status === 422 || errorData.includes('already')) {
+          console.log('Label already exists, continuing...')
+          return { success: true, exists: true }
+        }
+
+        throw new Error(`Chatwoot API error: ${response.status} ${response.statusText}`)
+      }
+
+      const data = await response.json()
+      console.log(`Label "${title}" created successfully`)
+
+      return data
+
+    } catch (error: any) {
+      console.error('Chatwoot Service Error creating label:', error)
+
+      // If it's just a duplicate label error, don't throw
+      if (error.message.includes('422') || error.message.includes('already')) {
+        return { success: true, exists: true }
+      }
+
+      throw new Error(`Failed to create label in Chatwoot: ${error.message}`)
+    }
+  }
+
+  /**
+   * Add a label to a conversation in Chatwoot
+   * @param accountId - The Chatwoot account ID
+   * @param conversationId - The conversation ID
+   * @param labels - Array of label names to add
+   * @param customApiKey - Optional custom API key
+   */
+  async addLabelsToConversation(accountId: number, conversationId: number, labels: string[], customApiKey?: string): Promise<any> {
+    try {
+      // Get chatwoot configuration from environment
+      const config = this.getChatwootConfig()
+
+      // Use custom API key if provided, otherwise use configured token
+      const apiKey = customApiKey || config.apiToken
+
+      if (!config.url || !apiKey) {
+        console.warn('Chatwoot URL or API token not configured. Cannot add labels.')
+        return { success: false, message: 'Chatwoot not configured' }
+      }
+
+      // Use environment URL
+      const baseUrl = this.chatwootUrl
+      const url = `${baseUrl}/api/v1/accounts/${accountId}/conversations/${conversationId}/labels`
+
+      const requestBody = {
+        labels: labels.map(label => sanitizeText(label))
+      }
+
+      console.log('Adding labels to conversation in Chatwoot:', {
+        url,
+        accountId,
+        conversationId,
+        labels,
+        usingCustomApiKey: !!customApiKey
+      })
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'api_access_token': apiKey,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(requestBody)
+      })
+
+      if (!response.ok) {
+        const errorData = await response.text()
+        console.error('Chatwoot API error adding labels:', response.status, errorData)
+        throw new Error(`Chatwoot API error: ${response.status} ${response.statusText}`)
+      }
+
+      const data = await response.json()
+      console.log(`Labels "${labels.join(', ')}" added successfully to conversation`)
+
+      return data
+
+    } catch (error: any) {
+      console.error('Chatwoot Service Error adding labels:', error)
+      throw new Error(`Failed to add labels to conversation in Chatwoot: ${error.message}`)
+    }
+  }
 }
 
 export default new ChatwootService() 

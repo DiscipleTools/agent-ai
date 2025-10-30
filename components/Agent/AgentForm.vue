@@ -356,6 +356,7 @@ const metadata = ref({
       { name: 'attributeName', label: 'Attribute Name', type: 'text', placeholder: 'attribute_name', required: true },
       { name: 'attributeValue', label: 'Attribute Value', type: 'text', placeholder: 'attribute_value', required: true }
     ]},
+    { type: 'mark_contact_hostile', name: 'Mark Contact as Hostile', description: 'Block the contact, add a hostile label, and resolve the conversation', category: 'conversation', parameters: []},
     { type: 'stop_workflow', name: 'Stop Workflow', description: 'Stop workflow execution', category: 'flow', disabled: true, disabledReason: 'Not implemented - no execution logic exists', parameters: []},
   ],
   conditions: [

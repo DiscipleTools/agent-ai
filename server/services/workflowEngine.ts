@@ -409,12 +409,16 @@ class WorkflowEngine {
         case 'set_custom_attribute':
           result = await this.executeSetCustomAttribute(action, context)
           break
-          
-          
+
+        case 'mark_contact_hostile':
+          result = await this.executeMarkContactHostile(action, context)
+          break
+
+
         case 'wait':
           result = await this.executeWait(action, context)
           break
-          
+
         default:
           throw new Error(`Unknown action type: ${action.type}`)
       }
@@ -570,12 +574,73 @@ class WorkflowEngine {
   private async executeSetCustomAttribute(action: any, context: WorkflowContext): Promise<any> {
     // This would require additional Chatwoot API methods for custom attributes
     // For now, we'll return a placeholder
-    return { 
+    return {
       attribute: action.parameters?.attributeName,
       value: action.parameters?.attributeValue
     }
   }
 
+  /**
+   * Execute mark contact as hostile action
+   * Blocks the contact, adds a "hostile" label, and resolves the conversation
+   */
+  private async executeMarkContactHostile(action: any, context: WorkflowContext): Promise<any> {
+    const { event, agent } = context
+
+    if (!event.data.conversation_id || !event.data.account_id) {
+      throw new Error('Mark contact hostile requires conversation ID and account ID')
+    }
+
+    // Get contact ID from sender or contact object
+    const contactId = event.data.sender?.id || event.data.contact?.id
+
+    if (!contactId) {
+      throw new Error('No contact ID found in event data')
+    }
+
+    const accountId = event.data.account_id
+    const conversationId = event.data.conversation_id
+    const apiKey = agent.settings?.chatwootApiKey
+
+    try {
+      // Block the contact
+      const blockResult = await chatwootService.blockContact(
+        accountId,
+        contactId,
+        apiKey
+      )
+
+      // Add "hostile" label to the conversation
+      const labelResult = await chatwootService.addLabelsToConversation(
+        accountId,
+        conversationId,
+        ['hostile'],
+        apiKey
+      )
+
+      // Resolve the conversation
+      const statusResult = await chatwootService.updateConversationStatus(
+        accountId,
+        conversationId,
+        'resolved',
+        apiKey
+      )
+
+      return {
+        contactBlocked: true,
+        contactId,
+        labelAdded: true,
+        label: 'hostile',
+        conversationResolved: true,
+        blockResult,
+        labelResult,
+        statusResult
+      }
+    } catch (error: any) {
+      console.error('Error marking contact as hostile:', error)
+      throw new Error(`Failed to mark contact as hostile: ${error.message}`)
+    }
+  }
 
   /**
    * Execute wait action

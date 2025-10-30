@@ -572,6 +572,20 @@ class InboxService {
         authHeaders
       )
 
+      // Create the "hostile" label for this account if it doesn't exist
+      try {
+        await chatwootService.createLabel(
+          inbox.accountId,
+          'hostile',
+          'Automatically applied to conversations with hostile or toxic content',
+          '#FF0000',
+          authHeaders
+        )
+        console.log('Hostile label created/verified for account', inbox.accountId)
+      } catch (labelError: any) {
+        console.warn('Could not create hostile label (may already exist):', labelError.message)
+      }
+
       return {
         ...botData,
         updated: true
