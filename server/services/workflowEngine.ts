@@ -244,7 +244,7 @@ class WorkflowEngine {
 
         default:
           console.warn(`Unknown condition type: ${type}`)
-          return false
+          return true
       }
 
     } catch (error) {

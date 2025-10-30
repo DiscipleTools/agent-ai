@@ -366,6 +366,39 @@ class AIService {
   }
 
 
+  /**
+   * Generate a simple AI response without RAG or context documents
+   * Uses the default connection/model. Useful for utility tasks like toxicity detection
+   */
+  async generateSimpleResponse(
+    systemPrompt: string,
+    userMessage: string
+  ): Promise<string> {
+    try {
+      const aiConfig = await this.getRequestedModel()
+
+      if (!aiConfig.apiKey) {
+        throw new Error('No AI connection configured')
+      }
+
+      const messages: OpenAIMessage[] = [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userMessage }
+      ]
+
+      const generatedContent = await this.executeAICall(aiConfig, messages, {})
+
+      if (!generatedContent || generatedContent.trim().length === 0) {
+        throw new Error('Empty response content from AI API')
+      }
+
+      return generatedContent.trim()
+    } catch (error: any) {
+      console.error('AI Service Error (simple response):', error.message)
+      throw new Error(`Failed to generate AI response: ${error.message}`)
+    }
+  }
+
   // Method to get available models for a specific connection
   async getAvailableModels(connectionId?: string): Promise<string[]> {
     try {
