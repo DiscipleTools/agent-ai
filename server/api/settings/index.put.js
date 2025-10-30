@@ -105,14 +105,6 @@ export default chatwootAuthMiddleware.superAdmin(async (event, checker) => {
       }
     }
 
-    // Validate Chatwoot configuration if provided
-    if (body.chatwoot) {
-      // API token validation (don't sanitize, but validate length)
-      if (body.chatwoot.apiToken && body.chatwoot.apiToken.length > 512) {
-        validationErrors.push('Chatwoot API token is too long')
-      }
-    }
-
     // Validate AI connections if provided
     if (body.aiConnections && Array.isArray(body.aiConnections)) {
       body.aiConnections.forEach((connection, index) => {
@@ -226,14 +218,7 @@ export default chatwootAuthMiddleware.superAdmin(async (event, checker) => {
           ...body.server
         }
       }
-      
-      if (body.chatwoot) {
-        settings.chatwoot = {
-          ...settings.chatwoot,
-          ...body.chatwoot
-        }
-      }
-      
+
       settings.updatedBy = user._id
     } else {
       // Create new settings
@@ -250,9 +235,6 @@ export default chatwootAuthMiddleware.superAdmin(async (event, checker) => {
         server: body.server || {
           maxFileSize: 10485760,
           allowedFileTypes: ['pdf', 'txt', 'doc', 'docx']
-        },
-        chatwoot: body.chatwoot || {
-          enabled: false
         },
         updatedBy: user._id
       })
@@ -280,10 +262,6 @@ export default chatwootAuthMiddleware.superAdmin(async (event, checker) => {
             pass: '***HIDDEN***'
           } : undefined
         } : undefined
-      } : undefined,
-      chatwoot: settings.chatwoot ? {
-        ...settings.chatwoot,
-        apiToken: settings.chatwoot.apiToken ? '***HIDDEN***' : null
       } : undefined
     }
 

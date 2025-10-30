@@ -88,23 +88,6 @@ class SettingsService {
     }
   }
 
-  async getChatwootSettings(): Promise<{ apiToken: string; enabled: boolean } | null> {
-    try {
-      const settings = await this.getAllSettings()
-      
-      if (!settings?.chatwoot) {
-        return null
-      }
-      
-      return {
-        apiToken: settings.chatwoot.apiToken || '',
-        enabled: settings.chatwoot.enabled || false
-      }
-    } catch (error: any) {
-      console.error('Failed to get Chatwoot settings:', error)
-      return null
-    }
-  }
 
   // Clear cache when settings are updated
   clearCache(): void {
@@ -191,13 +174,6 @@ class SettingsService {
           allowedFileTypes: Array.isArray(settingsData.server.allowedFileTypes)
             ? settingsData.server.allowedFileTypes.map(sanitizeAlphaNumeric)
             : []
-        }
-      }
-      // Chatwoot
-      if (settingsData.chatwoot && typeof settingsData.chatwoot === 'object') {
-        sanitized.chatwoot = {
-          apiToken: sanitizeText(settingsData.chatwoot.apiToken),
-          enabled: !!settingsData.chatwoot.enabled
         }
       }
       // --- End: Defense-in-depth sanitization and whitelisting ---

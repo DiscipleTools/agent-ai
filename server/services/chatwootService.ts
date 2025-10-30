@@ -1,15 +1,14 @@
 /**
  * Chatwoot Service
- * 
+ *
  * This service is responsible for all interactions with the Chatwoot API.
  * It handles sending messages, retrieving conversation history, and updating
- * conversation statuses. It can use system-wide Chatwoot credentials from
- * settings or environment variables, or it can use agent-specific API keys.
- * 
+ * conversation statuses. It uses Chatwoot credentials from environment variables,
+ * or can use agent-specific API keys.
+ *
  * Used by:
  * - POST /api/webhook/agent/[id]/chat
  */
-import settingsService from './settingsService'
 import { sanitizeUrl, sanitizeContent, sanitizeText } from '~/utils/sanitize'
 
 class ChatwootService {
@@ -21,37 +20,17 @@ class ChatwootService {
     this.apiToken = process.env.CHATWOOT_API_TOKEN || ''
   }
 
-  private async getChatwootConfig(): Promise<{ url: string; apiToken: string }> {
-    try {
-      const chatwootSettings = await settingsService.getChatwootSettings()
-      
-      // Check if chatwoot is configured in settings and enabled
-      if (chatwootSettings?.enabled) {
-        return {
-          url: this.chatwootUrl,
-          apiToken: chatwootSettings.apiToken || this.apiToken
-        }
-      }
-      
-      // Fall back to environment variables
-      return {
-        url: this.chatwootUrl,
-        apiToken: this.apiToken
-      }
-    } catch (error) {
-      console.error('Failed to get chatwoot config from settings, using env vars:', error)
-      // Fallback to environment variables on error
-      return {
-        url: this.chatwootUrl,
-        apiToken: this.apiToken
-      }
+  private getChatwootConfig(): { url: string; apiToken: string } {
+    return {
+      url: this.chatwootUrl,
+      apiToken: this.apiToken
     }
   }
 
   async sendMessage(accountId: number, conversationId: number, content: string, customApiKey?: string): Promise<any> {
     try {
-      // Get chatwoot configuration from settings or environment
-      const config = await this.getChatwootConfig()
+      // Get chatwoot configuration from environment
+      const config = this.getChatwootConfig()
       
       // Use custom API key if provided, otherwise use configured token
       const apiKey = customApiKey || config.apiToken

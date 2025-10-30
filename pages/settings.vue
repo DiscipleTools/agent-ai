@@ -39,9 +39,6 @@
       <!-- Email Configuration -->
       <SettingsEmailConfig />
 
-      <!-- Chatwoot Configuration -->
-      <SettingsChatwootIntegration />
-
       <!-- Settings Info -->
       <SettingsInfo />
 
