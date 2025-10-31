@@ -372,19 +372,14 @@ const connectionForm = reactive({
   isActive: true
 })
 
-// Real-time input sanitization watchers
-watch(() => connectionForm.name, (newValue) => {
-  const sanitized = sanitizeText(newValue)
-  if (newValue !== sanitized) {
-    connectionForm.name = sanitized
+// Auto-populate endpoint when provider is selected
+watch(() => connectionForm.provider, (newProvider) => {
+  if (newProvider === 'openai') {
+    connectionForm.endpoint = 'https://api.openai.com/v1'
+  } else if (newProvider === 'prediction-guard') {
+    connectionForm.endpoint = 'https://api.predictionguard.com'
   }
-})
-
-watch(() => connectionForm.endpoint, (newValue) => {
-  const sanitized = sanitizeUrl(newValue)
-  if (newValue !== sanitized) {
-    connectionForm.endpoint = sanitized
-  }
+  // For 'custom', don't auto-populate - let user enter their own
 })
 
 // Utility functions
