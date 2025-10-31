@@ -25,23 +25,14 @@
     <!-- Empty State -->
     <div v-else-if="agents.length === 0" class="text-center py-12">
       <div class="text-gray-500 dark:text-gray-400 mb-4">No agents found</div>
-      <p class="text-sm text-gray-600 dark:text-gray-500 mb-6">
-        Create your first AI agent to get started
-      </p>
-      <NuxtLink to="/agents/new" class="btn-primary">
-        Create Agent
-      </NuxtLink>
     </div>
 
     <!-- Agents Grid -->
     <div v-else>
-      <div class="flex justify-between items-center mb-6">
+      <div class="mb-6">
         <p class="text-sm text-gray-600 dark:text-gray-400">
           {{ agents.length }} {{ agents.length === 1 ? 'agent' : 'agents' }} found
         </p>
-        <NuxtLink to="/agents/new" class="btn-primary">
-          Create Agent
-        </NuxtLink>
       </div>
       
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
