@@ -122,6 +122,7 @@ export default chatwootAuthMiddleware.auth(async (event, checker) => {
       'ai_response', 'ai_summarize', 'ai_categorize', 'ai_sentiment_analysis',
       'change_status', 'assign_agent', 'add_private_note', 'add_public_note',
       'set_priority', 'set_custom_attribute', 'update_contact_attribute',
+      'mark_contact_hostile',
       'wait', 'stop_workflow'
     ]
 
