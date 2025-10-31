@@ -114,7 +114,7 @@ export default defineEventHandler(async (event) => {
     }
 
     // Get the webhook URL for the inbox
-    const webhookUrl = `${process.env.FRONTEND_URL}${inbox.webhookUrl}`
+    const webhookUrl = `${process.env.CHATWOOT_URL}${inbox.webhookUrl}`
 
     // Extract user session data for Chatwoot API calls
     const userSessionData = extractUserSessionData(event)
