@@ -236,6 +236,13 @@ class WorkflowEngine {
           return false
 
         case 'message_is_toxic':
+          // Skip toxicity check if conversation already has "hostile" label
+          const conversationLabels = eventData.conversation?.labels || []
+          if (conversationLabels.includes('hostile')) {
+            console.log('Skipping toxicity check - conversation already has hostile label')
+            return false
+          }
+
           // Check if message is toxic (async API call)
           const messageContent = eventData.message || ''
           const toxicityResult = await toxicityService.checkToxicity(messageContent)
