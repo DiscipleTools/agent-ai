@@ -246,14 +246,14 @@ const sanitizedUser = computed(() => {
 
 const navigation = computed(() => [
   { name: 'Inboxes', href: '/inboxes', icon: InboxIcon },
-  { name: 'Agents', href: '/agents', icon: RocketLaunchIcon },
+  { name: 'Agents', href: '/list', icon: RocketLaunchIcon },
   ...(authStore.isSuperAdmin ? [{ name: 'Settings', href: '/settings', icon: CogIcon }] : [])
 ])
 
 const currentPageName = computed(() => {
   const path = route.path
   if (path.includes('/inboxes')) return 'Inboxes'
-  if (path.includes('/agents')) return 'Agents'
+  if (path.includes('/list')) return 'Agents'
   if (path.includes('/settings')) return 'Settings'
   return 'Inboxes'
 })

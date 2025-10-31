@@ -86,10 +86,6 @@ const agentSchema = new mongoose.Schema({
           'message_created',
         ],
         required: [true, 'Trigger type is required']
-      },
-      isActive: {
-        type: Boolean,
-        default: true
       }
     }],
 
@@ -252,20 +248,15 @@ agentSchema.statics.findByTriggerType = function(triggerType, inboxIds = []) {
   const query = {
     isActive: true,
     'workflow.isActive': true,
-    'workflow.triggers': {
-      $elemMatch: {
-        type: triggerType,
-        isActive: true
-      }
-    }
+    'workflow.triggers.type': triggerType
   }
-  
+
   // If inbox IDs provided, filter by assigned inboxes
   if (inboxIds.length > 0) {
     // This would need to be combined with Inbox model queries
     // For now, we'll handle inbox filtering in the service layer
   }
-  
+
   return this.find(query).sort({ priority: 1 })
 }
 

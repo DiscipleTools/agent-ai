@@ -94,7 +94,6 @@
           v-for="(trigger, index) in form.workflow.triggers"
           :key="`trigger-${index}`"
           :trigger="trigger"
-          :metadata="metadata"
           :index="index"
           @update="updateTrigger(index, $event)"
           @remove="removeTrigger(index)"
@@ -448,8 +447,7 @@ watch(() => props.agent, (newAgent) => {
 // Trigger management
 const addTrigger = () => {
   form.workflow.triggers.push({
-    type: '',
-    isActive: true
+    type: 'message_created'
   })
 }
 

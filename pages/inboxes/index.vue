@@ -215,10 +215,10 @@ const createAgentForInbox = (inbox) => {
 
 const editAgent = (agent) => {
   console.log('editAgent called with:', agent)
-  
+
   // Navigate to agent edit page
   const agentId = agent._id || agent.id || agent
-  router.push(`/agents/${agentId}`)
+  router.push(`/list/${agentId}`)
 }
 
 const enableAiConnection = async (inbox) => {

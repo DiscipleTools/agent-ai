@@ -66,7 +66,7 @@ const handleSubmit = async (agentData) => {
       router.push(`/inboxes/${inboxId}`)
     } else {
       toast.success('Agent created successfully!')
-      router.push('/agents')
+      router.push('/list')
     }
   } catch (error) {
     console.error('Error creating agent:', error)

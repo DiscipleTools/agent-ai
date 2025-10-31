@@ -103,8 +103,7 @@ export default chatwootAuthMiddleware.auth(async (event, checker) => {
     if (body.workflow !== undefined) {
       updateData.workflow = {
         triggers: body.workflow.triggers?.map((trigger: any) => ({
-          type: sanitizeText(trigger.type),
-          isActive: trigger.isActive !== false
+          type: sanitizeText(trigger.type)
         })) || existingAgent.workflow?.triggers || [],
 
         conditions: body.workflow.conditions?.map((condition: any) => ({
