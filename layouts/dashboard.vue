@@ -222,14 +222,14 @@ import {
   RocketLaunchIcon
 } from '@heroicons/vue/24/outline'
 import { sanitizeText, sanitizeEmail } from '~/utils/sanitize.js'
-import packageJson from '~/package.json'
 
 const authStore = useAuthStore()
 const colorMode = useColorMode()
 const route = useRoute()
+const config = useRuntimeConfig()
 
 const mobileMenuOpen = ref(false)
-const version = packageJson.version
+const version = config.public.appVersion
 
 // Sanitized user data for secure display
 const sanitizedUser = computed(() => {
