@@ -25,7 +25,7 @@
 
     <!-- Agent Form -->
     <div v-else class="max-w-6xl">
-      <AgentForm @submit="handleSubmit" @cancel="handleCancel" />
+      <AgentForm :inbox-id="route.query.inboxId" @submit="handleSubmit" @cancel="handleCancel" />
     </div>
   </div>
 </template>

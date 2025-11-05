@@ -55,9 +55,15 @@ export const useApi = () => {
               }
 
               if (csrfTokenCache.value) {
-                options.headers = {
-                  ...options.headers,
-                  'X-CSRF-Token': csrfTokenCache.value
+                // Handle both plain objects and Headers instances
+                if (!options.headers) {
+                  options.headers = {}
+                }
+
+                if (options.headers instanceof Headers) {
+                  options.headers.set('X-CSRF-Token', csrfTokenCache.value)
+                } else if (typeof options.headers === 'object') {
+                  options.headers['X-CSRF-Token'] = csrfTokenCache.value
                 }
               }
             } catch (csrfError) {

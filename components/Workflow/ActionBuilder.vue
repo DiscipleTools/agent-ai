@@ -152,6 +152,61 @@
             {{ parameter.label }}
           </label>
         </div>
+
+        <!-- Label Select (multi-select dropdown) -->
+        <div v-else-if="parameter.type === 'label-select'" class="space-y-2">
+          <!-- Selected labels as tags -->
+          <div v-if="getLabelArray(parameter.name).length > 0" class="flex flex-wrap gap-2 mb-2">
+            <span
+              v-for="(labelTitle, labelIndex) in getLabelArray(parameter.name)"
+              :key="labelIndex"
+              class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-200"
+            >
+              {{ labelTitle }}
+              <button
+                type="button"
+                @click="removeLabel(parameter.name, labelIndex)"
+                class="ml-1.5 inline-flex items-center justify-center w-4 h-4 rounded-full hover:bg-blue-200 dark:hover:bg-blue-700"
+              >
+                <XMarkIcon class="w-3 h-3" />
+              </button>
+            </span>
+          </div>
+
+          <!-- Dropdown to add labels (requires inbox context) -->
+          <div v-if="inboxId">
+            <div v-if="labelsLoading" class="text-sm text-gray-500 dark:text-gray-400">
+              Loading labels...
+            </div>
+            <div v-else-if="labelsError" class="text-sm text-red-600 dark:text-red-400">
+              {{ labelsError }}
+            </div>
+            <div v-else-if="availableLabels.length === 0" class="text-sm text-gray-500 dark:text-gray-400">
+              No labels found in this inbox. Create labels in Chatwoot first.
+            </div>
+            <select
+              v-else
+              @change="addLabelFromDropdown(parameter.name, $event.target)"
+              class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-primary-500"
+            >
+              <option value="">Select a label to add...</option>
+              <option
+                v-for="label in getUnselectedLabels(parameter.name)"
+                :key="label.id"
+                :value="label.title"
+              >
+                {{ label.title }}
+              </option>
+            </select>
+          </div>
+
+          <!-- No inbox context -->
+          <div v-else class="p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-md">
+            <p class="text-sm text-yellow-800 dark:text-yellow-200">
+              Label selection requires inbox context. Please create or edit this agent from an inbox page.
+            </p>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -205,13 +260,56 @@ const props = defineProps({
   index: {
     type: Number,
     required: true
+  },
+  inboxId: {
+    type: String,
+    default: null
   }
 })
 
 const emit = defineEmits(['update', 'remove', 'move-up', 'move-down'])
 
+// API composable
+const { $api } = useApi()
+
+// Labels state
+const availableLabels = ref([])
+const labelsLoading = ref(false)
+const labelsError = ref(null)
+
+// Fetch labels when component mounts or inboxId changes
+onMounted(async () => {
+  if (props.inboxId) {
+    await fetchLabels()
+  }
+})
+
+watch(() => props.inboxId, (newInboxId) => {
+  if (newInboxId && availableLabels.value.length === 0) {
+    fetchLabels()
+  }
+})
+
+const fetchLabels = async () => {
+  if (!props.inboxId || labelsLoading.value) return
+
+  labelsLoading.value = true
+  labelsError.value = null
+
+  try {
+    const response = await $api(`/api/inboxes/${props.inboxId}/labels`)
+    availableLabels.value = response.data?.labels || []
+  } catch (error) {
+    console.error('Error fetching labels:', error)
+    labelsError.value = 'Failed to load labels'
+    availableLabels.value = []
+  } finally {
+    labelsLoading.value = false
+  }
+}
+
 // Local reactive copy with ensured parameters field
-const localAction = reactive({ 
+const localAction = reactive({
   ...props.action,
   parameters: props.action.parameters || {}
 })
@@ -278,5 +376,37 @@ const updateParameter = (paramName, value) => {
   const newParameters = { ...(localAction.parameters || {}) }
   newParameters[paramName] = value
   updateAction({ ...localAction, parameters: newParameters })
+}
+
+// Label selection methods
+const getLabelArray = (paramName) => {
+  const value = (localAction.parameters || {})[paramName]
+  if (Array.isArray(value)) return value
+  if (typeof value === 'string') return value.split(',').map(s => s.trim()).filter(Boolean)
+  return []
+}
+
+const removeLabel = (paramName, index) => {
+  const currentLabels = getLabelArray(paramName)
+  const newLabels = currentLabels.filter((_, i) => i !== index)
+  updateParameter(paramName, newLabels)
+}
+
+const addLabelFromDropdown = (paramName, selectElement) => {
+  const labelTitle = selectElement.value
+  if (!labelTitle) return
+
+  const currentLabels = getLabelArray(paramName)
+  if (!currentLabels.includes(labelTitle)) {
+    updateParameter(paramName, [...currentLabels, labelTitle])
+  }
+
+  // Reset dropdown
+  selectElement.value = ''
+}
+
+const getUnselectedLabels = (paramName) => {
+  const selectedLabels = getLabelArray(paramName)
+  return availableLabels.value.filter(label => !selectedLabels.includes(label.title))
 }
 </script>

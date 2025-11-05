@@ -186,6 +186,7 @@
           :action="action"
           :metadata="metadata"
           :index="index"
+          :inbox-id="inboxId"
           @update="updateAction(index, $event)"
           @remove="removeAction(index)"
           @move-up="moveAction(index, index - 1)"
@@ -252,6 +253,10 @@ const props = defineProps({
   agent: {
     type: Object,
     default: () => null
+  },
+  inboxId: {
+    type: String,
+    default: null
   }
 })
 
@@ -356,6 +361,9 @@ const metadata = ref({
       { name: 'attributeValue', label: 'Attribute Value', type: 'text', placeholder: 'attribute_value', required: true }
     ]},
     { type: 'mark_contact_hostile', name: 'Mark Contact as Hostile', description: 'Block the contact, add a hostile label, and resolve the conversation', category: 'conversation', parameters: []},
+    { type: 'add_label', name: 'Add Label', description: 'Add one or more labels to the conversation from available Chatwoot labels', category: 'conversation', parameters: [
+      { name: 'labels', label: 'Labels', type: 'label-select', required: true, multiple: true }
+    ]},
     { type: 'stop_workflow', name: 'Stop Workflow', description: 'Stop workflow execution', category: 'flow', disabled: true, disabledReason: 'Not implemented - no execution logic exists', parameters: []},
   ],
   conditions: [

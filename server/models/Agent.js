@@ -137,8 +137,9 @@ const agentSchema = new mongoose.Schema({
           'set_custom_attribute',
           'update_contact_attribute',
           'mark_contact_hostile',
-          
-          
+          'add_label',
+
+
           // Flow control
           'wait',
           'stop_workflow'

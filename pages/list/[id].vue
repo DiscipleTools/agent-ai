@@ -33,10 +33,11 @@
 
     <!-- Agent Editor -->
     <div v-else-if="agent" class="max-w-6xl">
-      <AgentForm 
+      <AgentForm
         :agent="agent"
-        @submit="handleSubmit" 
-        @cancel="handleCancel" 
+        :inbox-id="route.query.inboxId"
+        @submit="handleSubmit"
+        @cancel="handleCancel"
       />
     </div>
   </div>

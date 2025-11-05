@@ -421,6 +421,9 @@ class WorkflowEngine {
           result = await this.executeMarkContactHostile(action, context)
           break
 
+        case 'add_label':
+          result = await this.executeAddLabel(action, context)
+          break
 
         case 'wait':
           result = await this.executeWait(action, context)
@@ -650,13 +653,52 @@ class WorkflowEngine {
   }
 
   /**
+   * Execute add label action
+   * Adds one or more labels to the conversation
+   */
+  private async executeAddLabel(action: any, context: WorkflowContext): Promise<any> {
+    const { event, agent } = context
+
+    if (!event.data.conversation_id || !event.data.account_id) {
+      throw new Error('Add label requires conversation ID and account ID')
+    }
+
+    const labels = action.parameters?.labels
+    if (!labels || !Array.isArray(labels) || labels.length === 0) {
+      throw new Error('Add label requires at least one label')
+    }
+
+    const accountId = event.data.account_id
+    const conversationId = event.data.conversation_id
+    const apiKey = agent.settings?.chatwootApiKey
+
+    try {
+      const result = await chatwootService.addLabelsToConversation(
+        accountId,
+        conversationId,
+        labels,
+        apiKey
+      )
+
+      return {
+        labelsAdded: true,
+        labels,
+        result
+      }
+    } catch (error: any) {
+      console.error('Error adding labels:', error)
+      throw new Error(`Failed to add labels: ${error.message}`)
+    }
+  }
+
+  /**
    * Execute wait action
    */
   private async executeWait(action: any, context: WorkflowContext): Promise<any> {
     const duration = action.parameters?.duration || 1000 // milliseconds
-    
+
     await new Promise(resolve => setTimeout(resolve, duration))
-    
+
     return { waited: duration }
   }
 }
