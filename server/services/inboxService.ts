@@ -531,8 +531,8 @@ class InboxService {
 
       const botName = `AI Agent Bot - ${inbox.name}`
       const botDescription = `AI agent bot for inbox ${inbox.name}`
-      const baseUrl = process.env.NUXT_PUBLIC_API_BASE_URL || 'http://localhost:3000'
-      const webhookUrl = `${baseUrl}${inbox.webhookUrl}`
+      const baseUrl = process.env.CHATWOOT_URL
+      const webhookUrl = `${baseUrl}/agents${inbox.webhookUrl}`
 
       // Check if bot already exists
       if (inbox.chatwoot.botId) {

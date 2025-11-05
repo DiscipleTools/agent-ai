@@ -291,7 +291,7 @@ const createAgent = () => {
 }
 
 const editAgent = (agent) => {
-  router.push(`/list/${agent.id}`)
+  router.push(`/list/${agent.id}?inboxId=${inboxId}`)
 }
 
 const deleteAgent = async (agent) => {

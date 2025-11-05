@@ -54,9 +54,9 @@ export default defineEventHandler(async (event) => {
       test: true
     }
 
-    // Get the full webhook URL (assuming it needs to be a complete URL)
-    const baseUrl = process.env.NUXT_PUBLIC_API_BASE_URL || 'http://localhost:3000'
-    const fullWebhookUrl = `${baseUrl}${inbox.webhookUrl}`
+    // Get the full webhook URL (should match what Chatwoot will call)
+    const baseUrl = process.env.CHATWOOT_URL
+    const fullWebhookUrl = `${baseUrl}/agents${inbox.webhookUrl}`
 
     try {
       // Send test webhook to the inbox's webhook URL
