@@ -110,17 +110,17 @@ export default defineEventHandler(async (event) => {
     // Check if this is a new conversation (first message from contact) and mark as open if needed
     if (payload.conversation?.id && payload.account?.id) {
       try {
-        // Check if this is a new conversation using the webhook payload
-        // For new conversations: created_at === timestamp (first message)
-        // For existing conversations: created_at < timestamp (subsequent messages)
+        // Log full conversation object to debug what Chatwoot is sending
         const createdAt = payload.conversation.created_at
         const timestamp = payload.conversation.timestamp
+        const status = payload.conversation.status
         const isNewConversation = createdAt === timestamp
 
-        // Only mark as open if it's a new conversation AND not already open
-        // Chatwoot conversations can be: open, resolved, pending, snoozed
-        if (isNewConversation && payload.conversation.status !== 'open') {
-          console.log(`Marking new conversation ${payload.conversation.id} as open (created_at: ${createdAt}, timestamp: ${timestamp})`)
+        console.log(`Conversation ${payload.conversation.id} - created_at: ${createdAt} (${typeof createdAt}), timestamp: ${timestamp} (${typeof timestamp}), status: ${status}, isNew: ${isNewConversation}`)
+
+        // Mark as open if it's a new conversation AND not already open
+        if (isNewConversation && status !== 'open') {
+          console.log(`Marking conversation ${payload.conversation.id} as open (current status: ${status})`)
           await chatwootService.updateConversationStatus(
             payload.account.id,
             payload.conversation.id,
@@ -131,7 +131,6 @@ export default defineEventHandler(async (event) => {
         }
       } catch (convError: any) {
         console.warn(`Failed to check/update conversation status for ${payload.conversation.id}:`, convError.message)
-        // Don't throw error - continue with message processing even if status update fails
       }
     }
 
