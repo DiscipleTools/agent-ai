@@ -71,7 +71,35 @@ export default defineEventHandler(async (event) => {
 
     console.log(`Processing webhook for inbox ${inbox.name} (${inboxId}), event: ${payload.event}`)
 
-    // Only process message events for now
+    // Handle conversation_created event - mark as open immediately
+    if (payload.event === 'conversation_created') {
+      if (payload.id && payload.account_id) {
+        try {
+          const status = payload.status
+          console.log(`New conversation created: ${payload.id}, status: ${status}`)
+
+          if (status !== 'open') {
+            console.log(`Marking new conversation ${payload.id} as open`)
+            await chatwootService.updateConversationStatus(
+              payload.account_id,
+              payload.id,
+              'open',
+              inbox.chatwoot?.apiKey
+            )
+            console.log(`Successfully marked conversation ${payload.id} as open`)
+          }
+        } catch (convError: any) {
+          console.warn(`Failed to update conversation status for ${payload.id}:`, convError.message)
+        }
+      }
+      return {
+        success: true,
+        message: 'Conversation created event processed',
+        data: { event: payload.event, inbox: inbox.name }
+      }
+    }
+
+    // Only process message events for workflow processing
     if (payload.event !== 'message_created') {
       return {
         success: true,
@@ -85,8 +113,8 @@ export default defineEventHandler(async (event) => {
       return {
         success: true,
         message: `Skipped ${payload.message_type} message`,
-        data: { 
-          event: payload.event, 
+        data: {
+          event: payload.event,
           inbox: inbox.name,
           messageType: payload.message_type,
           skipped: true
@@ -99,15 +127,15 @@ export default defineEventHandler(async (event) => {
       return {
         success: true,
         message: 'Skipped empty message',
-        data: { 
-          event: payload.event, 
+        data: {
+          event: payload.event,
           inbox: inbox.name,
           skipped: true
         }
       }
     }
 
-    // Check if this is a new conversation (first message from contact) and mark as open if needed
+    // Also check on message_created in case conversation_created wasn't received
     if (payload.conversation?.id && payload.account?.id) {
       try {
         // Log full conversation object to debug what Chatwoot is sending
