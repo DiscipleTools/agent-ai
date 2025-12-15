@@ -802,6 +802,196 @@ class ChatwootService {
       throw new Error(`Failed to add labels to conversation in Chatwoot: ${error.message}`)
     }
   }
+
+  // ==================== ACCOUNT WEBHOOKS ====================
+
+  /**
+   * Create an account-level webhook in Chatwoot
+   * @param accountId - The Chatwoot account ID
+   * @param webhookUrl - URL to receive webhook events
+   * @param subscriptions - Array of event types to subscribe to
+   * @param authHeaders - Either API token or user session headers
+   */
+  async createAccountWebhook(
+    accountId: number,
+    webhookUrl: string,
+    subscriptions: string[],
+    authHeaders?: string | { 'access-token': string; client: string; uid: string; expiry?: string }
+  ): Promise<any> {
+    try {
+      const baseUrl = this.chatwootUrl
+      if (!baseUrl) {
+        throw new Error('Chatwoot URL not configured')
+      }
+
+      const url = `${baseUrl.replace(/\/$/, '')}/api/v1/accounts/${accountId}/webhooks`
+
+      const requestBody = {
+        webhook: {
+          url: webhookUrl,
+          subscriptions
+        }
+      }
+
+      let headers: Record<string, string>
+      if (typeof authHeaders === 'object' && authHeaders !== null) {
+        headers = {
+          'access-token': authHeaders['access-token'],
+          'client': authHeaders.client,
+          'uid': authHeaders.uid,
+          'Content-Type': 'application/json'
+        }
+      } else {
+        const config = this.getChatwootConfig()
+        const apiKey = typeof authHeaders === 'string' ? authHeaders : config.apiToken
+        if (!apiKey) {
+          throw new Error('Chatwoot API token not configured')
+        }
+        headers = {
+          'api_access_token': apiKey,
+          'Content-Type': 'application/json'
+        }
+      }
+
+      console.log('Creating account webhook in Chatwoot:', { url, accountId, webhookUrl, subscriptions })
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(requestBody)
+      })
+
+      if (!response.ok) {
+        const errorData = await response.text()
+        console.error('Chatwoot API error creating webhook:', response.status, errorData)
+        throw new Error(`Chatwoot API error: ${response.status} ${response.statusText} - ${errorData}`)
+      }
+
+      const data = await response.json()
+      console.log('Account webhook created successfully:', data)
+      return data
+    } catch (error: any) {
+      console.error('Chatwoot Service Error creating webhook:', error)
+      throw new Error(`Failed to create account webhook in Chatwoot: ${error.message}`)
+    }
+  }
+
+  /**
+   * List all webhooks for an account
+   * @param accountId - The Chatwoot account ID
+   * @param authHeaders - Either API token or user session headers
+   */
+  async listAccountWebhooks(
+    accountId: number,
+    authHeaders?: string | { 'access-token': string; client: string; uid: string; expiry?: string }
+  ): Promise<any[]> {
+    try {
+      const baseUrl = this.chatwootUrl
+      if (!baseUrl) {
+        throw new Error('Chatwoot URL not configured')
+      }
+
+      const url = `${baseUrl.replace(/\/$/, '')}/api/v1/accounts/${accountId}/webhooks`
+
+      let headers: Record<string, string>
+      if (typeof authHeaders === 'object' && authHeaders !== null) {
+        headers = {
+          'access-token': authHeaders['access-token'],
+          'client': authHeaders.client,
+          'uid': authHeaders.uid,
+          'Content-Type': 'application/json'
+        }
+      } else {
+        const config = this.getChatwootConfig()
+        const apiKey = typeof authHeaders === 'string' ? authHeaders : config.apiToken
+        if (!apiKey) {
+          throw new Error('Chatwoot API token not configured')
+        }
+        headers = {
+          'api_access_token': apiKey,
+          'Content-Type': 'application/json'
+        }
+      }
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers
+      })
+
+      if (!response.ok) {
+        const errorData = await response.text()
+        console.error('Chatwoot API error listing webhooks:', response.status, errorData)
+        throw new Error(`Chatwoot API error: ${response.status} ${response.statusText}`)
+      }
+
+      const data = await response.json()
+      // Handle various response formats
+      const webhooks = data.payload?.webhooks || data.payload || data.webhooks || data
+      return Array.isArray(webhooks) ? webhooks : []
+    } catch (error: any) {
+      console.error('Chatwoot Service Error listing webhooks:', error)
+      throw new Error(`Failed to list account webhooks from Chatwoot: ${error.message}`)
+    }
+  }
+
+  /**
+   * Delete an account webhook
+   * @param accountId - The Chatwoot account ID
+   * @param webhookId - The webhook ID to delete
+   * @param authHeaders - Either API token or user session headers
+   */
+  async deleteAccountWebhook(
+    accountId: number,
+    webhookId: number,
+    authHeaders?: string | { 'access-token': string; client: string; uid: string; expiry?: string }
+  ): Promise<void> {
+    try {
+      const baseUrl = this.chatwootUrl
+      if (!baseUrl) {
+        throw new Error('Chatwoot URL not configured')
+      }
+
+      const url = `${baseUrl.replace(/\/$/, '')}/api/v1/accounts/${accountId}/webhooks/${webhookId}`
+
+      let headers: Record<string, string>
+      if (typeof authHeaders === 'object' && authHeaders !== null) {
+        headers = {
+          'access-token': authHeaders['access-token'],
+          'client': authHeaders.client,
+          'uid': authHeaders.uid,
+          'Content-Type': 'application/json'
+        }
+      } else {
+        const config = this.getChatwootConfig()
+        const apiKey = typeof authHeaders === 'string' ? authHeaders : config.apiToken
+        if (!apiKey) {
+          throw new Error('Chatwoot API token not configured')
+        }
+        headers = {
+          'api_access_token': apiKey,
+          'Content-Type': 'application/json'
+        }
+      }
+
+      console.log('Deleting account webhook from Chatwoot:', { url, accountId, webhookId })
+
+      const response = await fetch(url, {
+        method: 'DELETE',
+        headers
+      })
+
+      if (!response.ok) {
+        const errorData = await response.text()
+        console.error('Chatwoot API error deleting webhook:', response.status, errorData)
+        throw new Error(`Chatwoot API error: ${response.status} ${response.statusText}`)
+      }
+
+      console.log('Account webhook deleted successfully')
+    } catch (error: any) {
+      console.error('Chatwoot Service Error deleting webhook:', error)
+      throw new Error(`Failed to delete account webhook from Chatwoot: ${error.message}`)
+    }
+  }
 }
 
 export default new ChatwootService() 

@@ -106,7 +106,28 @@ const settingsSchema = new mongoose.Schema({
     enabled: {
       type: Boolean,
       default: false
-    }
+    },
+    accountWebhooks: [{
+      accountId: {
+        type: Number,
+        required: true
+      },
+      webhookId: {
+        type: Number,
+        required: true
+      },
+      webhookUrl: {
+        type: String,
+        required: true
+      },
+      subscriptions: [{
+        type: String
+      }],
+      registeredAt: {
+        type: Date,
+        default: Date.now
+      }
+    }]
   },
   server: {
     webhookSecret: {

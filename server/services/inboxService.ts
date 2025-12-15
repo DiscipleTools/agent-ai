@@ -1,5 +1,6 @@
 import Inbox from '~/server/models/Inbox'
 import Agent from '~/server/models/Agent'
+import Settings from '~/server/models/Settings'
 import chatwootService from './chatwootService'
 import axios from 'axios'
 import { Types } from 'mongoose'
@@ -193,10 +194,104 @@ class InboxService {
         }
       }
 
+      // After syncing inboxes, ensure account webhook is registered
+      await this.ensureAccountWebhook(accountId, user.chatwootSessionData)
+
       return syncResults
     } catch (error: any) {
       console.error(`Error syncing inboxes for account ${accountId}:`, error)
       throw error
+    }
+  }
+
+  /**
+   * Ensure an account-level webhook is registered for receiving events
+   * @param accountId - Chatwoot account ID
+   * @param authHeaders - Authentication headers
+   */
+  private async ensureAccountWebhook(accountId: number, authHeaders?: any) {
+    try {
+      // Get or create settings document
+      let settings = await Settings.findOne()
+      if (!settings) {
+        console.log('No settings document found, skipping webhook registration')
+        return
+      }
+
+      // Check if webhook already registered for this account
+      const existingWebhook = settings.chatwoot?.accountWebhooks?.find(
+        (w: any) => w.accountId === accountId
+      )
+
+      if (existingWebhook) {
+        console.log(`Account ${accountId} webhook already registered (ID: ${existingWebhook.webhookId})`)
+        return
+      }
+
+      // Build webhook URL (uses CHATWOOT_URL since nginx proxies /agents/ to Agent AI)
+      const chatwootUrl = process.env.CHATWOOT_URL
+      if (!chatwootUrl) {
+        console.warn('CHATWOOT_URL not configured, skipping webhook registration')
+        return
+      }
+
+      const webhookUrl = `${chatwootUrl.replace(/\/$/, '')}/agents/api/webhook/account/${accountId}`
+      const subscriptions = ['conversation_created', 'message_created']
+
+      // Check if webhook already exists in Chatwoot
+      let webhookId: number | null = null
+      try {
+        const existingWebhooks = await chatwootService.listAccountWebhooks(accountId, authHeaders)
+        const existingInChatwoot = existingWebhooks.find((w: any) => w.url === webhookUrl)
+        if (existingInChatwoot) {
+          console.log(`Found existing webhook in Chatwoot for account ${accountId} (ID: ${existingInChatwoot.id})`)
+          webhookId = existingInChatwoot.id
+        }
+      } catch (listError: any) {
+        console.warn(`Could not list webhooks for account ${accountId}:`, listError.message)
+      }
+
+      // Create webhook if it doesn't exist in Chatwoot
+      if (!webhookId) {
+        console.log(`Creating account webhook for account ${accountId}: ${webhookUrl}`)
+
+        const response = await chatwootService.createAccountWebhook(
+          accountId,
+          webhookUrl,
+          subscriptions,
+          authHeaders
+        )
+
+        // Extract webhook data from response (may be nested in payload.webhook)
+        const webhookData = response.payload?.webhook || response.webhook || response
+        webhookId = webhookData.id
+
+        if (!webhookId) {
+          throw new Error('No webhook ID in response')
+        }
+      }
+
+      // Save webhook info to settings
+      if (!settings.chatwoot) {
+        settings.chatwoot = {}
+      }
+      if (!settings.chatwoot.accountWebhooks) {
+        settings.chatwoot.accountWebhooks = []
+      }
+
+      settings.chatwoot.accountWebhooks.push({
+        accountId,
+        webhookId,
+        webhookUrl,
+        subscriptions,
+        registeredAt: new Date()
+      })
+
+      await settings.save()
+
+    } catch (error: any) {
+      // Don't fail the sync if webhook registration fails
+      console.error(`Failed to register webhook for account ${accountId}:`, error.message)
     }
   }
 
