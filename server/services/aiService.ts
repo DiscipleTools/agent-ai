@@ -154,15 +154,7 @@ class AIService {
       requestBody.max_tokens = maxTokens
     }
 
-    console.log('Sending request to AI service:', {
-      endpoint: `${aiConfig.endpoint}/chat/completions`,
-      model: requestBody.model,
-      temperature: requestBody.temperature,
-      max_tokens: requestBody.max_tokens || requestBody.max_completion_tokens,
-      messageCount: messages.length
-    })
-
-    console.log('messages', messages)
+    console.log('Sending request to AI service')
 
     const response = await fetch(`${aiConfig.endpoint}/chat/completions`, {
       method: 'POST',
@@ -187,13 +179,6 @@ class AIService {
 
     const data: OpenAIResponse = await response.json()
     
-    console.log('AI API response:', {
-      id: data.id,
-      model: data.model,
-      usage: data.usage,
-      choicesCount: data.choices?.length || 0
-    })
-
     if (!data.choices || !data.choices[0] || !data.choices[0].message) {
       console.error('Invalid response format from AI API:', data)
       throw new Error('Invalid response format from AI API - missing choices or message')

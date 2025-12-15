@@ -4,6 +4,7 @@ A full-stack Nuxt.js application for managing AI agents that integrate with Chat
 
 ## Useful command:
 docker compose -f docker-compose.local.yml down && docker compose -f docker-compose.local.yml up --build -d
+docker-compose -f docker-compose.yml logs -f app
 
 ## 🚀 Quick Start (Development)
 

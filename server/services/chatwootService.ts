@@ -168,7 +168,6 @@ class ChatwootService {
       const data = await response.json()
       
       // Chatwoot returns messages in a 'payload' array, not directly
-      console.log('Chatwoot API response:', data)
       const messages = data.payload || data
       console.log(`Retrieved ${messages?.length || 0} messages from conversation ${conversationId}`)
       
@@ -420,8 +419,7 @@ class ChatwootService {
 
       // Check if response has content before parsing JSON
       const responseText = await response.text()
-      console.log('Chatwoot API response text:', responseText)
-      
+
       let data
       if (responseText.trim()) {
         try {
