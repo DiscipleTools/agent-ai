@@ -35,7 +35,7 @@ export default defineEventHandler(async (event) => {
     }
 
     // Find the agent in the agents array
-    const agentAssignment = inbox.agents.find(a => a.agentId.toString() === agentId)
+    const agentAssignment = inbox.agents.find((a: any) => a.agentId.toString() === agentId)
     if (!agentAssignment) {
       throw createError({
         statusCode: 404,
@@ -66,7 +66,7 @@ export default defineEventHandler(async (event) => {
         removedAgent,
         summary: {
           remainingAgents: inbox.agents.length,
-          activeAgents: inbox.agents.filter(a => a.isActive).length
+          activeAgents: inbox.agents.filter((a: any) => a.isActive).length
         }
       }
     }

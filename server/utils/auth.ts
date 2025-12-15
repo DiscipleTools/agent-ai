@@ -66,6 +66,13 @@ export async function requireChatwootAuth(event: any) {
   // Get Chatwoot URL from environment (fallback to localhost)
   const chatwootInstanceUrl = process.env.CHATWOOT_URL
 
+  if (!chatwootInstanceUrl) {
+    throw createError({
+      statusCode: 500,
+      statusMessage: 'Chatwoot URL not configured'
+    })
+  }
+
   try {
     // Make request to Chatwoot API to validate session
     const profileUrl = `${chatwootInstanceUrl.replace(/\/$/, '')}/api/v1/profile`

@@ -23,7 +23,7 @@ export default defineEventHandler(async (event) => {
       _id: inboxId,
       createdBy: user.id || user._id
     })
-      .lean()
+      .lean() as any
 
     if (!inbox) {
       throw createError({

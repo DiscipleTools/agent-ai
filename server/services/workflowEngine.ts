@@ -113,12 +113,12 @@ class WorkflowEngine {
   private async findMatchingAgents(event: WorkflowEvent, inboxId?: string): Promise<any[]> {
     try {
       // Find workflow agents with matching triggers
-      let agents = await Agent.findByTriggerType(event.type)
-      
+      let agents = await (Agent as any).findByTriggerType(event.type)
+
       // If inbox ID provided, filter by agents assigned to this inbox
       if (inboxId) {
         const assignedAgentIds = await this.getAgentsAssignedToInbox(inboxId)
-        agents = agents.filter(agent => 
+        agents = agents.filter((agent: any) =>
           assignedAgentIds.some(assignedId => assignedId.toString() === agent._id.toString())
         )
       }
@@ -154,7 +154,7 @@ class WorkflowEngine {
       const agentIds: string[] = []
       
       // Add other assigned agents
-      inbox.agents?.forEach(assignment => {
+      inbox.agents?.forEach((assignment: any) => {
         if (assignment.agentId && assignment.isActive) {
           agentIds.push(assignment.agentId._id.toString())
         }

@@ -152,7 +152,7 @@ class AgentService {
         // Response agent functionality removed
 
         // Check if agent is in processing pipeline
-        const agentInPipeline = inbox.agents.find(a => a.agentId.toString() === agentId)
+        const agentInPipeline = inbox.agents.find((a: any) => a.agentId.toString() === agentId)
         if (agentInPipeline) {
           assignments.processingPipeline.push({
             inboxId: inbox._id,
@@ -211,7 +211,7 @@ class AgentService {
       // Check if agent is already assigned in any capacity
       if (assignmentType === 'response') {
         // Check if agent is already in processing pipeline
-        const existingInPipeline = inbox.agents.find(a => a.agentId.toString() === agentId)
+        const existingInPipeline = inbox.agents.find((a: any) => a.agentId.toString() === agentId)
         if (existingInPipeline) {
           return { isValid: false, reason: 'Agent is already in processing pipeline' }
         }
@@ -219,7 +219,7 @@ class AgentService {
         // Response agent functionality removed
 
         // Check if agent is already in processing pipeline
-        const existingInPipeline = inbox.agents.find(a => a.agentId.toString() === agentId)
+        const existingInPipeline = inbox.agents.find((a: any) => a.agentId.toString() === agentId)
         if (existingInPipeline) {
           return { isValid: false, reason: 'Agent is already in processing pipeline' }
         }
@@ -289,11 +289,11 @@ class AgentService {
 
         if (assignmentType === 'response') {
           // Check if already in processing pipeline
-          const isInPipeline = inbox.agents.some(a => a.agentId.toString() === agentId)
+          const isInPipeline = inbox.agents.some((a: any) => a.agentId.toString() === agentId)
           return !isInPipeline
         } else {
           // Check if already in processing pipeline
-          const isInPipeline = inbox.agents.some(a => a.agentId.toString() === agentId)
+          const isInPipeline = inbox.agents.some((a: any) => a.agentId.toString() === agentId)
           return !isInPipeline
         }
       })

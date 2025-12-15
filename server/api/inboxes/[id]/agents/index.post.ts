@@ -56,7 +56,7 @@ export default defineEventHandler(async (event) => {
     // Response agent functionality removed
 
     // Check if agent is already in agents array
-    const existingAgent = inbox.agents.find(a => a.agentId.toString() === agentId)
+    const existingAgent = inbox.agents.find((a: any) => a.agentId.toString() === agentId)
     if (existingAgent) {
       throw createError({
         statusCode: 409,
@@ -69,7 +69,7 @@ export default defineEventHandler(async (event) => {
     await inbox.save()
 
     // Get the newly added agent assignment for response
-    const addedAgent = inbox.agents.find(a => a.agentId.toString() === agentId)
+    const addedAgent = inbox.agents.find((a: any) => a.agentId.toString() === agentId) as any
     
     // Populate agent details
     await inbox.populate('agents.agentId', 'name description')
@@ -92,7 +92,7 @@ export default defineEventHandler(async (event) => {
         },
         summary: {
           totalAgents: inbox.agents.length,
-          activeAgents: inbox.agents.filter(a => a.isActive).length
+          activeAgents: inbox.agents.filter((a: any) => a.isActive).length
         }
       }
     }

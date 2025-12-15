@@ -46,7 +46,7 @@ export default defineEventHandler(async (event) => {
     }
 
     // Find the agent in the agents array
-    const agentIndex = inbox.agents.findIndex(a => a.agentId.toString() === agentId)
+    const agentIndex = inbox.agents.findIndex((a: any) => a.agentId.toString() === agentId)
     if (agentIndex === -1) {
       throw createError({
         statusCode: 404,
@@ -71,7 +71,7 @@ export default defineEventHandler(async (event) => {
 
     // Re-sort agents by priority if priority was changed
     if (updateData.priority !== undefined) {
-      inbox.agents.sort((a, b) => a.priority - b.priority)
+      inbox.agents.sort((a: any, b: any) => a.priority - b.priority)
     }
 
     await inbox.save()
@@ -79,7 +79,7 @@ export default defineEventHandler(async (event) => {
     // Populate agent details for response
     await inbox.populate('agents.agentId', 'name description')
 
-    const updatedAgent = inbox.agents.find(a => a.agentId._id.toString() === agentId)
+    const updatedAgent = inbox.agents.find((a: any) => a.agentId._id.toString() === agentId) as any
 
     return {
       success: true,
@@ -89,14 +89,14 @@ export default defineEventHandler(async (event) => {
           id: inbox._id,
           name: inbox.name
         },
-        updatedAgent: {
+        updatedAgent: updatedAgent ? {
           agentId: updatedAgent.agentId._id,
           name: updatedAgent.name,
           priority: updatedAgent.priority,
           isActive: updatedAgent.isActive,
           assignedAt: updatedAgent.assignedAt,
           config: updatedAgent.config
-        },
+        } : null,
         updateData
       }
     }

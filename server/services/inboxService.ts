@@ -150,7 +150,7 @@ class InboxService {
    */
   private async syncAccountInboxes(accountId: number, user: any) {
     try {
-      const chatwootInstanceUrl = (process.env.CHATWOOT_URL).replace(/\/$/, '')
+      const chatwootInstanceUrl = (process.env.CHATWOOT_URL || '').replace(/\/$/, '')
       
       // Get session data from the user object (set during authentication)
       const sessionData = user.chatwootSessionData
@@ -561,11 +561,11 @@ class InboxService {
               createdBy
             }
             
-            const newInbox = await this.createInbox(newInboxData)
+            const newInbox = await this.createInbox(newInboxData) as any
             syncResults.created.push({
-              id: newInbox._id,
-              name: newInbox.name,
-              inboxId: newInbox.inboxId
+              id: newInbox?._id,
+              name: newInbox?.name,
+              inboxId: newInbox?.inboxId
             })
           }
         } catch (inboxError: any) {
@@ -765,7 +765,7 @@ class InboxService {
         throw new Error('Inbox not found')
       }
 
-      const agent = inbox.agents.find(a => a.agentId.toString() === agentId)
+      const agent = inbox.agents.find((a: any) => a.agentId.toString() === agentId)
       if (!agent) {
         throw new Error('Agent is not assigned to this inbox')
       }
@@ -785,7 +785,7 @@ class InboxService {
 
       // Re-sort agents by priority if priority was changed
       if (updates.priority !== undefined) {
-        inbox.agents.sort((a, b) => a.priority - b.priority)
+        inbox.agents.sort((a: any, b: any) => a.priority - b.priority)
       }
 
       await inbox.save()
@@ -843,8 +843,8 @@ class InboxService {
 
       // Get processing order
       const sortedAgents = inbox.agents
-        .filter(a => a.isActive && a.agentId)
-        .sort((a, b) => a.priority - b.priority)
+        .filter((a: any) => a.isActive && a.agentId)
+        .sort((a: any, b: any) => a.priority - b.priority)
 
       return {
         inbox: {
@@ -852,9 +852,9 @@ class InboxService {
           name: inbox.name
         },
         processing: {
-          preProcessAgents: sortedAgents.filter(a => a.priority < 100),
-          mainProcessAgents: sortedAgents.filter(a => a.priority >= 100 && a.priority < 200),
-          postProcessAgents: sortedAgents.filter(a => a.priority >= 200)
+          preProcessAgents: sortedAgents.filter((a: any) => a.priority < 100),
+          mainProcessAgents: sortedAgents.filter((a: any) => a.priority >= 100 && a.priority < 200),
+          postProcessAgents: sortedAgents.filter((a: any) => a.priority >= 200)
         }
       }
     } catch (error) {

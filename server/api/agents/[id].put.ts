@@ -133,7 +133,14 @@ export default chatwootAuthMiddleware.auth(async (event, checker) => {
       agentId,
       { $set: updateData },
       { new: true, runValidators: true }
-    ).lean()
+    ).lean() as any
+
+    if (!updatedAgent) {
+      throw createError({
+        statusCode: 404,
+        statusMessage: 'Agent not found after update'
+      })
+    }
 
     return {
       success: true,

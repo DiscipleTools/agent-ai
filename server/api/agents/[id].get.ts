@@ -64,7 +64,7 @@ export default chatwootAuthMiddleware.agentAccess('read')(async (event, checker,
     }).select('name channelType agents').lean()
 
     const assignments = inboxAssignments.map(inbox => {
-      const processingAgent = inbox.agents?.find(a => a.agentId.toString() === agentId)
+      const processingAgent = inbox.agents?.find((a: any) => a.agentId.toString() === agentId)
       
       return {
         inboxId: inbox._id,

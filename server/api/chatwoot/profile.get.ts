@@ -62,6 +62,14 @@ export default defineEventHandler(async (event) => {
     // Get Chatwoot URL from environment (fallback to nginx proxy for Docker environments)
     const chatwootInstanceUrl = process.env.CHATWOOT_URL
 
+    if (!chatwootInstanceUrl) {
+      return {
+        success: false,
+        message: 'Chatwoot URL not configured',
+        statusCode: 500
+      }
+    }
+
     // Make request to Chatwoot API
     const profileUrl = `${chatwootInstanceUrl.replace(/\/$/, '')}/api/v1/profile`
     
