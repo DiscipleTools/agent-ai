@@ -29,6 +29,7 @@ function validateWebhookSignature(payload: string, signature: string, secret: st
 
 export default defineEventHandler(async (event) => {
   try {
+    console.log('webhook received')
     const inboxId = getRouterParam(event, 'id')
     if (!inboxId) {
       throw createError({
@@ -69,7 +70,7 @@ export default defineEventHandler(async (event) => {
       console.log(`Processing webhook without signature validation for inbox ${inboxId}`)
     }
 
-    console.log(`Processing webhook for inbox ${inbox.name} (${inboxId}), event: ${payload.event}`)
+    console.log(`Processing webhook for inbox ${inbox.name} (${inboxId}), event: ${payload.event}, conversation_id: ${payload.conversation?.id || payload.id}`)
 
     // Handle conversation_created event - mark as open immediately
     if (payload.event === 'conversation_created') {
@@ -147,7 +148,7 @@ export default defineEventHandler(async (event) => {
         console.log(`Conversation ${payload.conversation.id} - created_at: ${createdAt} (${typeof createdAt}), timestamp: ${timestamp} (${typeof timestamp}), status: ${status}, isNew: ${isNewConversation}`)
 
         // Mark as open if it's a new conversation AND not already open
-        if (isNewConversation && status !== 'open') {
+        if (status !== 'open') {
           console.log(`Marking conversation ${payload.conversation.id} as open (current status: ${status})`)
           await chatwootService.updateConversationStatus(
             payload.account.id,

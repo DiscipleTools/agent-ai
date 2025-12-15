@@ -2,6 +2,8 @@
 
 A full-stack Nuxt.js application for managing AI agents that integrate with Chatwoot instances. This system enables organizations to deploy multiple AI agents that can automatically respond to customer inquiries via chat and email using Prediction Guard's secure AI models.
 
+## Useful command:
+docker compose -f docker-compose.local.yml down && docker compose -f docker-compose.local.yml up --build -d
 
 ## 🚀 Quick Start (Development)
 
