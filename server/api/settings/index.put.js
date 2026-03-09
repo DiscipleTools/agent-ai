@@ -6,10 +6,10 @@
  */
 import Settings from '../../models/Settings.js'
 import settingsService from '../../services/settingsService.ts'
-import { authMiddleware } from '../../utils/auth.ts'
+import { chatwootAuthMiddleware } from '../../utils/auth.ts'
 import { sanitizeText, sanitizeEmail, sanitizeUrl, sanitizeAlphaNumeric, validators } from '~/utils/sanitize.js'
 
-export default authMiddleware.admin(async (event, checker) => {
+export default chatwootAuthMiddleware.superAdmin(async (event, checker) => {
   try {
     // Get user from checker
     const user = checker.user
@@ -102,24 +102,6 @@ export default authMiddleware.admin(async (event, checker) => {
             body.server.allowedFileTypes[index] = sanitizedType
           })
         }
-      }
-    }
-
-    // Validate and sanitize Chatwoot configuration if provided
-    if (body.chatwoot) {
-      if (body.chatwoot.url) {
-        const sanitizedUrl = sanitizeUrl(body.chatwoot.url)
-        if (!validators.validUrl(sanitizedUrl)) {
-          validationErrors.push('Please enter a valid Chatwoot URL')
-        }
-        body.chatwoot.url = sanitizedUrl
-      } else if (body.chatwoot.enabled) {
-        validationErrors.push('Chatwoot URL is required when Chatwoot is enabled')
-      }
-
-      // API token validation (don't sanitize, but validate length)
-      if (body.chatwoot.apiToken && body.chatwoot.apiToken.length > 512) {
-        validationErrors.push('Chatwoot API token is too long')
       }
     }
 
@@ -236,14 +218,7 @@ export default authMiddleware.admin(async (event, checker) => {
           ...body.server
         }
       }
-      
-      if (body.chatwoot) {
-        settings.chatwoot = {
-          ...settings.chatwoot,
-          ...body.chatwoot
-        }
-      }
-      
+
       settings.updatedBy = user._id
     } else {
       // Create new settings
@@ -260,9 +235,6 @@ export default authMiddleware.admin(async (event, checker) => {
         server: body.server || {
           maxFileSize: 10485760,
           allowedFileTypes: ['pdf', 'txt', 'doc', 'docx']
-        },
-        chatwoot: body.chatwoot || {
-          enabled: false
         },
         updatedBy: user._id
       })
@@ -290,10 +262,6 @@ export default authMiddleware.admin(async (event, checker) => {
             pass: '***HIDDEN***'
           } : undefined
         } : undefined
-      } : undefined,
-      chatwoot: settings.chatwoot ? {
-        ...settings.chatwoot,
-        apiToken: settings.chatwoot.apiToken ? '***HIDDEN***' : null
       } : undefined
     }
 

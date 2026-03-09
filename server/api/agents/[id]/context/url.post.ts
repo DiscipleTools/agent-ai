@@ -12,15 +12,15 @@
  * Prevents duplicate URLs from being added to the same agent.
  */
 import { connectDB } from '~/server/utils/db'
-import { authMiddleware } from '~/server/utils/auth'
+import { chatwootAuthMiddleware } from '~/server/utils/auth'
 import { validateUrlOrThrow } from '~/server/utils/urlValidator'
 import Agent from '~/server/models/Agent'
-import User from '~/server/models/User'
+// User model removed - using Chatwoot authentication
 import webScrapingService from '~/server/services/webScrapingService'
 import { ragService } from '~/server/services/ragService'
 import mongoose from 'mongoose'
 
-export default authMiddleware.agentAccess('write')(async (event, checker, agentId) => {
+export default chatwootAuthMiddleware.agentAccess('write')(async (event, checker, agentId) => {
   try {
     // Connect to database
     await connectDB()

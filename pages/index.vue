@@ -18,9 +18,9 @@ definePageMeta({
 const authStore = useAuthStore()
 
 onMounted(async () => {
-  // If user is authenticated, redirect to agents
+  // If user is authenticated, redirect to inboxes
   if (authStore.isAuthenticated) {
-    await navigateTo('/agents')
+    await navigateTo('/inboxes')
     return
   }
 
@@ -28,7 +28,7 @@ onMounted(async () => {
   if (!authStore.user) {
     try {
       await authStore.fetchUser()
-      await navigateTo('/agents')
+      await navigateTo('/inboxes')
     } catch (error) {
       console.warn('Auth failed:', sanitizeErrorMessage(error))
       const accessToken = useCookie('access-token')

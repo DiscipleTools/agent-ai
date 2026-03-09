@@ -2,6 +2,9 @@
 
 A full-stack Nuxt.js application for managing AI agents that integrate with Chatwoot instances. This system enables organizations to deploy multiple AI agents that can automatically respond to customer inquiries via chat and email using Prediction Guard's secure AI models.
 
+## Useful command:
+docker compose -f docker-compose.local.yml down && docker compose -f docker-compose.local.yml up --build -d
+docker-compose -f docker-compose.yml logs -f app
 
 ## 🚀 Quick Start (Development)
 
@@ -32,11 +35,8 @@ Required environment variables:
 # Database
 MONGODB_URI=mongodb://localhost:27017/agent-ai-server
 
-# JWT Configuration
-JWT_SECRET=your-super-secret-jwt-key
-JWT_REFRESH_SECRET=your-super-secret-refresh-key
-JWT_EXPIRE=24h
-JWT_REFRESH_EXPIRE=7d
+# Security Configuration
+JWT_SECRET=your-super-secret-jwt-key  # Used for CSRF token signing only
 
 # Chatwoot Integration (optional)
 CHATWOOT_URL=https://your-chatwoot-instance.com

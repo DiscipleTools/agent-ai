@@ -40,6 +40,7 @@
         </div>
       </div>
 
+
       <div>
         <label for="prompt" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
           System Prompt *
@@ -73,25 +74,6 @@ const props = defineProps({
   errors: {
     type: Object,
     default: () => ({})
-  }
-})
-
-// Watch for sanitization
-watch(() => props.form.name, (newValue) => {
-  if (newValue !== sanitizeText(newValue)) {
-    props.form.name = sanitizeText(newValue)
-  }
-})
-
-watch(() => props.form.description, (newValue) => {
-  if (newValue !== sanitizeText(newValue)) {
-    props.form.description = sanitizeText(newValue)
-  }
-})
-
-watch(() => props.form.prompt, (newValue) => {
-  if (newValue !== sanitizeContent(newValue)) {
-    props.form.prompt = sanitizeContent(newValue)
   }
 })
 </script>

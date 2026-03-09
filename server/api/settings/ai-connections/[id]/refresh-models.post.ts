@@ -4,10 +4,10 @@
  */
 import settingsService from '~/server/services/settingsService'
 import aiService from '~/server/services/aiService'
-import { authMiddleware } from '~/server/utils/auth'
+import { chatwootAuthMiddleware } from '~/server/utils/auth'
 import { sanitizeObjectId } from '~/utils/sanitize'
 
-export default authMiddleware.admin(async (event, checker) => {
+export default chatwootAuthMiddleware.superAdmin(async (event, checker) => {
   try {
     // Get user from checker
     const user = checker.user

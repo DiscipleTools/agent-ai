@@ -14,9 +14,14 @@
     >
       <div class="flex flex-col h-full">
         <div class="flex items-center justify-between h-16 px-4 border-b border-gray-200 dark:border-gray-700">
-          <h1 class="text-xl font-bold text-gray-900 dark:text-white">
-            Agent AI
-          </h1>
+          <div class="flex items-baseline">
+            <h1 class="text-xl font-bold text-gray-900 dark:text-white">
+              Agent AI
+            </h1>
+            <span class="ml-2 text-xs text-gray-500 dark:text-gray-400 font-medium">
+              v{{ version }}
+            </span>
+          </div>
           <button
             @click="closeMobileMenu"
             class="p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700"
@@ -40,38 +45,29 @@
         </nav>
         
         <div class="p-4 border-t border-gray-200 dark:border-gray-700">
-          <div class="flex items-center">
-            <NuxtLink 
-              to="/profile" 
-              @click="closeMobileMenu"
-              class="flex items-center flex-1 min-w-0 p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors group"
-              title="Go to profile"
-            >
+          <NuxtLink
+            to="/chatwoot-profile"
+            @click="closeMobileMenu"
+            class="flex items-center hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-colors cursor-pointer"
+          >
+            <div class="flex items-center flex-1 min-w-0 p-2">
               <div class="flex-shrink-0">
-                <div class="w-10 h-10 bg-primary-100 dark:bg-primary-900 rounded-full flex items-center justify-center group-hover:bg-primary-200 dark:group-hover:bg-primary-800 transition-colors">
+                <div class="w-10 h-10 bg-primary-100 dark:bg-primary-900 rounded-full flex items-center justify-center">
                   <span class="text-sm font-medium text-primary-600 dark:text-primary-400">
                     {{ sanitizedUser?.initial }}
                   </span>
                 </div>
               </div>
               <div class="ml-3 flex-1 min-w-0">
-                <p class="text-sm font-medium text-gray-900 dark:text-white truncate group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">
+                <p class="text-sm font-medium text-gray-900 dark:text-white truncate">
                   {{ sanitizedUser?.name }}
                 </p>
                 <p class="text-xs text-gray-500 dark:text-gray-400 truncate">
                   {{ sanitizedUser?.email }}
                 </p>
               </div>
-            </NuxtLink>
-            <button
-              @click="authStore.logout"
-              class="ml-2 flex items-center px-3 py-2 text-sm font-medium text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900 rounded-md transition-colors"
-              title="Logout"
-            >
-              <ArrowRightOnRectangleIcon class="w-4 h-4 mr-1" />
-              Logout
-            </button>
-          </div>
+            </div>
+          </NuxtLink>
         </div>
       </div>
     </div>
@@ -86,9 +82,14 @@
               <div class="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center">
                 <CpuChipIcon class="w-5 h-5 text-white" />
               </div>
-              <h1 class="ml-3 text-xl font-bold text-gray-900 dark:text-white">
-                Agent AI
-              </h1>
+              <div class="ml-3 flex items-baseline">
+                <h1 class="text-xl font-bold text-gray-900 dark:text-white">
+                  Agent AI
+                </h1>
+                <span class="ml-2 text-xs text-gray-500 dark:text-gray-400 font-medium">
+                  v{{ version }}
+                </span>
+              </div>
             </div>
           </div>
           
@@ -109,51 +110,30 @@
             </NuxtLink>
           </nav>
           
-          <!-- User Profile -->
+          <!-- User Info -->
           <div class="flex-shrink-0 p-4 border-t border-gray-200 dark:border-gray-700">
-            <div class="flex items-center">
-              <NuxtLink 
-                to="/profile" 
-                class="flex items-center flex-1 min-w-0 p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors group"
-                title="Go to profile"
-              >
+            <NuxtLink
+              to="/chatwoot-profile"
+              class="flex items-center hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-colors cursor-pointer"
+            >
+              <div class="flex items-center flex-1 min-w-0 p-2">
                 <div class="flex-shrink-0">
-                  <div class="w-10 h-10 bg-primary-100 dark:bg-primary-900 rounded-full flex items-center justify-center group-hover:bg-primary-200 dark:group-hover:bg-primary-800 transition-colors">
+                  <div class="w-10 h-10 bg-primary-100 dark:bg-primary-900 rounded-full flex items-center justify-center">
                     <span class="text-sm font-medium text-primary-600 dark:text-primary-400">
                       {{ sanitizedUser?.initial }}
                     </span>
                   </div>
                 </div>
                 <div class="ml-3 flex-1 min-w-0">
-                  <p class="text-sm font-medium text-gray-900 dark:text-white truncate group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">
+                  <p class="text-sm font-medium text-gray-900 dark:text-white truncate">
                     {{ sanitizedUser?.name }}
                   </p>
                   <p class="text-xs text-gray-500 dark:text-gray-400 truncate">
                     {{ sanitizedUser?.role === 'admin' ? 'Administrator' : 'User' }}
                   </p>
                 </div>
-              </NuxtLink>
-              <div class="ml-2 flex space-x-1">
-                <!-- Theme toggle button hidden
-                <button
-                  @click="toggleDarkMode"
-                  class="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                  title="Toggle theme"
-                >
-                  <SunIcon v-if="$colorMode.value === 'dark'" class="w-4 h-4" />
-                  <MoonIcon v-else class="w-4 h-4" />
-                </button>
-                -->
-                <button
-                  @click="authStore.logout"
-                  class="ml-2 flex items-center px-3 py-2 text-sm font-medium text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900 rounded-md transition-colors"
-                  title="Logout"
-                >
-                  <ArrowRightOnRectangleIcon class="w-4 h-4 mr-1" />
-                  Logout
-                </button>
               </div>
-            </div>
+            </NuxtLink>
           </div>
         </div>
       </div>
@@ -179,10 +159,10 @@
                     <li>
                       <div class="flex items-center">
                         <HomeIcon class="w-4 h-4 text-gray-400" />
-                        <span class="ml-2 text-sm font-medium text-gray-500 dark:text-gray-400">Agents</span>
+                        <span class="ml-2 text-sm font-medium text-gray-500 dark:text-gray-400">Inboxes</span>
                       </div>
                     </li>
-                    <li v-if="currentPageName !== 'Agents'">
+                    <li v-if="currentPageName !== 'Inboxes'">
                       <div class="flex items-center">
                         <ChevronRightIcon class="w-4 h-4 text-gray-400 mx-2" />
                         <span class="text-sm font-medium text-gray-900 dark:text-white">{{ currentPageName }}</span>
@@ -193,24 +173,26 @@
               </div>
               
               <div class="flex items-center space-x-4">
-                <!-- Logout button (desktop) -->
-                <button
-                  @click="authStore.logout"
-                  class="hidden md:flex items-center px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors"
-                  title="Logout"
+                <!-- Chatwoot button (desktop) -->
+                <a
+                  href="/"
+                  rel="noopener noreferrer"
+                  class="hidden md:flex items-center px-3 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900 rounded-md transition-colors"
+                  title="Open Chatwoot"
                 >
-                  <ArrowRightOnRectangleIcon class="w-4 h-4 mr-2" />
-                  Logout
-                </button>
+                  <ChatBubbleLeftRightIcon class="w-4 h-4 mr-2" />
+                  Chatwoot
+                </a>
                 
-                <!-- Logout button (mobile) -->
-                <button
-                  @click="authStore.logout"
-                  class="md:hidden p-2 text-gray-400 hover:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors"
-                  title="Logout"
+                <!-- Chatwoot button (mobile) -->
+                <a
+                  href="/"
+                  rel="noopener noreferrer"
+                  class="md:hidden p-2 text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900 rounded-md transition-colors"
+                  title="Open Chatwoot"
                 >
-                  <ArrowRightOnRectangleIcon class="w-5 h-5" />
-                </button>
+                  <ChatBubbleLeftRightIcon class="w-5 h-5" />
+                </a>
               </div>
             </div>
           </div>
@@ -229,24 +211,25 @@
 import {
   HomeIcon,
   CpuChipIcon,
-  UsersIcon,
   CogIcon,
-  UserIcon,
-  ArrowRightOnRectangleIcon,
   Bars3Icon,
   XMarkIcon,
   SunIcon,
   MoonIcon,
-  ChevronRightIcon
+  ChevronRightIcon,
+  ChatBubbleLeftRightIcon,
+  InboxIcon,
+  RocketLaunchIcon
 } from '@heroicons/vue/24/outline'
 import { sanitizeText, sanitizeEmail } from '~/utils/sanitize.js'
 
 const authStore = useAuthStore()
-const agentsStore = useAgentsStore()
 const colorMode = useColorMode()
 const route = useRoute()
+const config = useRuntimeConfig()
 
 const mobileMenuOpen = ref(false)
+const version = config.public.appVersion
 
 // Sanitized user data for secure display
 const sanitizedUser = computed(() => {
@@ -262,25 +245,20 @@ const sanitizedUser = computed(() => {
 })
 
 const navigation = computed(() => [
-  { 
-    name: 'Agents', 
-    href: '/agents', 
-    icon: CpuChipIcon, 
-    badge: agentsStore.agents.length > 0 ? agentsStore.agents.length.toString() : undefined 
-  },
-  ...(authStore.isAdmin ? [{ name: 'Users', href: '/users', icon: UsersIcon }] : []),
-  { name: 'Profile', href: '/profile', icon: UserIcon },
-  ...(authStore.isAdmin ? [{ name: 'Settings', href: '/settings', icon: CogIcon }] : [])
+  { name: 'Inboxes', href: '/inboxes', icon: InboxIcon },
+  { name: 'Agents', href: '/list', icon: RocketLaunchIcon },
+  ...(authStore.isSuperAdmin ? [{ name: 'Settings', href: '/settings', icon: CogIcon }] : [])
 ])
 
 const currentPageName = computed(() => {
   const path = route.path
-  if (path.includes('/agents')) return 'Agents'
-  if (path.includes('/users')) return 'Users'
-  if (path.includes('/profile')) return 'Profile'
+  if (path.includes('/inboxes')) return 'Inboxes'
+  if (path.includes('/list')) return 'Agents'
   if (path.includes('/settings')) return 'Settings'
-  return 'Agents'
+  return 'Inboxes'
 })
+
+
 
 const toggleDarkMode = () => {
   colorMode.preference = colorMode.value === 'dark' ? 'light' : 'dark'
@@ -299,15 +277,5 @@ watch(() => route.path, () => {
   mobileMenuOpen.value = false
 })
 
-// Fetch agents on mount if not already loaded
-onMounted(async () => {
-  if (agentsStore.agents.length === 0 && !agentsStore.loading) {
-    try {
-      await agentsStore.fetchAgents()
-    } catch (error) {
-      // Silently fail - the user will see the count as 0 and can navigate to agents page
-      console.error('Failed to fetch agents for sidebar count:', error)
-    }
-  }
-})
+
 </script> 

@@ -1,27 +1,46 @@
-const isValidToken = (token) => {
-  if (!token || typeof token !== 'string') return false
+const hasChatwootSession = () => {
   try {
-    const parts = token.split('.')
-    if (parts.length !== 3) return false
-    const payload = JSON.parse(atob(parts[1]))
-    return payload.exp * 1000 > Date.now()
+    const sessionCookie = useCookie('cw_d_session_info')
+    if (!sessionCookie.value) return false
+    
+    // Check if the cookie has the required structure
+    let sessionData
+    if (typeof sessionCookie.value === 'object') {
+      sessionData = sessionCookie.value
+    } else if (typeof sessionCookie.value === 'string') {
+      try {
+        const decodedCookie = decodeURIComponent(sessionCookie.value)
+        sessionData = JSON.parse(decodedCookie)
+      } catch {
+        return false
+      }
+    } else {
+      return false
+    }
+    
+    // Check for required Chatwoot session fields
+    return !!(sessionData['access-token'] && sessionData.client && sessionData.uid)
   } catch {
     return false
   }
 }
 
-export default defineNuxtRouteMiddleware((to, from) => {
+export default defineNuxtRouteMiddleware(async (to, from) => {
   const authStore = useAuthStore()
-  const accessToken = useCookie('access-token')
 
-  // If no token or invalid token, redirect to login
-  if (!accessToken.value || !isValidToken(accessToken.value)) {
-    accessToken.value = null
-    return navigateTo('/login')
+  // Check for Chatwoot session instead of Agent AI JWT token
+  if (!hasChatwootSession()) {
+    // Redirect to Chatwoot login (which will be the main app root)
+    return navigateTo('/')
   }
 
-  // If no user data and we have a valid token, something went wrong
-  if (!authStore.user && accessToken.value) {
-    return navigateTo('/login')
+  // If no user data but we have a valid Chatwoot session, try to fetch user
+  if (!authStore.user) {
+    try {
+      await authStore.fetchUser()
+    } catch (error) {
+      console.error('Failed to fetch user with Chatwoot session:', error)
+      return navigateTo('/')
+    }
   }
 }) 

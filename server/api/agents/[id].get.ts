@@ -13,12 +13,13 @@
  */
 
 import { connectDB } from '~/server/utils/db'
-import { authMiddleware } from '~/server/utils/auth'
+import { chatwootAuthMiddleware } from '~/server/utils/auth'
 import Agent from '~/server/models/Agent'
+import Inbox from '~/server/models/Inbox'
 import { ragService } from '~/server/services/ragService'
 import { sanitizeContent, sanitizeObjectId, sanitizeFilename, sanitizeUrl, sanitizeObject, sanitizeErrorMessage } from '~/utils/sanitize'
 
-export default authMiddleware.agentAccess('read')(async (event, checker, agentId) => {
+export default chatwootAuthMiddleware.agentAccess('read')(async (event, checker, agentId) => {
   try {
     // Connect to database
     await connectDB()
@@ -57,7 +58,26 @@ export default authMiddleware.agentAccess('read')(async (event, checker, agentId
       })
     )
 
-    // Create enhanced agent object with RAG summary
+    // Get inbox assignments for this agent
+    const inboxAssignments = await Inbox.find({
+      'agents.agentId': agentId
+    }).select('name channelType agents').lean()
+
+    const assignments = inboxAssignments.map(inbox => {
+      const processingAgent = inbox.agents?.find((a: any) => a.agentId.toString() === agentId)
+      
+      return {
+        inboxId: inbox._id,
+        inboxName: inbox.name,
+        channelType: inbox.channelType,
+        assignmentType: 'processing',
+        priority: processingAgent?.priority,
+        isActive: processingAgent?.isActive,
+        config: processingAgent?.config
+      }
+    })
+
+    // Create enhanced agent object with RAG summary and assignments
     const enhancedAgent = {
       ...agent.toObject(),
       contextDocuments: contextDocumentsWithRAG,
@@ -65,6 +85,12 @@ export default authMiddleware.agentAccess('read')(async (event, checker, agentId
         totalDocuments: contextDocumentsWithRAG.length,
         documentsInRAG: contextDocumentsWithRAG.filter((doc: any) => doc.rag.inRAG).length,
         totalChunks: contextDocumentsWithRAG.reduce((sum: number, doc: any) => sum + doc.rag.chunksCount, 0)
+      },
+      assignments: {
+        inboxes: assignments,
+        totalInboxes: assignments.length,
+        responseInboxes: 0,
+        processingInboxes: assignments.length
       }
     }
 

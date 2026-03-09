@@ -99,10 +99,6 @@ const settingsSchema = new mongoose.Schema({
     }
   },
   chatwoot: {
-    url: {
-      type: String,
-      required: false
-    },
     apiToken: {
       type: String,
       required: false
@@ -110,7 +106,28 @@ const settingsSchema = new mongoose.Schema({
     enabled: {
       type: Boolean,
       default: false
-    }
+    },
+    accountWebhooks: [{
+      accountId: {
+        type: Number,
+        required: true
+      },
+      webhookId: {
+        type: Number,
+        required: true
+      },
+      webhookUrl: {
+        type: String,
+        required: true
+      },
+      subscriptions: [{
+        type: String
+      }],
+      registeredAt: {
+        type: Date,
+        default: Date.now
+      }
+    }]
   },
   server: {
     webhookSecret: {
@@ -127,8 +144,7 @@ const settingsSchema = new mongoose.Schema({
     }
   },
   updatedBy: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
+    type: String, // Chatwoot user ID as string
     required: true
   }
 }, {

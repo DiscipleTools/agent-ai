@@ -1,0 +1,224 @@
+import Inbox from '~/server/models/Inbox'
+import workflowEngine from '~/server/services/workflowEngine'
+import chatwootService from '~/server/services/chatwootService'
+import * as crypto from 'crypto'
+
+// Helper function to validate webhook signature
+function validateWebhookSignature(payload: string, signature: string, secret: string): boolean {
+  if (!signature || !secret) {
+    return false
+  }
+  
+  // Calculate expected signature using HMAC-SHA256 (standard webhook format)
+  const expectedSignature = crypto
+    .createHmac('sha256', secret)
+    .update(payload)
+    .digest('hex')
+  
+  // Handle both formats: "sha256=hash" and just "hash"
+  const normalizedSignature = signature.startsWith('sha256=') 
+    ? signature.substring(7) 
+    : signature
+  
+  // Use constant-time comparison to prevent timing attacks
+  return crypto.timingSafeEqual(
+    Buffer.from(expectedSignature, 'hex'),
+    Buffer.from(normalizedSignature, 'hex')
+  )
+}
+
+export default defineEventHandler(async (event) => {
+  try {
+    console.log('webhook received')
+    const inboxId = getRouterParam(event, 'id')
+    if (!inboxId) {
+      throw createError({
+        statusCode: 400,
+        statusMessage: 'Inbox ID is required'
+      })
+    }
+
+    // Get and validate payload
+    const payload = await readBody(event)
+    const signature = getHeader(event, 'X-Webhook-Secret') || getHeader(event, 'x-webhook-secret')
+
+    // Load inbox with populated agents
+    const inbox = await Inbox.findById(inboxId)
+      .populate('agents.agentId')
+
+    if (!inbox || !inbox.isActive) {
+      throw createError({
+        statusCode: 404,
+        statusMessage: 'Inbox not found or inactive'
+      })
+    }
+
+    // Optional signature validation - only validate if both secret and signature are provided
+    if (!payload.test && inbox.webhookSecret && signature) {
+      const payloadString = JSON.stringify(payload)
+      
+      if (!validateWebhookSignature(payloadString, signature, inbox.webhookSecret)) {
+        console.warn(`Invalid webhook signature for inbox ${inboxId}`)
+        throw createError({
+          statusCode: 401,
+          statusMessage: 'Invalid webhook signature'
+        })
+      }
+    } else if (inbox.webhookSecret && !signature) {
+      console.log(`Webhook secret configured but no signature provided - processing without validation for inbox ${inboxId}`)
+    } else {
+      console.log(`Processing webhook without signature validation for inbox ${inboxId}`)
+    }
+
+    console.log(`Processing webhook for inbox ${inbox.name} (${inboxId}), event: ${payload.event}, conversation_id: ${payload.conversation?.id || payload.id}`)
+
+    // Handle conversation_created event - mark as open immediately
+    if (payload.event === 'conversation_created') {
+      if (payload.id && payload.account_id) {
+        try {
+          const status = payload.status
+          console.log(`New conversation created: ${payload.id}, status: ${status}`)
+
+          if (status !== 'open') {
+            console.log(`Marking new conversation ${payload.id} as open`)
+            await chatwootService.updateConversationStatus(
+              payload.account_id,
+              payload.id,
+              'open',
+              inbox.chatwoot?.apiKey
+            )
+            console.log(`Successfully marked conversation ${payload.id} as open`)
+          }
+        } catch (convError: any) {
+          console.warn(`Failed to update conversation status for ${payload.id}:`, convError.message)
+        }
+      }
+      return {
+        success: true,
+        message: 'Conversation created event processed',
+        data: { event: payload.event, inbox: inbox.name }
+      }
+    }
+
+    // Only process message events for workflow processing
+    if (payload.event !== 'message_created') {
+      return {
+        success: true,
+        message: `Event ${payload.event} acknowledged but not processed`,
+        data: { event: payload.event, inbox: inbox.name }
+      }
+    }
+
+    // Skip if message is outgoing or template (from agent/bot/system)
+    if (payload.message_type === 'outgoing' || payload.message_type === 'template') {
+      return {
+        success: true,
+        message: `Skipped ${payload.message_type} message`,
+        data: {
+          event: payload.event,
+          inbox: inbox.name,
+          messageType: payload.message_type,
+          skipped: true
+        }
+      }
+    }
+
+    // Skip if no message content
+    if (!payload.content || !payload.content.trim()) {
+      return {
+        success: true,
+        message: 'Skipped empty message',
+        data: {
+          event: payload.event,
+          inbox: inbox.name,
+          skipped: true
+        }
+      }
+    }
+
+    // Also check on message_created in case conversation_created wasn't received
+    if (payload.conversation?.id && payload.account?.id) {
+      try {
+        // Log full conversation object to debug what Chatwoot is sending
+        const createdAt = payload.conversation.created_at
+        const timestamp = payload.conversation.timestamp
+        const status = payload.conversation.status
+        const isNewConversation = createdAt === timestamp
+
+        console.log(`Conversation ${payload.conversation.id} - created_at: ${createdAt} (${typeof createdAt}), timestamp: ${timestamp} (${typeof timestamp}), status: ${status}, isNew: ${isNewConversation}`)
+
+        // Mark as open if it's a new conversation AND not already open
+        if (status !== 'open') {
+          console.log(`Marking conversation ${payload.conversation.id} as open (current status: ${status})`)
+          await chatwootService.updateConversationStatus(
+            payload.account.id,
+            payload.conversation.id,
+            'open',
+            inbox.chatwoot?.apiKey
+          )
+          console.log(`Successfully marked conversation ${payload.conversation.id} as open`)
+        }
+      } catch (convError: any) {
+        console.warn(`Failed to check/update conversation status for ${payload.conversation.id}:`, convError.message)
+      }
+    }
+
+    // Use the centralized agent processing engine instead of duplicated logic
+    const processingContext = {
+      message: payload.content || '',
+      message_id: payload.id,
+      message_type: payload.message_type,
+      conversation_id: payload.conversation?.id,
+      account_id: payload.account?.id || payload.conversation?.account_id,
+      event_type: payload.event,
+      timestamp: new Date().toISOString()
+    }
+
+    // Process with workflow system
+    const workflowResults = await workflowEngine.processEvent({
+      type: payload.event,
+      data: {
+        message: payload.content,
+        message_id: payload.id,
+        message_type: payload.message_type,
+        conversation_id: payload.conversation?.id,
+        account_id: payload.account?.id || payload.conversation?.account_id,
+        sender: payload.sender,
+        conversation: payload.conversation,
+        account: payload.account,
+        inbox: payload.inbox,
+        contact: payload.contact,
+        assignee: payload.assignee,
+        timestamp: new Date().toISOString()
+      },
+      metadata: {
+        inboxId,
+        source: 'webhook'
+      }
+    }, inboxId)
+
+    return {
+      success: true,
+      message: 'Webhook processed successfully',
+      data: {
+        workflows: workflowResults,
+        summary: {
+          workflowsExecuted: workflowResults.length,
+          workflowsSuccessful: workflowResults.filter(w => w.success).length
+        }
+      }
+    }
+
+  } catch (error: any) {
+    console.error('Webhook processing error:', error)
+    
+    if (error.statusCode) {
+      throw error
+    }
+    
+    throw createError({
+      statusCode: 500,
+      statusMessage: 'Failed to process webhook'
+    })
+  }
+})

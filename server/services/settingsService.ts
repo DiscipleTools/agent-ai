@@ -10,7 +10,6 @@
  */
 
 import Settings from '~/server/models/Settings'
-import User from '~/server/models/User' // Ensure User model is registered for populate
 import { Types } from 'mongoose'
 import { sanitizeText, sanitizeEmail, sanitizeUrl, sanitizeAlphaNumeric, sanitizeAndValidateModels, sanitizeObjectId, sanitizeModelId } from '~/utils/sanitize.js'
 
@@ -89,24 +88,6 @@ class SettingsService {
     }
   }
 
-  async getChatwootSettings(): Promise<{ url: string; apiToken: string; enabled: boolean } | null> {
-    try {
-      const settings = await this.getAllSettings()
-      
-      if (!settings?.chatwoot) {
-        return null
-      }
-      
-      return {
-        url: settings.chatwoot.url || '',
-        apiToken: settings.chatwoot.apiToken || '',
-        enabled: settings.chatwoot.enabled || false
-      }
-    } catch (error: any) {
-      console.error('Failed to get Chatwoot settings:', error)
-      return null
-    }
-  }
 
   // Clear cache when settings are updated
   clearCache(): void {
@@ -122,7 +103,7 @@ class SettingsService {
         return this.cachedSettings
       }
 
-      const settings = await Settings.findOne().populate('updatedBy', 'name email')
+      const settings = await Settings.findOne()
       
       if (settings) {
         // Cache the settings
@@ -195,14 +176,6 @@ class SettingsService {
             : []
         }
       }
-      // Chatwoot
-      if (settingsData.chatwoot && typeof settingsData.chatwoot === 'object') {
-        sanitized.chatwoot = {
-          url: sanitizeUrl(settingsData.chatwoot.url),
-          apiToken: sanitizeText(settingsData.chatwoot.apiToken),
-          enabled: !!settingsData.chatwoot.enabled
-        }
-      }
       // --- End: Defense-in-depth sanitization and whitelisting ---
       let settings = await Settings.findOne()
       if (settings) {
@@ -211,13 +184,13 @@ class SettingsService {
           { _id: settings._id },
           {
             ...sanitized,
-            updatedBy: new Types.ObjectId(userId)
+            updatedBy: userId.toString()
           },
           { 
             new: true,
             runValidators: true
           }
-        ).populate('updatedBy', 'name email')
+        )
         if (!updatedSettings) {
           throw new Error('Failed to update settings - document not found')
         }
@@ -228,10 +201,10 @@ class SettingsService {
         // Create new settings
         settings = new Settings({
           ...sanitized,
-          updatedBy: new Types.ObjectId(userId)
+          updatedBy: userId.toString()
         })
         await settings.save()
-        await settings.populate('updatedBy', 'name email')
+        // User data comes from Chatwoot auth, no need to populate
         // Clear cache after update
         this.clearCache()
         return settings
@@ -251,4 +224,4 @@ class SettingsService {
   }
 }
 
-export default new SettingsService() 
+export default new SettingsService()

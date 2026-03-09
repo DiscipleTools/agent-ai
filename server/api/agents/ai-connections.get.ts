@@ -8,9 +8,9 @@
  */
 import { sanitizeText, sanitizeUrl, sanitizeErrorMessage } from '~/utils/sanitize'
 import settingsService from '~/server/services/settingsService'
-import { authMiddleware } from '~/server/utils/auth'
+import { chatwootAuthMiddleware } from '~/server/utils/auth'
 
-export default authMiddleware.auth(async (event, checker) => {
+export default chatwootAuthMiddleware.auth(async (event, checker) => {
   try {
 
     const connections = await settingsService.getAllAIConnections()

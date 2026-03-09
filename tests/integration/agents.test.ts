@@ -56,7 +56,6 @@ describe('Agents API', () => {
         body: {
           name: 'New Test Agent',
           description: 'A new test agent',
-          prompt: 'You are a helpful assistant',
           model: 'gpt-3.5-turbo'
         }
       })
@@ -77,8 +76,7 @@ describe('Agents API', () => {
           body: {
             name: 'Unauthorized Agent',
             description: 'Should not be created',
-            prompt: 'You are a helpful assistant',
-            model: 'gpt-3.5-turbo'
+              model: 'gpt-3.5-turbo'
           }
         })
       ).rejects.toThrow()

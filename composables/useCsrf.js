@@ -33,10 +33,18 @@ export const useCsrf = () => {
       throw new Error('Could not obtain CSRF token')
     }
 
-    const requestOptions = {
-      ...options,
-      headers: {
-        ...options.headers,
+    const requestOptions = { ...options }
+
+    // Handle both plain objects and Headers instances
+    if (!requestOptions.headers) {
+      requestOptions.headers = {}
+    }
+
+    if (requestOptions.headers instanceof Headers) {
+      requestOptions.headers.set('X-CSRF-Token', token)
+    } else if (typeof requestOptions.headers === 'object') {
+      requestOptions.headers = {
+        ...requestOptions.headers,
         'X-CSRF-Token': token
       }
     }
@@ -49,7 +57,11 @@ export const useCsrf = () => {
         csrfToken.value = null
         const newToken = await getCsrfToken()
         if (newToken) {
-          requestOptions.headers['X-CSRF-Token'] = newToken
+          if (requestOptions.headers instanceof Headers) {
+            requestOptions.headers.set('X-CSRF-Token', newToken)
+          } else {
+            requestOptions.headers['X-CSRF-Token'] = newToken
+          }
           return await $api(url, requestOptions)
         }
       }

@@ -1,8 +1,8 @@
 export default defineNuxtRouteMiddleware((to, from) => {
   const authStore = useAuthStore()
   
-  // If user is authenticated, redirect to agents
+  // If user is authenticated, redirect to inboxes
   if (authStore.isAuthenticated) {
-    return navigateTo('/agents')
+    return navigateTo('/inboxes')
   }
 }) 

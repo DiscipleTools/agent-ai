@@ -10,7 +10,7 @@
  * - Vector storage and similarity search via Qdrant
  * - Support for multiple document types (files, URLs, websites)
  * - Language detection and preprocessing for improved search relevance
- * - Batch processing with connection resilience and timeout handling
+ * - Batch processing with connection resilience
  * 
  * Document Processing Flow:
  * 1. Text content is cleaned and chunked into manageable pieces
@@ -23,6 +23,8 @@
 import { pipeline } from '@xenova/transformers'
 import type { Pipeline } from '@xenova/transformers'
 import crypto from 'crypto'
+import fs from 'fs'
+import path from 'path'
 import { 
   sanitizeContent, 
   sanitizeSearchQuery, 
@@ -63,22 +65,73 @@ class RAGService {
   private qdrantUrl: string
   private modelName = 'Xenova/all-MiniLM-L12-v2' // Multilingual model
   private isInitialized = false
+  private isLoadingModel = false
 
   constructor() {
     this.qdrantUrl = process.env.QDRANT_URL || 'http://localhost:6333'
+    
+    // Start loading embedding model immediately on service initialization
+    this.initializeEmbeddingModel()
   }
 
+  private logCacheStatus(): boolean {
+    const xenovaCache = '/app/.output/server/node_modules/@xenova/transformers/.cache'
+    
+    try {
+      if (fs.existsSync(xenovaCache)) {
+        // Check for our specific model
+        const modelPath = path.join(xenovaCache, 'Xenova', 'all-MiniLM-L12-v2')
+        if (fs.existsSync(modelPath)) {
+          return true // Cache hit
+        }
+      }
+    } catch (error) {
+      // Ignore errors, will be detected during model loading
+    }
+    
+    return false // Cache miss
+  }
+
+
+
   private async initializeEmbeddingModel(): Promise<void> {
-    if (!this.embeddingModel) {
+    // If model is already loaded or currently being loaded, don't load again
+    if (this.embeddingModel || this.isLoadingModel) {
+      return
+    }
+    
+    this.isLoadingModel = true
+    
+    try {
+      // Check if model is cached before loading
+      const isCached = this.logCacheStatus()
+      
+      const startTime = Date.now()
+      let downloadDetected = false
+      
       this.embeddingModel = await pipeline('feature-extraction', this.modelName, {
         quantized: false,
         progress_callback: (progress: any) => {
           if (progress.status === 'downloading') {
-            console.log(`Downloading model: ${progress.name} - ${progress.progress?.toFixed(1)}%`)
+            downloadDetected = true
           }
         }
       })
-      console.log('✅ Multilingual embedding model loaded successfully')
+      
+      const loadTime = Date.now() - startTime
+      
+      // Single line status
+      if (isCached && !downloadDetected) {
+        console.log(`⚡ Embedding model loaded from cache (${loadTime}ms)`)
+      } else {
+        console.log(`🌐 Embedding model downloaded and cached (${loadTime}ms)`)
+      }
+      
+    } catch (error: any) {
+      console.error('❌ Failed to initialize embedding model:', error.message)
+      this.embeddingModel = null
+    } finally {
+      this.isLoadingModel = false
     }
   }
 
@@ -235,12 +288,6 @@ class RAGService {
     return text.replace(/\s+/g, ' ').trim()
   }
 
-  /**
-   * Escape special regex characters
-   */
-  private escapeRegex(string: string): string {
-    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  }
 
   async processDocument(agentId: string, documentId: string, content: string, metadata: {
     type: 'file' | 'url' | 'website'

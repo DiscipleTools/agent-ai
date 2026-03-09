@@ -1,0 +1,86 @@
+services:
+  # Agent AI Application
+  app:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    container_name: agent-ai-app
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - MONGODB_URI=${MONGODB_URI}
+      - QDRANT_URL=http://qdrant:6333
+      - JWT_SECRET=${JWT_SECRET}
+      - APP_NAME=${APP_NAME:-Agent AI Server}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - CHATWOOT_URL=${CHATWOOT_URL:-http://host.docker.internal:5600}
+      - CHATWOOT_API_TOKEN=${CHATWOOT_API_TOKEN:-}
+      - NODE_OPTIONS=--max-old-space-size=3072
+    depends_on:
+      - mongodb
+      - qdrant
+    ports:
+      - '127.0.0.1:5510:3000'
+    volumes:
+      - agent_storage:/app/storage
+      - huggingface_cache:/app/.output/server/node_modules/@xenova/transformers/.cache
+    networks:
+      - agent-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # MongoDB Database
+  mongodb:
+    image: mongo:7.0
+    container_name: agent-ai-mongodb
+    restart: unless-stopped
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=${MONGO_ROOT_USER}
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_ROOT_PASSWORD}
+      - MONGO_INITDB_DATABASE=agent-ai-server
+    volumes:
+      - mongodb_data:/data/db
+      - ./docker/mongodb/init:/docker-entrypoint-initdb.d:ro
+    ports:
+      - '127.0.0.1:27018:27017'
+    networks:
+      - agent-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Qdrant Vector Database
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: agent-ai-qdrant
+    volumes:
+      - qdrant_data:/qdrant/storage
+    environment:
+      - QDRANT__SERVICE__HTTP_PORT=6333
+      - QDRANT__SERVICE__GRPC_PORT=6334
+      - QDRANT__LOG_LEVEL=INFO
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:6334:6333'
+    networks:
+      - agent-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:6333/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  agent-network:
+    driver: bridge
+
+volumes:
+  agent_storage:
+  mongodb_data:
+  qdrant_data:
+  huggingface_cache:

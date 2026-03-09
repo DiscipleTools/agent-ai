@@ -23,7 +23,6 @@ const cleanFormData = sanitizeObject(formData, schemas.agent)
 - `sanitizeNumber(input)` - Parse and validate numeric input
 - `sanitizeUrl(input)` - Clean URLs and prevent SSRF attacks
 - `sanitizeFilename(input)` - Remove dangerous filename characters
-- `sanitizePrompt(input)` - Clean prompts while preserving formatting
 - `sanitizeEmail(input)` - Clean and normalize email addresses
 - `sanitizeHtml(input, options)` - Allow only safe HTML tags
 - `sanitizeSearchQuery(input)` - Clean search queries
@@ -39,13 +38,12 @@ const cleanFormData = sanitizeObject(formData, schemas.agent)
 
 ```javascript
 // In your component
-import { sanitizeText, sanitizePrompt, sanitizeObject, schemas, validators } from '~/utils/sanitize'
+import { sanitizeText, sanitizeObject, schemas, validators } from '~/utils/sanitize'
 
 // Form state with sanitization
 const form = reactive({
   name: sanitizeText(props.data?.name || ''),
   description: sanitizeText(props.data?.description || ''),
-  prompt: sanitizePrompt(props.data?.prompt || '')
 })
 
 // Real-time sanitization watchers
@@ -63,9 +61,6 @@ const validateForm = () => {
     errors.name = 'Name must be between 2 and 100 characters'
   }
   
-  if (!validators.textLength(form.prompt, 10, 2000)) {
-    errors.prompt = 'Prompt must be between 10 and 2000 characters'
-  }
   
   return Object.keys(errors).length === 0 ? null : errors
 }
@@ -170,7 +165,6 @@ The library includes predefined schemas for common use cases:
 schemas.agent = {
   name: 'text',
   description: 'text', 
-  prompt: 'prompt',
   temperature: 'number',
   maxTokens: 'number',
   responseDelay: 'number',
@@ -204,7 +198,7 @@ You can create custom schemas for your specific use cases:
 ```javascript
 const customSchema = {
   title: 'text',
-  content: 'prompt',
+  content: 'text',
   category: 'text',
   priority: 'number',
   isPublic: (input) => Boolean(input), // Custom function

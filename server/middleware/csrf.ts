@@ -5,7 +5,7 @@
  * to prevent Cross-Site Request Forgery attacks.
  */
 
-import { requireAuth } from '~/server/utils/auth'
+import { requireChatwootAuth } from '~/server/utils/auth'
 import csrfService from '~/server/services/csrfService'
 
 export default defineEventHandler(async (event) => {
@@ -23,14 +23,6 @@ export default defineEventHandler(async (event) => {
 
   // Skip CSRF check for certain endpoints that don't require it
   const skipCSRFPaths = [
-    '/api/auth/login',
-    '/api/auth/refresh',
-    '/api/auth/setup-account',
-    '/api/auth/forgot-password',
-    '/api/auth/reset-password',
-    '/api/auth/validate-reset-token',
-    '/api/users/complete-setup',
-    '/api/users/validate-invitation',
     '/api/health',
     '/api/rag/health',
     '/api/rag/test-connection'
@@ -49,7 +41,7 @@ export default defineEventHandler(async (event) => {
 
   try {
     // Require authentication first - CSRF only applies to authenticated requests
-    await requireAuth(event)
+    await requireChatwootAuth(event)
 
     // Get CSRF token from headers or body
     let csrfToken = getHeader(event, 'x-csrf-token') || 

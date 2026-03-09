@@ -3,10 +3,10 @@
  * @endpoint GET /api/rag/health
  */
 import { ragService } from '~/server/services/ragService'
-import { authMiddleware } from '~/server/utils/auth'
+import { chatwootAuthMiddleware } from '~/server/utils/auth'
 import { sanitizeErrorMessage, sanitizeInternalUrl } from '~/utils/sanitize.js'
 
-export default authMiddleware.admin(async (event, checker) => {
+export default chatwootAuthMiddleware.auth(async (event, checker) => {
   try {
 
     // Check RAG system health

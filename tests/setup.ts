@@ -1,6 +1,6 @@
 import { beforeAll, afterAll, beforeEach, afterEach } from 'vitest'
 import mongoose from 'mongoose'
-import User from '~/server/models/User'
+// User model removed - using Chatwoot authentication
 import Agent from '~/server/models/Agent'
 import jwt from 'jsonwebtoken'
 
@@ -10,9 +10,8 @@ config()
 
 // Test database configuration - use main database for true integration testing
 const TEST_DB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/agent-ai-server'
-// Use the same JWT secrets as the dev server from .env file
+// Use the same JWT secret as the dev server from .env file (for CSRF token signing only)
 const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-this-in-production'
-const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'your-super-secret-refresh-key-change-this-in-production'
 
 // Ensure NODE_ENV is set to test for any test-specific behavior
 process.env.NODE_ENV = 'test'
@@ -57,7 +56,6 @@ export const testAgents = {
     _id: new mongoose.Types.ObjectId('507f1f77bcf86cd799439014'),
     name: 'Public Agent',
     description: 'Test agent accessible to admin only',
-    prompt: 'You are a test agent for admin users',
     isActive: true,
     createdBy: testUsers.admin._id
   },
@@ -65,7 +63,6 @@ export const testAgents = {
     _id: new mongoose.Types.ObjectId('507f1f77bcf86cd799439015'),
     name: 'User Agent',
     description: 'Test agent for user',
-    prompt: 'You are a test agent for regular users',
     isActive: true,
     createdBy: testUsers.user._id
   }
@@ -77,29 +74,29 @@ testUsers.user.agentAccess = [testAgents.userAgent._id]
 // Track agents created during tests for cleanup
 export const createdAgentIds: mongoose.Types.ObjectId[] = []
 
-// Helper function to generate JWT tokens using the same secrets as the server
-export function generateTestToken(userId: string, type: 'access' | 'refresh' = 'access'): string {
-  const secret = type === 'access' ? JWT_SECRET : JWT_REFRESH_SECRET
-  const expiresIn = type === 'access' ? '24h' : '7d'
-  
+// Helper function to generate JWT tokens using the same secret as the server (for CSRF testing)
+export function generateTestToken(userId: string, type: 'csrf' = 'csrf'): string {
   return jwt.sign(
     { 
       userId,
-      type
+      type,
+      sessionId: `test-session-${userId}`,
+      nonce: 'test-nonce',
+      iat: Math.floor(Date.now() / 1000)
     },
-    secret,
+    JWT_SECRET,
     { 
-      expiresIn,
+      expiresIn: '1h',
       issuer: 'agent-ai-server',
       audience: 'agent-ai-client'
     }
   )
 }
 
-// Helper function to get auth headers for tests
+// Helper function to get auth headers for tests (Note: Tests use Chatwoot session cookies, not JWT auth)
 export function getAuthHeaders(userType: 'admin' | 'user' | 'inactive'): Record<string, string> {
   const userId = testUsers[userType]._id.toString()
-  const token = generateTestToken(userId, 'access')
+  const token = generateTestToken(userId, 'csrf')
   
   return {
     'Authorization': `Bearer ${token}`,
@@ -117,9 +114,8 @@ async function cleanTestData() {
       testUsers.inactive._id
     ]
     
-    const deletedUsers = await User.deleteMany({
-      _id: { $in: testUserIds }
-    })
+    // Users are now managed by Chatwoot - no cleanup needed
+    const deletedUsers = { deletedCount: 0 }
     
     // Only delete test agents by their specific IDs
     const testAgentIds = [
@@ -154,12 +150,8 @@ async function cleanTestData() {
 // Helper function to seed test data
 async function seedTestData() {
   try {
-    // Create test users with plain passwords (will be hashed by pre-save middleware)
-    const users = await User.create([
-      testUsers.admin,
-      testUsers.user,
-      testUsers.inactive
-    ])
+    // Users are now managed by Chatwoot - no seeding needed
+    const users: any[] = []
     
     // Create test agents
     const agents = await Agent.create([

@@ -43,10 +43,14 @@ export const sanitizeNumber = (input) => {
 /**
  * Sanitize URL input and prevent dangerous protocols and SSRF attacks
  * @param {string|any} input - The URL to sanitize
+ * @param {Object} options - Options for URL sanitization
+ * @param {boolean} options.allowLocalhost - Whether to allow localhost URLs (for development)
  * @returns {string} - Sanitized URL or empty string if invalid
  */
-export const sanitizeUrl = (input) => {
+export const sanitizeUrl = (input, options = {}) => {
   if (!input || typeof input !== 'string') return ''
+  
+  const { allowLocalhost = false } = options
   
   // Basic URL sanitization - remove dangerous protocols and characters
   const cleaned = input.trim()
@@ -66,14 +70,17 @@ export const sanitizeUrl = (input) => {
   try {
     const url = new URL(cleaned)
     
-    // Block localhost and private IP ranges
+    // Block localhost and private IP ranges (but allow Docker internal communication)
     const hostname = url.hostname.toLowerCase()
-    if (hostname === 'localhost' || 
+    const isLocalOrPrivate = (hostname === 'localhost' || 
         hostname === '127.0.0.1' || 
         hostname === '0.0.0.0' ||
         hostname.match(/^10\./) ||
         hostname.match(/^172\.(1[6-9]|2[0-9]|3[01])\./) ||
-        hostname.match(/^192\.168\./)) {
+        hostname.match(/^192\.168\./)) &&
+        hostname !== 'host.docker.internal'
+    
+    if (isLocalOrPrivate && !allowLocalhost) {
       return ''
     }
     
@@ -136,29 +143,6 @@ export const sanitizeEmail = (input) => {
     .substring(0, 254) // RFC 5321 limit
 }
 
-/**
- * Sanitize HTML content by allowing only safe tags and attributes
- * @param {string|any} input - The HTML content to sanitize
- * @param {Object} options - Options for allowed tags and attributes
- * @returns {string} - Sanitized HTML
- */
-export const sanitizeHtml = (input, options = {}) => {
-  if (!input || typeof input !== 'string') return ''
-  
-  const defaultOptions = {
-    allowedTags: ['p', 'br', 'strong', 'em', 'u', 'b', 'i'],
-    allowedAttributes: {},
-    ...options
-  }
-  
-  // For now, just strip all HTML - can be enhanced with a proper HTML sanitizer library
-  if (defaultOptions.allowedTags.length === 0) {
-    return input.replace(/<[^>]*>/g, '').trim()
-  }
-  
-  // This is a basic implementation - for production, consider using DOMPurify or similar
-  return input.trim()
-}
 
 /**
  * Sanitize search query input
@@ -226,16 +210,6 @@ export const sanitizeModelId = (input) => {
   return input.replace(/[^\w\s\-./:]/g, '').trim()
 }
 
-/**
- * Sanitize password input. It only ensures it's a string.
- * It does not remove characters, as that could invalidate a correct password.
- * @param {any} input - The password to sanitize
- * @returns {string} - Sanitized password
- */
-export const sanitizePassword = (input) => {
-  if (typeof input !== 'string') return ''
-  return input
-}
 
 /**
  * Sanitize a string to contain only alphanumeric characters.
@@ -320,14 +294,23 @@ export const sanitizeInternalUrl = (input) => {
 
 /**
  * Sanitize MongoDB ObjectId to prevent injection attacks
- * @param {string|any} input - The ObjectId to sanitize
+ * @param {string|ObjectId|any} input - The ObjectId to sanitize (string or MongoDB ObjectId object)
  * @returns {string} - Sanitized ObjectId or empty string if invalid
  */
 export const sanitizeObjectId = (input) => {
-  if (!input || typeof input !== 'string') return ''
+  if (!input) return ''
+  
+  // Convert ObjectId objects to string
+  let inputString = input
+
+  if (typeof input === 'object' && input.toString) {
+    inputString = input.toString()
+  } else if (typeof input !== 'string') {
+    return ''
+  }
   
   // Remove any non-hex characters and trim whitespace
-  const sanitized = input.trim().replace(/[^a-fA-F0-9]/g, '')
+  const sanitized = inputString.trim().replace(/[^a-fA-F0-9]/g, '')
   
   // MongoDB ObjectIds must be exactly 24 characters long
   if (sanitized.length !== 24) return ''
@@ -361,22 +344,30 @@ export const sanitizeObject = (obj, schema) => {
   
   const sanitized = {}
   
-  for (const [key, sanitizer] of Object.entries(schema)) {
-    if (obj.hasOwnProperty(key)) {
+  // Check if there's a wildcard rule
+  const wildcardRule = schema['*']
+  
+  for (const [key, value] of Object.entries(obj)) {
+    let sanitizer = schema[key] || wildcardRule
+    
+    if (sanitizer) {
       if (typeof sanitizer === 'function') {
-        sanitized[key] = sanitizer(obj[key])
+        sanitized[key] = sanitizer(value)
       } else if (sanitizer === 'text') {
-        sanitized[key] = sanitizeText(obj[key])
+        sanitized[key] = sanitizeText(value)
       } else if (sanitizer === 'number') {
-        sanitized[key] = sanitizeNumber(obj[key])
+        sanitized[key] = sanitizeNumber(value)
       } else if (sanitizer === 'url') {
-        sanitized[key] = sanitizeUrl(obj[key])
+        sanitized[key] = sanitizeUrl(value)
       } else if (sanitizer === 'email') {
-        sanitized[key] = sanitizeEmail(obj[key])
+        sanitized[key] = sanitizeEmail(value)
       } else if (sanitizer === 'content') {
-        sanitized[key] = sanitizeContent(obj[key])
+        sanitized[key] = sanitizeContent(value)
       } else if (sanitizer === 'filename') {
-        sanitized[key] = sanitizeFilename(obj[key])
+        sanitized[key] = sanitizeFilename(value)
+      } else if (sanitizer === 'mixed') {
+        // For mixed content, pass through as-is (for action parameters)
+        sanitized[key] = value
       }
     }
   }
@@ -436,8 +427,8 @@ export const validators = {
   /**
    * Validate that a sanitized URL is valid
    */
-  validUrl: (url) => {
-    const sanitized = sanitizeUrl(url)
+  validUrl: (url, options = {}) => {
+    const sanitized = sanitizeUrl(url, options)
     if (!sanitized) return false
     
     try {
@@ -576,75 +567,7 @@ export const sanitizeScrapedHtml = (html) => {
     .trim()
 }
 
-/**
- * Sanitize URL query parameters to prevent injection attacks
- * @param {string|any} queryString - The query string to sanitize
- * @returns {string} - Sanitized query string
- */
-export const sanitizeUrlQuery = (queryString) => {
-  if (!queryString || typeof queryString !== 'string') return ''
-  
-  try {
-    const params = new URLSearchParams(queryString)
-    const sanitizedParams = new URLSearchParams()
-    
-    for (const [key, value] of params) {
-      // Sanitize parameter names and values
-      const cleanKey = key
-        .replace(/[<>"'&]/g, '') // Remove dangerous characters
-        .replace(/[^\w\-_.]/g, '') // Only allow word characters, hyphens, underscores, dots
-        .substring(0, 100) // Limit length
-      
-      const cleanValue = value
-        .replace(/[<>"']/g, '') // Remove dangerous characters
-        .replace(/javascript:/gi, '') // Remove javascript protocol
-        .replace(/data:/gi, '') // Remove data protocol
-        .substring(0, 500) // Limit length
-      
-      if (cleanKey && cleanValue) {
-        sanitizedParams.append(cleanKey, cleanValue)
-      }
-    }
-    
-    return sanitizedParams.toString()
-  } catch (error) {
-    return ''
-  }
-}
 
-/**
- * Sanitize HTTP headers to prevent header injection attacks
- * @param {Object|any} headers - The headers object to sanitize
- * @returns {Object} - Sanitized headers object
- */
-export const sanitizeHttpHeaders = (headers) => {
-  if (!headers || typeof headers !== 'object') return {}
-  
-  const sanitizedHeaders = {}
-  const allowedHeaders = [
-    'accept', 'accept-language', 'accept-encoding', 'user-agent',
-    'cache-control', 'content-type', 'content-length', 'referer',
-    'dnt', 'connection', 'upgrade-insecure-requests'
-  ]
-  
-  for (const [key, value] of Object.entries(headers)) {
-    const lowerKey = key.toLowerCase()
-    
-    // Only allow known safe headers
-    if (allowedHeaders.includes(lowerKey)) {
-      const sanitizedValue = String(value)
-        .replace(/[\r\n]/g, '') // Remove line breaks (header injection)
-        .replace(/[^\x20-\x7E]/g, '') // Remove non-printable characters
-        .substring(0, 500) // Limit length
-      
-      if (sanitizedValue) {
-        sanitizedHeaders[key] = sanitizedValue
-      }
-    }
-  }
-  
-  return sanitizedHeaders
-}
 
 /**
  * Sanitize extracted text content to remove potential security issues

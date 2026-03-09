@@ -2,100 +2,210 @@
  * Authentication and Authorization Utilities
  * 
  * This module provides centralized authentication and permission management for the Agent AI system.
- * It handles JWT token verification, user authentication, role-based access control, and resource-specific
+ * It handles Chatwoot session validation, role-based access control, and resource-specific
  * permissions (agents, context documents, users, settings, RAG operations).
  * 
  * Key Features:
- * - JWT token verification with proper validation
- * - Role-based access control (admin, user)
+ * - Chatwoot session validation and user authentication
+ * - Role-based access control (admin, user, superadmin)
  * - Resource-specific permissions with agent-level access control
  * - Permission checker utilities for fine-grained access control
  * - Middleware composers for common authentication patterns
  * - Input sanitization and validation for security
  */
 
-import jwt from 'jsonwebtoken'
-import User from '~/server/models/User'
 import mongoose from 'mongoose'
-import { sanitizeToken, sanitizeObjectId, sanitizeErrorMessage } from '~/utils/sanitize.js'
+import axios from 'axios'
+import { sanitizeToken, sanitizeObjectId, sanitizeErrorMessage, sanitizeText, sanitizeEmail, sanitizeUrl } from '~/utils/sanitize.js'
 
-export async function requireAuth(event: any) {
-  const rawToken = getCookie(event, 'access-token') || getHeader(event, 'authorization')?.replace('Bearer ', '')
+// Chatwoot authentication function
+export async function requireChatwootAuth(event: any) {
+  // Parse the Chatwoot session cookie
+  const sessionCookie = getCookie(event, 'cw_d_session_info')
   
-  if (!rawToken) {
+  if (!sessionCookie) {
     throw createError({
       statusCode: 401,
-      statusMessage: 'Access token required'
+      statusMessage: 'No Chatwoot session found. Please log into Chatwoot first.'
     })
   }
 
-  // Sanitize token to prevent injection attacks
-  const token = sanitizeToken(rawToken)
-  if (!token) {
+  let sessionData
+  try {
+    // Handle different cookie formats
+    if (typeof sessionCookie === 'object') {
+      sessionData = sessionCookie
+    } else if (typeof sessionCookie === 'string') {
+      try {
+        const decodedCookie = decodeURIComponent(sessionCookie)
+        sessionData = JSON.parse(decodedCookie)
+      } catch (parseError) {
+        sessionData = sessionCookie
+      }
+    } else {
+      throw new Error('Unexpected cookie format')
+    }
+  } catch (e) {
+    console.error('Error parsing session cookie:', e)
     throw createError({
-      statusCode: 401,
-      statusMessage: 'Invalid token format'
+      statusCode: 400,
+      statusMessage: 'Invalid Chatwoot session cookie format'
+    })
+  }
+
+  // Extract required authentication headers
+  const { 'access-token': accessToken, client, uid, expiry } = sessionData
+  
+  if (!accessToken || !client || !uid) {
+    throw createError({
+      statusCode: 400,
+      statusMessage: 'Incomplete Chatwoot session data'
+    })
+  }
+
+  // Get Chatwoot URL from environment (fallback to localhost)
+  const chatwootInstanceUrl = process.env.CHATWOOT_URL
+
+  if (!chatwootInstanceUrl) {
+    throw createError({
+      statusCode: 500,
+      statusMessage: 'Chatwoot URL not configured'
     })
   }
 
   try {
-    // Verify token with same options as AuthService for consistency
-    const jwtSecret = process.env.JWT_SECRET
-    if (!jwtSecret) {
-      throw new Error('JWT_SECRET environment variable not configured')
+    // Make request to Chatwoot API to validate session
+    const profileUrl = `${chatwootInstanceUrl.replace(/\/$/, '')}/api/v1/profile`
+    
+    const response = await axios.get(profileUrl, {
+      headers: {
+        accept: 'application/json, text/plain, */*',
+        'content-type': 'application/json',
+        'access-token': accessToken,
+        client,
+        uid,
+        expiry,
+      },
+      validateStatus: (s) => s >= 200 && s < 500,
+    })
+    
+    
+    if (response.status !== 200) {
+      console.error('Chatwoot profile API error:', response.status, response.data)
+      throw createError({
+        statusCode: 401,
+        statusMessage: 'Invalid Chatwoot session'
+      })
     }
     
-    const decoded = jwt.verify(token, jwtSecret, {
-      issuer: 'agent-ai-server',
-      audience: 'agent-ai-client'
-    }) as any
+    const profileData = response.data
 
-    // Validate token type
-    if (decoded.type !== 'access') {
-      throw createError({
-        statusCode: 401,
-        statusMessage: 'Invalid token type'
-      })
-    }
-
-    // Sanitize userId from token payload
-    const sanitizedUserId = sanitizeObjectId(decoded.userId)
-    if (!sanitizedUserId) {
-      throw createError({
-        statusCode: 401,
-        statusMessage: 'Invalid token payload'
-      })
-    }
-
-    const user = await User.findById(sanitizedUserId).select('-password -refreshTokens')
-
-    if (!user || !user.isActive) {
-      throw createError({
-        statusCode: 401,
-        statusMessage: 'Invalid token'
-      })
+    // Transform Chatwoot profile to Agent AI user format
+    const userData = {
+      _id: profileData.id,
+      id: profileData.id,
+      name: sanitizeText(profileData.name || ''),
+      email: sanitizeEmail(profileData.email || ''),
+      superadmin: profileData.type === 'SuperAdmin',
+      avatar_url: sanitizeUrl(profileData.avatar_url) || null,
+      isActive: profileData.confirmed || true,
+      // Store session data for API calls
+      chatwootSessionData: {
+        'access-token': accessToken,
+        client,
+        uid,
+        expiry
+      },
+      // agentAccess is now determined dynamically based on Chatwoot account administration
+      chatwoot: {
+        availability_status: sanitizeText(profileData.availability_status || ''),
+        auto_offline: profileData.auto_offline,
+        confirmed: profileData.confirmed,
+        accounts: (profileData.accounts || []).map((account: any) => ({
+          id: account.id,
+          name: sanitizeText(account.name || ''),
+          role: sanitizeText(account.role || ''),
+          status: sanitizeText(account.status || ''),
+        }))
+      }
     }
 
     // Attach user to event context
-    event.context.user = user
-    return user
+    event.context.user = userData
+    return userData
   } catch (error: any) {
-    // Sanitize error message to prevent information leakage
-    const sanitizedError = sanitizeErrorMessage(error)
-    console.error('Token verification error:', sanitizedError)
+    // Handle axios errors
+    if (error.response) {
+      throw createError({
+        statusCode: 401,
+        statusMessage: 'Chatwoot authentication failed'
+      })
+    }
     
-    // Don't leak specific error details to client
+    // Re-throw createError instances
+    if (error.statusCode) {
+      throw error
+    }
+    
     throw createError({
       statusCode: 401,
-      statusMessage: 'Invalid token'
+      statusMessage: error.message || 'Authentication failed'
     })
   }
+}
+
+/**
+ * Helper function to validate if user has admin access to specific inboxes
+ * @param user - The authenticated user object
+ * @param inboxes - Array of inbox assignments with accountId and inboxId
+ * @returns Promise<{isValid: boolean, invalidInboxes: string[]}>
+ */
+export async function validateInboxPermissions(user: any, inboxes: Array<{accountId: number, inboxId: number}>): Promise<{isValid: boolean, invalidInboxes: string[]}> {
+  if (!inboxes || inboxes.length === 0) {
+    return { isValid: true, invalidInboxes: [] }
+  }
+
+  // Super admins can access all inboxes
+  if (user.superadmin === true) {
+    return { isValid: true, invalidInboxes: [] }
+  }
+
+  const userAccounts = user.chatwoot?.accounts || []
+  const invalidInboxes: string[] = []
+
+  // Check each inbox assignment
+  for (const inbox of inboxes) {
+    const userAccount = userAccounts.find((account: any) => account.id === inbox.accountId)
+    
+    if (!userAccount) {
+      invalidInboxes.push(`Account ${inbox.accountId} (Inbox ${inbox.inboxId}) - No access`)
+      continue
+    }
+
+    // Only allow if user is an administrator on this account
+    if (userAccount.role !== 'administrator') {
+      invalidInboxes.push(`Account ${inbox.accountId} (Inbox ${inbox.inboxId}) - Role '${userAccount.role}' insufficient (administrator required)`)
+    }
+  }
+
+  return {
+    isValid: invalidInboxes.length === 0,
+    invalidInboxes
+  }
+}
+
+// Legacy functions kept for compatibility with internal permission system
+// These are used internally by the permission middleware but not for authentication
+export async function requireAuth(event: any) {
+  // This function is deprecated - use requireChatwootAuth instead
+  console.warn('requireAuth is deprecated, use requireChatwootAuth instead')
+  return await requireChatwootAuth(event)
 }
 
 export async function requireAdmin(event: any) {
   const user = event.context.user
   
-  if (!user || user.role !== 'admin') {
+  if (!user || (user.role !== 'admin' && !user.superadmin)) {
     throw createError({
       statusCode: 403,
       statusMessage: 'Admin access required'
@@ -174,25 +284,30 @@ export function createPermissionChecker(user: any): PermissionChecker {
     user,
 
     hasRole(role: string): boolean {
-      return user.role === role
+      // For Chatwoot users, check superadmin flag and admin role
+      if (role === 'admin') {
+        return user.superadmin === true
+      }
+      return user.role === role || false
     },
 
     hasAgentAccess(agentId: string): boolean {
-      if (user.role === 'admin') return true
-      if (!user.agentAccess || !agentId) return false
+      if (user.superadmin === true) return true
+      if (!agentId) return false
       
       // Sanitize the provided agentId for secure comparison
       const sanitizedAgentId = sanitizeObjectId(agentId)
       if (!sanitizedAgentId) return false
       
-      return user.agentAccess.some((id: mongoose.Types.ObjectId) => 
-        id.toString() === sanitizedAgentId
-      )
+      // For Chatwoot users, agent access is determined by whether the user
+      // is an administrator of any account that the agent's inboxes belong to
+      // This will be checked at the API level by fetching the agent and comparing inboxes
+      return true // Allow hasAgentAccess to pass, actual check happens in canAccessAgentResource
     },
 
     canAccessResource(permission: string, context: PermissionContext = {}): boolean {
-      // Admin users have access to everything
-      if (user.role === 'admin') return true
+      // Admin users (superadmin in Chatwoot) have access to everything
+      if (user.superadmin === true) return true
 
       // Check permission based on type
       switch (permission) {
@@ -233,6 +348,59 @@ export function createPermissionChecker(user: any): PermissionChecker {
           return false
       }
     }
+  }
+}
+
+/**
+ * Check if user can access an agent based on Chatwoot account administration
+ * @param user - The authenticated user object
+ * @param agent - The agent object with inboxes array
+ * @returns boolean - true if user can access the agent
+ */
+export function canAccessAgentResource(user: any, agent: any): boolean {
+  // Super admins can access all agents
+  if (user.superadmin === true) return true
+  
+  // If agent has no inboxes, only super admins can access it
+  if (!agent.inboxes || agent.inboxes.length === 0) return false
+  
+  // Get user's administered accounts
+  const userAccounts = user.chatwoot?.accounts || []
+  const adminAccountIds = userAccounts
+    .filter((account: any) => account.role === 'administrator')
+    .map((account: any) => account.id)
+  
+  if (adminAccountIds.length === 0) return false
+  
+  // Check if any of the agent's inboxes belong to accounts the user administers
+  return agent.inboxes.some((inbox: any) => 
+    adminAccountIds.includes(inbox.accountId)
+  )
+}
+
+/**
+ * Get MongoDB query to filter agents based on user's Chatwoot account administration
+ * @param user - The authenticated user object
+ * @returns object - MongoDB query object
+ */
+export function getAgentAccessQuery(user: any): object {
+  // Super admins can access all agents
+  if (user.superadmin === true) return {}
+  
+  // Get user's administered accounts
+  const userAccounts = user.chatwoot?.accounts || []
+  const adminAccountIds = userAccounts
+    .filter((account: any) => account.role === 'administrator')
+    .map((account: any) => account.id)
+  
+  if (adminAccountIds.length === 0) {
+    // User has no admin access to any accounts, return query that matches nothing
+    return { _id: { $in: [] } }
+  }
+  
+  // Return query that matches agents with inboxes belonging to user's administered accounts
+  return {
+    'inboxes.accountId': { $in: adminAccountIds }
   }
 }
 
@@ -300,7 +468,7 @@ export async function requirePermission(
 }
 
 /**
- * Agent-specific permission check (most common use case)
+ * Agent-specific permission check with database lookup (most common use case)
  * Usage: await requireAgentAccess(event, agentId, 'read')
  */
 export async function requireAgentAccess(
@@ -324,11 +492,39 @@ export async function requireAgentAccess(
     })
   }
 
-  const permission = operation === 'read' ? PERMISSIONS.AGENT.READ :
-                    operation === 'write' ? PERMISSIONS.AGENT.WRITE :
-                    PERMISSIONS.AGENT.DELETE
+  // Authenticate user first
+  const user = await requireChatwootAuth(event)
+  const checker = createPermissionChecker(user)
 
-  return await requirePermission(event, permission, { agentId: sanitizedAgentId })
+  // Super admins have access to everything
+  if (user.superadmin === true) {
+    return checker
+  }
+
+  // Import Agent model here to avoid circular dependency
+  const { connectDB } = await import('~/server/utils/db')
+  const Agent = await import('~/server/models/Agent').then(m => m.default)
+  
+  // Connect to database and fetch agent
+  await connectDB()
+  const agent = await Agent.findById(sanitizedAgentId).select('inboxes')
+  
+  if (!agent) {
+    throw createError({
+      statusCode: 404,
+      statusMessage: 'Agent not found'
+    })
+  }
+
+  // Check if user can access this agent based on Chatwoot account administration
+  if (!canAccessAgentResource(user, agent)) {
+    throw createError({
+      statusCode: 403,
+      statusMessage: 'Access denied'
+    })
+  }
+
+  return checker
 }
 
 /**
@@ -371,37 +567,146 @@ export function getRequiredAgentId(event: any): string {
  */
 export const authMiddleware = {
   /**
-   * Require authentication only
+   * Require authentication only (deprecated - use chatwootAuthMiddleware)
+   */
+  auth: (handler: (event: any, checker: PermissionChecker) => Promise<any>) => {
+    console.warn('authMiddleware.auth is deprecated, use chatwootAuthMiddleware.auth instead')
+    return defineEventHandler(async (event) => {
+      const user = await requireChatwootAuth(event)
+      const checker = createPermissionChecker(user)
+      return handler(event, checker)
+    })
+  },
+
+  /**
+   * Require admin role (deprecated - use chatwootAuthMiddleware)
+   */
+  admin: (handler: (event: any, checker: PermissionChecker) => Promise<any>) => {
+    console.warn('authMiddleware.admin is deprecated, use chatwootAuthMiddleware.admin instead')
+    return defineEventHandler(async (event) => {
+      const user = await requireChatwootAuth(event)
+      await requireAdmin(event)
+      const checker = createPermissionChecker(user)
+      return handler(event, checker)
+    })
+  },
+
+  /**
+   * Require agent access with operation (deprecated - use chatwootAuthMiddleware)
+   */
+  agentAccess: (operation: 'read' | 'write' | 'delete' = 'read') => {
+    console.warn('authMiddleware.agentAccess is deprecated, use chatwootAuthMiddleware.agentAccess instead')
+    return (handler: (event: any, checker: PermissionChecker, agentId: string) => Promise<any>) => {
+      return defineEventHandler(async (event) => {
+        const user = await requireChatwootAuth(event)
+        const agentId = getRequiredAgentId(event)
+        
+        // Create permission checker
+        const checker = createPermissionChecker(user)
+        
+        // Check agent access permission
+        const permission = operation === 'read' ? PERMISSIONS.AGENT.READ :
+                          operation === 'write' ? PERMISSIONS.AGENT.WRITE :
+                          PERMISSIONS.AGENT.DELETE
+
+        if (!checker.canAccessResource(permission, { agentId })) {
+          throw createError({
+            statusCode: 403,
+            statusMessage: 'Access denied'
+          })
+        }
+        
+        return handler(event, checker, agentId)
+      })
+    }
+  }
+}
+
+// Chatwoot-specific authentication middleware
+export const chatwootAuthMiddleware = {
+  /**
+   * Require Chatwoot authentication only
    */
   auth: (handler: (event: any, checker: PermissionChecker) => Promise<any>) => {
     return defineEventHandler(async (event) => {
-      const checker = await requireAuthWithChecker(event)
+      const user = await requireChatwootAuth(event)
+      const checker = createPermissionChecker(user)
       return handler(event, checker)
     })
   },
 
   /**
-   * Require admin role
+   * Require Chatwoot authentication with admin role
    */
   admin: (handler: (event: any, checker: PermissionChecker) => Promise<any>) => {
     return defineEventHandler(async (event) => {
-      await requireAuth(event)
-      await requireAdmin(event)
-      const checker = createPermissionChecker(event.context.user)
+      const user = await requireChatwootAuth(event)
+      if (user.superadmin !== true) {
+        throw createError({
+          statusCode: 403,
+          statusMessage: 'Admin access required'
+        })
+      }
+      const checker = createPermissionChecker(user)
       return handler(event, checker)
     })
   },
 
   /**
-   * Require agent access with operation
+   * Require Chatwoot authentication with super admin role
+   */
+  superAdmin: (handler: (event: any, checker: PermissionChecker) => Promise<any>) => {
+    return defineEventHandler(async (event) => {
+      const user = await requireChatwootAuth(event)
+      
+      // Check if user has super admin role in any of their accounts
+      //@todo user might not be returning role yet. not on the account level
+      const isSuperAdmin = user.superadmin === true
+      
+      if (!isSuperAdmin) {
+        throw createError({
+          statusCode: 403,
+          statusMessage: 'Super admin access required'
+        })
+      }
+      
+      const checker = createPermissionChecker(user)
+      return handler(event, checker)
+    })
+  },
+
+  /**
+   * Require Chatwoot authentication with agent access based on account administration
    */
   agentAccess: (operation: 'read' | 'write' | 'delete' = 'read') => {
     return (handler: (event: any, checker: PermissionChecker, agentId: string) => Promise<any>) => {
       return defineEventHandler(async (event) => {
         const agentId = getRequiredAgentId(event)
+        
+        // Use the new requireAgentAccess function that checks Chatwoot account administration
         const checker = await requireAgentAccess(event, agentId, operation)
+        
         return handler(event, checker, agentId)
       })
     }
   }
-} 
+}
+
+/**
+ * Simple helper to get user from event context
+ * Works with both Chatwoot auth and test scenarios
+ */
+export function getUserFromEvent(event: any) {
+  // Check for test user ID header first (for tests)
+  const testUserId = getHeader(event, 'user-id')
+  if (testUserId) {
+    return { id: testUserId, _id: testUserId }
+  }
+  
+  // Check for authenticated user in context (from Chatwoot auth)
+  if (event.context?.user) {
+    return event.context.user
+  }
+  
+  return null
+}

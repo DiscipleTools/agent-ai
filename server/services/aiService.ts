@@ -129,74 +129,33 @@ class AIService {
     settings: { temperature?: number, max_tokens?: number },
     agentId?: string
   ): Promise<string> {
-    // Determine if this is OpenAI API and model type
-    const isOpenAI = aiConfig.endpoint.includes('api.openai.com')
-    const isReasoningModel = isOpenAI && (
-      aiConfig.model.includes('gpt-5') ||
-      aiConfig.model.includes('o1') ||
-      aiConfig.model.includes('o3')
-    )
-
-    // Reasoning models need more tokens (for internal reasoning + response)
-    // Default to 4000 for reasoning models, 500 for others
-    const defaultTokens = isReasoningModel ? 4000 : 500
-    const maxTokensValue = settings.max_tokens || defaultTokens
-
-    const usesMaxCompletionTokens = isOpenAI && (
-      aiConfig.model.includes('gpt-5') ||
-      aiConfig.model.includes('gpt-4o') ||
-      aiConfig.model.includes('o1') ||
-      aiConfig.model.includes('o3')
-    )
-
-    // For reasoning models, convert system messages to user messages
-    let processedMessages = messages
-    if (isReasoningModel) {
-      processedMessages = messages.reduce((acc: OpenAIMessage[], msg, index) => {
-        if (msg.role === 'system') {
-          // Convert system message to a user message with developer instructions
-          if (index === 0 && messages[1]?.role === 'user') {
-            // Prepend system content to first user message
-            return acc
-          } else {
-            // Convert standalone system message to user message
-            return [...acc, { role: 'user', content: `[SYSTEM INSTRUCTIONS]\n${msg.content}` }]
-          }
-        } else if (msg.role === 'user' && index === 1 && messages[0]?.role === 'system') {
-          // This is the first user message after a system message, prepend the system content
-          return [...acc, { role: 'user', content: `${messages[0].content}\n\n---\n\n${msg.content}` }]
-        } else {
-          return [...acc, msg]
-        }
-      }, [])
-    }
-
     const requestBody: any = {
       model: aiConfig.model,
-      messages: processedMessages
+      messages
     }
 
-    // Reasoning models (gpt-5, o1, o3) don't support custom temperature
-    if (!isReasoningModel) {
+    // Handle temperature restrictions for newer models
+    if (aiConfig.model.includes('gpt-5') || aiConfig.model.includes('o1')) {
+      // GPT-5 and o1 models only support default temperature (1)
+      requestBody.temperature = 1
+    } else {
       requestBody.temperature = settings.temperature || 0.3
     }
 
-    // Use appropriate token parameter based on model
-    if (usesMaxCompletionTokens) {
-      requestBody.max_completion_tokens = maxTokensValue
+    // Use max_completion_tokens for GPT-4o and newer models, max_tokens for older models
+    // For reasoning models, use a higher default to allow for both reasoning and completion
+    let maxTokens = settings.max_tokens || 500
+    if (aiConfig.model.includes('gpt-5') || aiConfig.model.includes('o1')) {
+      // Reasoning models need more tokens - increase default
+      maxTokens = settings.max_tokens || 2000
+      requestBody.max_completion_tokens = maxTokens
+    } else if (aiConfig.model.includes('gpt-4o')) {
+      requestBody.max_completion_tokens = maxTokens
     } else {
-      requestBody.max_tokens = maxTokensValue
+      requestBody.max_tokens = maxTokens
     }
 
-    console.log('Sending request to AI service:', {
-      endpoint: `${aiConfig.endpoint}/chat/completions`,
-      model: requestBody.model,
-      temperature: requestBody.temperature || 'default',
-      max_tokens: maxTokensValue,
-      tokenParam: usesMaxCompletionTokens ? 'max_completion_tokens' : 'max_tokens',
-      isReasoningModel,
-      messageCount: messages.length
-    })
+    console.log('Sending request to AI service')
 
     const response = await fetch(`${aiConfig.endpoint}/chat/completions`, {
       method: 'POST',
@@ -220,20 +179,20 @@ class AIService {
     }
 
     const data: OpenAIResponse = await response.json()
-    
-    console.log('AI API response:', {
-      id: data.id,
-      model: data.model,
-      usage: data.usage,
-      choicesCount: data.choices?.length || 0
-    })
 
     if (!data.choices || !data.choices[0] || !data.choices[0].message) {
       console.error('Invalid response format from AI API:', data)
       throw new Error('Invalid response format from AI API - missing choices or message')
     }
 
-    return data.choices[0].message.content
+    const content = data.choices[0].message.content
+
+    if (!content || content.trim().length === 0) {
+      console.error('Empty content from AI API. Full response:', JSON.stringify(data, null, 2))
+      throw new Error('AI API returned empty content')
+    }
+
+    return content
   }
 
   private async getAIConfig(agentId: string): Promise<{ apiKey: string; endpoint: string; model: string }> {
@@ -369,7 +328,9 @@ class AIService {
         // Fallback to traditional context document concatenation if RAG is not available
         systemPrompt = this.appendContextDocuments(systemPrompt, contextDocuments)
       }
-    } catch (ragError) {
+
+    } catch (ragError: any) {
+      console.warn('RAG service unavailable, falling back to traditional context documents:', ragError.message)
       // Fallback to traditional context documents
       systemPrompt = this.appendContextDocuments(systemPrompt, contextDocuments)
     }
@@ -390,8 +351,38 @@ class AIService {
     return systemPrompt
   }
 
-  delay(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms))
+
+  /**
+   * Generate a simple AI response without RAG or context documents
+   * Uses the default connection/model. Useful for utility tasks like toxicity detection
+   */
+  async generateSimpleResponse(
+    systemPrompt: string,
+    userMessage: string
+  ): Promise<string> {
+    try {
+      const aiConfig = await this.getRequestedModel()
+
+      if (!aiConfig.apiKey) {
+        throw new Error('No AI connection configured')
+      }
+
+      const messages: OpenAIMessage[] = [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userMessage }
+      ]
+
+      const generatedContent = await this.executeAICall(aiConfig, messages, {})
+
+      if (!generatedContent || generatedContent.trim().length === 0) {
+        throw new Error('Empty response content from AI API')
+      }
+
+      return generatedContent.trim()
+    } catch (error: any) {
+      console.error('AI Service Error (simple response):', error.message)
+      throw new Error(`Failed to generate AI response: ${error.message}`)
+    }
   }
 
   // Method to get available models for a specific connection
